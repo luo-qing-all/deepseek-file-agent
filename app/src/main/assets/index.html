@@ -4,585 +4,175 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#ffffff">
-<meta name="format-detection" content="telephone=no">
-<meta name="apple-mobile-web-app-capable" content="yes">
 <title>DeepSeek</title>
 <style>
-:root{
-  --bg:#ffffff;
-  --fg:#16181d;
-  --muted:#8a8f99;
-  --line:#eceef2;
-  --accent:#4d6bfe;
-  --bubble-ai:#f4f5f7;
-  --radius:18px;
-}
+:root{--bg:#fff;--fg:#16181d;--muted:#8a8f99;--line:#eceef2;--accent:#4d6bfe;--bubble-ai:#f4f5f7;--radius:18px}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{height:100%}
-body{
-  margin:0;
-  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",Arial,sans-serif;
-  background:var(--bg);color:var(--fg);
-  display:flex;flex-direction:column;
-  height:100vh;height:100dvh;
-  overflow:hidden;font-size:16px;
-  -webkit-font-smoothing:antialiased;
-}
-header{
-  flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;
-  padding:calc(10px + env(safe-area-inset-top)) 16px 10px;
-  border-bottom:1px solid var(--line);
-  background:rgba(255,255,255,.92);
-  backdrop-filter:saturate(180%) blur(12px);
-  -webkit-backdrop-filter:saturate(180%) blur(12px);
-}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;background:var(--bg);color:var(--fg);display:flex;flex-direction:column;height:100vh;height:100dvh;overflow:hidden;font-size:16px;-webkit-font-smoothing:antialiased}
+header{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;padding:calc(10px + env(safe-area-inset-top)) 16px 10px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.92);backdrop-filter:saturate(180%) blur(12px);-webkit-backdrop-filter:saturate(180%) blur(12px)}
 header .title{font-size:17px;font-weight:600;letter-spacing:.2px}
 header .title small{font-size:11px;font-weight:400;color:var(--muted);margin-left:6px}
-.icon-btn{
-  border:none;background:transparent;color:var(--fg);
-  width:38px;height:38px;border-radius:50%;
-  display:flex;align-items:center;justify-content:center;
-  padding:0;
-}
+.icon-btn{border:none;background:transparent;color:var(--fg);width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;padding:0}
 .icon-btn:active{background:#f0f1f4}
 .header-left{display:flex;align-items:center;gap:2px}
 .header-left .icon-btn{margin-left:-8px;margin-right:4px}
-#chat{
-  flex:1 1 auto;overflow-y:auto;overscroll-behavior:contain;
-  -webkit-overflow-scrolling:touch;
-  padding:16px 14px 8px;
-}
-.welcome{
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  height:100%;min-height:44vh;color:var(--muted);user-select:none;
-}
-.welcome .logo{
-  width:56px;height:56px;border-radius:18px;
-  background:linear-gradient(135deg,#4d6bfe,#7d93ff);
-  color:#fff;font-weight:700;font-size:20px;letter-spacing:.5px;
-  display:flex;align-items:center;justify-content:center;
-  box-shadow:0 8px 20px rgba(77,107,254,.28);
-  margin-bottom:14px;
-}
+#chat{flex:1 1 auto;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:16px 14px 8px}
+.welcome{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:44vh;color:var(--muted);user-select:none}
+.welcome .logo{width:56px;height:56px;border-radius:18px;background:linear-gradient(135deg,#4d6bfe,#7d93ff);color:#fff;font-weight:700;font-size:20px;letter-spacing:.5px;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px rgba(77,107,254,.28);margin-bottom:14px}
 .welcome p{margin:0;font-size:14px}
 .msg{display:flex;margin-bottom:14px;animation:pop .22s ease}
 @keyframes pop{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .msg.user{justify-content:flex-end}
-.msg .bubble{
-  max-width:84%;
-  padding:10px 14px;
-  border-radius:var(--radius);
-  font-size:15px;line-height:1.6;
-  word-break:break-word;
-}
-.msg.user .bubble{
-  background:var(--accent);color:#fff;
-  border-bottom-right-radius:6px;
-  white-space:pre-wrap;
-}
-.msg.ai .bubble{
-  background:var(--bubble-ai);
-  border-bottom-left-radius:6px;
-  white-space:pre-wrap;
-}
+.msg .bubble{max-width:84%;padding:10px 14px;border-radius:var(--radius);font-size:15px;line-height:1.6;word-break:break-word}
+.msg.user .bubble{background:var(--accent);color:#fff;border-bottom-right-radius:6px;white-space:pre-wrap}
+.msg.ai .bubble{background:var(--bubble-ai);border-bottom-left-radius:6px;white-space:pre-wrap}
 .msg.ai .bubble.error{background:#fff2f2;color:#c0392b}
-.tool-call-tip{
-  display:inline-flex;align-items:center;gap:5px;
-  margin:0 0 8px;padding:5px 10px;
-  background:rgba(52,199,89,.1);
-  border-radius:10px;
-  font-size:12px;color:#34c759;font-weight:500;
-}
+.tool-call-tip{display:inline-flex;align-items:center;gap:5px;margin:0 0 8px;padding:5px 10px;background:rgba(52,199,89,.1);border-radius:10px;font-size:12px;color:#34c759;font-weight:500}
 .tool-call-tip::before{content:'🔧';font-size:13px}
-.msg.user .msg-images{
-  display:flex;flex-wrap:wrap;gap:5px;
-  margin-top:8px;
-}
-.msg.user .msg-images img{
-  max-width:110px;max-height:110px;
-  border-radius:9px;display:block;
-  object-fit:cover;
-  border:1px solid rgba(255,255,255,.35);
-}
-.msg.user .msg-files{
-  display:flex;flex-wrap:wrap;gap:5px;
-  margin-top:8px;
-}
-.msg.user .msg-file-tag{
-  display:inline-flex;align-items:center;gap:4px;
-  padding:4px 9px;border-radius:8px;
-  background:rgba(255,255,255,.2);
-  font-size:12px;
-}
+.msg.user .msg-images{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.msg.user .msg-images img{max-width:110px;max-height:110px;border-radius:9px;display:block;object-fit:cover;border:1px solid rgba(255,255,255,.35)}
+.msg.user .msg-files{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.msg.user .msg-file-tag{display:inline-flex;align-items:center;gap:4px;padding:4px 9px;border-radius:8px;background:rgba(255,255,255,.2);font-size:12px}
 .msg.ai .content{display:inline}
-.msg.ai .bubble.streaming .content::after{
-  content:'';display:inline-block;width:2px;height:1em;
-  background:var(--accent);vertical-align:-.15em;margin-left:3px;
-  border-radius:1px;animation:blink 1s step-end infinite;
-}
+.msg.ai .bubble.streaming .content::after{content:'';display:inline-block;width:2px;height:1em;background:var(--accent);vertical-align:-.15em;margin-left:3px;border-radius:1px;animation:blink 1s step-end infinite}
 @keyframes blink{50%{opacity:0}}
-.reason{
-  margin:0 0 8px;padding:8px 10px;
-  background:rgba(0,0,0,.035);border-radius:12px;
-  font-size:12.5px;color:#6b7280;line-height:1.55;
-}
-.reason summary{
-  cursor:pointer;list-style:none;font-weight:600;
-  color:#8a8f99;outline:none;
-}
+.reason{margin:0 0 8px;padding:8px 10px;background:rgba(0,0,0,.035);border-radius:12px;font-size:12.5px;color:#6b7280;line-height:1.55}
+.reason summary{cursor:pointer;list-style:none;font-weight:600;color:#8a8f99;outline:none}
 .reason summary::-webkit-details-marker{display:none}
 .reason summary::before{content:'▸ ';display:inline-block;transition:transform .2s}
 .reason[open] summary::before{transform:rotate(90deg)}
 .reason-text{white-space:pre-wrap;margin-top:6px;max-height:220px;overflow-y:auto}
-.usage-bar{
-  display:none;
-  padding:6px 10px;
-  font-size:11px;
-  color:var(--muted);
-  text-align:right;
-  border-top:1px dashed var(--line);
-  margin-top:4px;
-}
+.usage-bar{display:none;padding:6px 10px;font-size:11px;color:var(--muted);text-align:right;border-top:1px dashed var(--line);margin-top:4px}
 .usage-bar.show{display:block}
 .usage-bar span{margin-left:8px}
 .usage-bar .usage-accent{color:var(--accent);font-weight:600}
-.composer{
-  flex:0 0 auto;
-  padding:10px 12px calc(10px + env(safe-area-inset-bottom));
-  border-top:1px solid var(--line);
-  background:#fff;
-}
+.composer{flex:0 0 auto;padding:10px 12px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:#fff}
 .composer-inner{display:flex;align-items:flex-end;gap:6px}
-.quick-bar{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  padding:0 4px 8px;
-  overflow-x:auto;
-  -webkit-overflow-scrolling:touch;
-}
-.quick-btn{
-  display:inline-flex;
-  align-items:center;
-  gap:5px;
-  padding:6px 12px;
-  border-radius:16px;
-  border:1px solid var(--line);
-  background:#fff;
-  color:var(--muted);
-  font-size:12px;
-  font-family:inherit;
-  font-weight:500;
-  transition:all .18s;
-  cursor:pointer;
-  flex:0 0 auto;
-  max-width:180px;
-}
+.quick-bar{display:flex;align-items:center;gap:8px;padding:0 4px 8px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.quick-btn{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:16px;border:1px solid var(--line);background:#fff;color:var(--muted);font-size:12px;font-family:inherit;font-weight:500;transition:all .18s;cursor:pointer;flex:0 0 auto;max-width:180px}
 .quick-btn:active{transform:scale(.95)}
-.quick-btn.active{
-  background:rgba(77,107,254,.08);
-  border-color:var(--accent);
-  color:var(--accent);
-}
-.quick-btn.disabled{opacity:.4;cursor:not-allowed;}
+.quick-btn.active{background:rgba(77,107,254,.08);border-color:var(--accent);color:var(--accent)}
+.quick-btn.disabled{opacity:.4;cursor:not-allowed}
 .quick-btn.disabled:active{transform:none}
 .quick-btn svg{flex:0 0 auto}
 .quick-btn span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.preview-bar{
-  display:none;gap:8px;
-  padding:0 4px 10px;
-  overflow-x:auto;
-  -webkit-overflow-scrolling:touch;
-}
+.preview-bar{display:none;gap:8px;padding:0 4px 10px;overflow-x:auto;-webkit-overflow-scrolling:touch}
 .preview-bar.has-items{display:flex}
 .preview-item{position:relative;flex:0 0 auto;width:64px;height:64px}
-.preview-item img{
-  width:100%;height:100%;object-fit:cover;
-  border-radius:10px;display:block;
-  border:1px solid var(--line);
-}
-.preview-item.file-preview{
-  width:auto;min-width:100px;max-width:160px;height:64px;
-  background:#f4f5f7;border-radius:10px;
-  display:flex;align-items:center;gap:8px;
-  padding:0 12px;
-  border:1px solid var(--line);
-}
-.preview-item.file-preview .file-icon{
-  width:30px;height:30px;flex:0 0 auto;
-  background:var(--accent);color:#fff;border-radius:6px;
-  display:flex;align-items:center;justify-content:center;
-  font-size:10px;font-weight:700;
-}
+.preview-item img{width:100%;height:100%;object-fit:cover;border-radius:10px;display:block;border:1px solid var(--line)}
+.preview-item.file-preview{width:auto;min-width:100px;max-width:160px;height:64px;background:#f4f5f7;border-radius:10px;display:flex;align-items:center;gap:8px;padding:0 12px;border:1px solid var(--line)}
+.preview-item.file-preview .file-icon{width:30px;height:30px;flex:0 0 auto;background:var(--accent);color:#fff;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}
 .preview-item.file-preview .file-meta{flex:1;min-width:0}
-.preview-item.file-preview .file-name{
-  font-size:12px;font-weight:500;color:var(--fg);
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-}
-.preview-item.file-preview .file-size{
-  font-size:10.5px;color:var(--muted);margin-top:2px;
-}
-.preview-item .rm{
-  position:absolute;top:-6px;right:-6px;
-  width:22px;height:22px;border-radius:50%;
-  background:rgba(22,24,29,.82);color:#fff;
-  border:2px solid #fff;
-  display:flex;align-items:center;justify-content:center;
-  font-size:14px;line-height:1;padding:0;
-}
+.preview-item.file-preview .file-name{font-size:12px;font-weight:500;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.preview-item.file-preview .file-size{font-size:10.5px;color:var(--muted);margin-top:2px}
+.preview-item .rm{position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;background:rgba(22,24,29,.82);color:#fff;border:2px solid #fff;display:flex;align-items:center;justify-content:center;padding:0}
 .preview-item .rm svg{display:block}
-#input{
-  flex:1;resize:none;border:none;outline:none;
-  background:#f4f5f7;border-radius:20px;
-  padding:11px 15px;font-size:16px;line-height:1.4;
-  font-family:inherit;color:inherit;
-  max-height:120px;min-height:42px;
-  transition:background .15s;
-  min-width:0;
-}
+#input{flex:1;resize:none;border:none;outline:none;background:#f4f5f7;border-radius:20px;padding:11px 15px;font-size:16px;line-height:1.4;font-family:inherit;color:inherit;max-height:120px;min-height:42px;transition:background .15s;min-width:0}
 #input:focus{background:#eef0f4}
-.btn-round{
-  flex:0 0 auto;width:38px;height:38px;border-radius:50%;
-  border:none;background:#f4f5f7;color:#5b6069;
-  display:flex;align-items:center;justify-content:center;
-  padding:0;transition:transform .12s,opacity .15s,background .15s;
-}
+.btn-round{flex:0 0 auto;width:38px;height:38px;border-radius:50%;border:none;background:#f4f5f7;color:#5b6069;display:flex;align-items:center;justify-content:center;padding:0;transition:transform .12s,opacity .15s,background .15s}
 .btn-round:active{transform:scale(.92);background:#e8eaef}
 .btn-round:disabled{opacity:.4}
-#send{
-  flex:0 0 auto;width:42px;height:42px;border-radius:50%;
-  border:none;background:var(--accent);color:#fff;
-  display:flex;align-items:center;justify-content:center;
-  padding:0;transition:transform .12s,opacity .15s;
-}
+#send{flex:0 0 auto;width:42px;height:42px;border-radius:50%;border:none;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;padding:0;transition:transform .12s,opacity .15s}
 #send:active{transform:scale(.92)}
 #send:disabled{background:#dfe1e6;color:#fff}
 #send.stop{background:#16181d}
-.loading-mask{
-  position:fixed;inset:0;z-index:90;
-  background:rgba(255,255,255,.78);
-  backdrop-filter:blur(3px);
-  -webkit-backdrop-filter:blur(3px);
-  display:none;align-items:center;justify-content:center;
-  flex-direction:column;gap:14px;
-}
+.loading-mask{position:fixed;inset:0;z-index:90;background:rgba(255,255,255,.78);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px}
 .loading-mask.show{display:flex}
-.spinner{
-  width:38px;height:38px;border-radius:50%;
-  border:3px solid #dfe1e6;border-top-color:var(--accent);
-  animation:spin .8s linear infinite;
-}
+.spinner{width:38px;height:38px;border-radius:50%;border:3px solid #dfe1e6;border-top-color:var(--accent);animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 .loading-mask p{margin:0;font-size:13.5px;color:#5b6069}
 .drawer{position:fixed;inset:0;z-index:70;pointer-events:none}
 .drawer.open{pointer-events:auto}
-.drawer-backdrop{
-  position:absolute;inset:0;background:rgba(0,0,0,.35);
-  opacity:0;transition:opacity .28s;
-}
+.drawer-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.35);opacity:0;transition:opacity .28s}
 .drawer.open .drawer-backdrop{opacity:1}
-.drawer-panel{
-  position:absolute;left:0;top:0;bottom:0;
-  width:86%;max-width:340px;
-  background:#fff;
-  transform:translateX(-101%);
-  transition:transform .3s cubic-bezier(.32,.72,0,1);
-  display:flex;flex-direction:column;
-  padding-top:env(safe-area-inset-top);
-  padding-bottom:env(safe-area-inset-bottom);
-  box-shadow:4px 0 20px rgba(0,0,0,.06);
-}
+.drawer-panel{position:absolute;left:0;top:0;bottom:0;width:86%;max-width:340px;background:#fff;transform:translateX(-101%);transition:transform .3s cubic-bezier(.32,.72,0,1);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);box-shadow:4px 0 20px rgba(0,0,0,.06)}
 .drawer.open .drawer-panel{transform:translateX(0)}
-.drawer-head{
-  padding:16px 18px 12px;
-  display:flex;align-items:center;justify-content:space-between;
-  border-bottom:1px solid var(--line);
-}
+.drawer-head{padding:16px 18px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}
 .drawer-head h2{margin:0;font-size:17px;font-weight:600}
 .drawer-head-actions{display:flex;gap:2px}
 .drawer-search{padding:10px 14px 6px}
-.drawer-search input{
-  width:100%;padding:9px 13px;
-  border:1px solid var(--line);border-radius:10px;
-  font-size:14px;font-family:inherit;color:inherit;
-  background:#f7f8fa;outline:none;
-  -webkit-appearance:none;
-}
+.drawer-search input{width:100%;padding:9px 13px;border:1px solid var(--line);border-radius:10px;font-size:14px;font-family:inherit;color:inherit;background:#f7f8fa;outline:none;-webkit-appearance:none}
 .drawer-search input:focus{border-color:var(--accent);background:#fff}
-.drawer-list{
-  flex:1;overflow-y:auto;
-  -webkit-overflow-scrolling:touch;
-  padding:6px 8px;
-}
-.history-item{
-  display:flex;align-items:center;gap:10px;
-  padding:11px 12px;
-  border-radius:12px;
-  cursor:pointer;
-}
+.drawer-list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:6px 8px}
+.history-item{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:12px;cursor:pointer}
 .history-item:active{background:#f4f5f7}
 .history-item.active{background:rgba(77,107,254,.08)}
 .history-item-body{flex:1;min-width:0}
-.history-item-title{
-  font-size:14px;font-weight:500;color:var(--fg);
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  margin-bottom:2px;
-}
-.history-item-meta{
-  font-size:11px;color:var(--muted);
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-}
+.history-item-title{font-size:14px;font-weight:500;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
+.history-item-meta{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .history-item-actions{display:flex;gap:0;flex:0 0 auto}
-.history-icon-btn{
-  width:30px;height:30px;
-  border:none;background:transparent;color:var(--muted);
-  border-radius:8px;
-  display:flex;align-items:center;justify-content:center;
-  padding:0;cursor:pointer;
-}
+.history-icon-btn{width:30px;height:30px;border:none;background:transparent;color:var(--muted);border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer}
 .history-icon-btn:active{background:#eef0f4}
-.history-empty{
-  text-align:center;padding:40px 20px;color:var(--muted);font-size:13px;
-}
+.history-empty{text-align:center;padding:40px 20px;color:var(--muted);font-size:13px}
 .sheet{position:fixed;inset:0;z-index:60;pointer-events:none}
 .sheet.open{pointer-events:auto}
-.sheet-backdrop{
-  position:absolute;inset:0;background:rgba(0,0,0,.35);
-  opacity:0;transition:opacity .28s;
-}
+.sheet-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.35);opacity:0;transition:opacity .28s}
 .sheet.open .sheet-backdrop{opacity:1}
-.sheet-panel{
-  position:absolute;left:0;right:0;bottom:0;
-  background:#fff;border-radius:22px 22px 0 0;
-  padding:8px 20px calc(22px + env(safe-area-inset-bottom));
-  transform:translateY(101%);
-  transition:transform .3s cubic-bezier(.32,.72,0,1);
-  max-height:88vh;max-height:88dvh;overflow-y:auto;
-  -webkit-overflow-scrolling:touch;
-}
+.sheet-panel{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:22px 22px 0 0;padding:8px 20px calc(22px + env(safe-area-inset-bottom));transform:translateY(101%);transition:transform .3s cubic-bezier(.32,.72,0,1);max-height:88vh;max-height:88dvh;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .sheet.open .sheet-panel{transform:translateY(0)}
-.sheet-handle{
-  width:38px;height:4px;border-radius:2px;background:#dcdfe5;
-  margin:6px auto 12px;
-}
-.sheet-head{
-  display:flex;align-items:center;justify-content:space-between;
-  margin-bottom:18px;
-}
+.sheet-handle{width:38px;height:4px;border-radius:2px;background:#dcdfe5;margin:6px auto 12px}
+.sheet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
 .sheet-head h2{margin:0;font-size:17px;font-weight:600}
-.sheet-head button{
-  border:none;background:transparent;color:var(--accent);
-  font-size:15px;font-family:inherit;padding:4px 0;
-}
+.sheet-head button{border:none;background:transparent;color:var(--accent);font-size:15px;font-family:inherit;padding:4px 0}
 .field{margin-bottom:20px}
-.field > label{
-  display:flex;align-items:center;justify-content:space-between;
-  font-size:13.5px;font-weight:600;color:#3f434b;
-  margin-bottom:8px;letter-spacing:.2px;
-}
-.field .val{
-  font-weight:500;color:var(--accent);font-size:12.5px;
-  font-variant-numeric:tabular-nums;
-}
-input[type=text],input[type=password],input[type=number],textarea{
-  width:100%;padding:11px 13px;
-  border:1px solid var(--line);border-radius:12px;
-  font-size:16px;font-family:inherit;color:inherit;
-  background:#fafbfc;outline:none;
-  transition:border-color .15s,background .15s;
-  -webkit-appearance:none;
-  resize:vertical;
-}
-input[type=text]:focus,input[type=password]:focus,input[type=number]:focus,textarea:focus{
-  border-color:var(--accent);background:#fff;
-}
+.field > label{display:flex;align-items:center;justify-content:space-between;font-size:13.5px;font-weight:600;color:#3f434b;margin-bottom:8px;letter-spacing:.2px}
+.field .val{font-weight:500;color:var(--accent);font-size:12.5px;font-variant-numeric:tabular-nums}
+input[type=text],input[type=password],input[type=number],textarea{width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:12px;font-size:16px;font-family:inherit;color:inherit;background:#fafbfc;outline:none;transition:border-color .15s,background .15s;-webkit-appearance:none;resize:vertical}
+input[type=text]:focus,input[type=password]:focus,input[type=number]:focus,textarea:focus{border-color:var(--accent);background:#fff}
 .input-wrap{position:relative}
 .input-wrap input{padding-right:66px}
-.eye{
-  position:absolute;right:4px;top:50%;transform:translateY(-50%);
-  border:none;background:transparent;color:var(--accent);
-  font-size:14px;font-family:inherit;padding:8px 12px;
-}
+.eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);border:none;background:transparent;color:var(--accent);font-size:14px;font-family:inherit;padding:8px 12px}
 .segment{display:flex;background:#f4f5f7;border-radius:12px;padding:3px;gap:3px}
-.segment button{
-  flex:1;border:none;background:transparent;
-  padding:9px 2px;border-radius:9px;
-  font-size:11.5px;font-family:inherit;font-weight:500;
-  color:var(--muted);transition:background .15s,color .15s;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-}
-.segment button.active{
-  background:#fff;color:var(--fg);
-  box-shadow:0 1px 3px rgba(0,0,0,.08);
-}
-input[type=range]{
-  -webkit-appearance:none;appearance:none;
-  width:100%;height:4px;border-radius:2px;
-  background:#e6e8ec;outline:none;margin:10px 0 2px;
-}
-input[type=range]::-webkit-slider-thumb{
-  -webkit-appearance:none;appearance:none;
-  width:22px;height:22px;border-radius:50%;
-  background:#fff;border:2px solid var(--accent);
-  box-shadow:0 1px 5px rgba(0,0,0,.18);cursor:pointer;
-}
-input[type=range]::-moz-range-thumb{
-  width:20px;height:20px;border-radius:50%;
-  background:#fff;border:2px solid var(--accent);
-  box-shadow:0 1px 5px rgba(0,0,0,.18);
-}
+.segment button{flex:1;border:none;background:transparent;padding:9px 2px;border-radius:9px;font-size:11.5px;font-family:inherit;font-weight:500;color:var(--muted);transition:background .15s,color .15s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.segment button.active{background:#fff;color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:2px;background:#e6e8ec;outline:none;margin:10px 0 2px}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;border:2px solid var(--accent);box-shadow:0 1px 5px rgba(0,0,0,.18);cursor:pointer}
 .switch{position:relative;display:inline-block;width:48px;height:28px;flex:0 0 auto}
 .switch input{opacity:0;width:0;height:0;position:absolute}
-.switch .slider{
-  position:absolute;inset:0;background:#dfe1e6;border-radius:14px;
-  transition:background .2s;cursor:pointer;
-}
-.switch .slider::before{
-  content:'';position:absolute;width:24px;height:24px;left:2px;top:2px;
-  background:#fff;border-radius:50%;transition:transform .2s;
-  box-shadow:0 1px 3px rgba(0,0,0,.22);
-}
+.switch .slider{position:absolute;inset:0;background:#dfe1e6;border-radius:14px;transition:background .2s;cursor:pointer}
+.switch .slider::before{content:'';position:absolute;width:24px;height:24px;left:2px;top:2px;background:#fff;border-radius:50%;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.22)}
 .switch input:checked + .slider{background:var(--accent)}
 .switch input:checked + .slider::before{transform:translateX(20px)}
-.btn-ghost{
-  width:100%;padding:12px;border-radius:12px;
-  border:1px solid var(--line);background:#fff;
-  color:#e5484d;font-size:15px;font-family:inherit;font-weight:500;
-}
+.btn-ghost{width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:#fff;color:#e5484d;font-size:15px;font-family:inherit;font-weight:500}
 .btn-ghost:active{background:#fafafa}
-.desc{
-  font-size:11.5px;color:var(--muted);line-height:1.65;
-  margin:7px 0 0;letter-spacing:.1px;
-  min-height:18px;
-}
+.desc{font-size:11.5px;color:var(--muted);line-height:1.65;margin:7px 0 0;letter-spacing:.1px;min-height:18px}
 .desc b{color:#7a8090;font-weight:600}
 .skill-list{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
-.skill-item{
-  display:flex;align-items:center;gap:10px;
-  padding:12px 14px;
-  border:1px solid var(--line);border-radius:14px;
-  background:#fafbfc;
-  transition:all .15s;
-  cursor:pointer;
-}
-.skill-item.active{
-  border-color:var(--accent);
-  background:rgba(77,107,254,.06);
-}
+.skill-item{display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:#fafbfc;transition:all .15s;cursor:pointer}
+.skill-item.active{border-color:var(--accent);background:rgba(77,107,254,.06)}
 .skill-item-body{flex:1;min-width:0}
-.skill-item-name{
-  font-size:14px;font-weight:600;color:var(--fg);
-  margin-bottom:2px;
-  display:flex;align-items:center;gap:6px;
-}
-.skill-badge{
-  display:inline-block;
-  padding:1px 6px;border-radius:6px;
-  font-size:9.5px;font-weight:600;
-  background:rgba(77,107,254,.12);color:var(--accent);
-}
-.skill-item-preview{
-  font-size:11.5px;color:var(--muted);
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-}
+.skill-item-name{font-size:14px;font-weight:600;color:var(--fg);margin-bottom:2px;display:flex;align-items:center;gap:6px}
+.skill-badge{display:inline-block;padding:1px 6px;border-radius:6px;font-size:9.5px;font-weight:600;background:rgba(77,107,254,.12);color:var(--accent)}
+.skill-item-preview{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .skill-item-actions{display:flex;gap:2px;flex:0 0 auto}
-.skill-icon-btn{
-  width:32px;height:32px;
-  border:none;background:transparent;color:var(--muted);
-  border-radius:8px;
-  display:flex;align-items:center;justify-content:center;
-  padding:0;cursor:pointer;
-}
+.skill-icon-btn{width:32px;height:32px;border:none;background:transparent;color:var(--muted);border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer}
 .skill-icon-btn:active{background:#eef0f4}
-.skill-empty{
-  text-align:center;padding:24px 0;
-  color:var(--muted);font-size:13px;
-}
-.skill-editor{
-  padding:14px;
-  border:1px solid var(--accent);border-radius:14px;
-  background:#fff;margin-bottom:16px;
-  display:none;
-}
+.skill-empty{text-align:center;padding:24px 0;color:var(--muted);font-size:13px}
+.skill-editor{padding:14px;border:1px solid var(--accent);border-radius:14px;background:#fff;margin-bottom:16px;display:none}
 .skill-editor.show{display:block}
-.skill-editor-title{
-  font-size:13px;font-weight:600;color:#5b6069;
-  margin-bottom:10px;
-  display:flex;align-items:center;justify-content:space-between;
-}
+.skill-editor-title{font-size:13px;font-weight:600;color:#5b6069;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
 .skill-editor-hint{font-size:11px;color:var(--muted);font-weight:400}
-.skill-editor input[type=text],
-.skill-editor textarea{
-  width:100%;padding:11px 13px;
-  border:1px solid var(--line);border-radius:12px;
-  font-size:15px;font-family:inherit;color:inherit;
-  background:#fafbfc;outline:none;margin-bottom:10px;
-  -webkit-appearance:none;resize:vertical;
-}
-.skill-editor input[type=text]:focus,
-.skill-editor textarea:focus{
-  border-color:var(--accent);background:#fff;
-}
+.skill-editor input[type=text],.skill-editor textarea{width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:12px;font-size:15px;font-family:inherit;color:inherit;background:#fafbfc;outline:none;margin-bottom:10px;-webkit-appearance:none;resize:vertical}
+.skill-editor input[type=text]:focus,.skill-editor textarea:focus{border-color:var(--accent);background:#fff}
 .skill-editor-actions{display:flex;gap:8px}
-.skill-editor-actions button{
-  flex:1;padding:10px;border-radius:10px;border:none;
-  font-size:14px;font-family:inherit;font-weight:500;
-  cursor:pointer;
-}
+.skill-editor-actions button{flex:1;padding:10px;border-radius:10px;border:none;font-size:14px;font-family:inherit;font-weight:500;cursor:pointer}
 .skill-editor-actions .btn-cancel{background:#f4f5f7;color:var(--fg)}
 .skill-editor-actions .btn-save{background:var(--accent);color:#fff}
-.skill-editor-actions button:active{opacity:.8}
 .skill-upload-row{display:flex;gap:8px;margin-bottom:8px}
-.btn-add-skill{
-  flex:1;padding:12px;
-  border:1.5px dashed var(--line);background:#fff;
-  color:var(--accent);font-size:13.5px;font-family:inherit;font-weight:500;
-  border-radius:12px;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;gap:5px;
-}
-.btn-add-skill:active{background:#fafbfc}
-.btn-upload-skill{
-  flex:1;padding:12px;
-  border:1.5px dashed var(--line);background:#fff;
-  color:#34c759;font-size:13.5px;font-family:inherit;font-weight:500;
-  border-radius:12px;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;gap:5px;
-}
-.btn-upload-skill:active{background:#fafbfc}
-.tool-toggles{
-  display:flex;flex-direction:column;gap:10px;
-  padding:12px 14px;
-  background:#fafbfc;border-radius:14px;
-  border:1px solid var(--line);
-  margin-bottom:12px;
-}
-.tool-toggle-row{
-  display:flex;align-items:center;justify-content:space-between;
-  gap:10px;
-}
+.btn-add-skill,.btn-upload-skill{flex:1;padding:12px;border:1.5px dashed var(--line);background:#fff;font-size:13.5px;font-family:inherit;font-weight:500;border-radius:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px}
+.btn-add-skill{color:var(--accent)}
+.btn-upload-skill{color:#34c759}
+.tool-toggles{display:flex;flex-direction:column;gap:10px;padding:12px 14px;background:#fafbfc;border-radius:14px;border:1px solid var(--line);margin-bottom:12px}
+.tool-toggle-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .tool-toggle-label{flex:1}
-.tool-toggle-name{
-  font-size:13.5px;font-weight:600;color:var(--fg);
-  display:flex;align-items:center;gap:6px;
-}
-.tool-toggle-desc{
-  font-size:11px;color:var(--muted);
-  margin-top:3px;line-height:1.5;
-}
-.status-dot{
-  width:7px;height:7px;border-radius:50%;
-  background:#ccc;flex:0 0 auto;
-}
+.tool-toggle-name{font-size:13.5px;font-weight:600;color:var(--fg);display:flex;align-items:center;gap:6px}
+.tool-toggle-desc{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.5}
+.status-dot{width:7px;height:7px;border-radius:50%;background:#ccc;flex:0 0 auto}
 .status-dot.ok{background:#34c759}
 .status-dot.warn{background:#ff9500}
 .status-dot.err{background:#ff3b30}
-#toast{
-  position:fixed;left:50%;bottom:96px;transform:translate(-50%,10px);
-  background:rgba(22,24,29,.92);color:#fff;
-  padding:9px 16px;border-radius:20px;font-size:13.5px;
-  opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;
-  z-index:99;max-width:78vw;text-align:center;
-}
+#toast{position:fixed;left:50%;bottom:96px;transform:translate(-50%,10px);background:rgba(22,24,29,.92);color:#fff;padding:9px 16px;border-radius:20px;font-size:13.5px;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;z-index:99;max-width:78vw;text-align:center}
 #toast.show{opacity:1;transform:translate(-50%,0)}
 #fileInput,#docInput,#skillFileInput{display:none}
 </style>
@@ -592,51 +182,30 @@ input[type=range]::-moz-range-thumb{
 <header>
   <div class="header-left">
     <button class="icon-btn" id="menuBtn" aria-label="历史对话">
-      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round">
-        <path d="M3 6h18M3 12h18M3 18h18"/>
-      </svg>
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
     </button>
     <div class="title">DeepSeek<small id="modelTag">deepseek-flash</small></div>
   </div>
   <button class="icon-btn" id="settingsBtn" aria-label="设置">
-    <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-      <circle cx="12" cy="12" r="3.2"/>
-      <path d="M12 2.6v2.5M12 18.9v2.5M21.4 12h-2.5M5.1 12H2.6M18.65 5.35l-1.77 1.77M7.12 16.88l-1.77 1.77M18.65 18.65l-1.77-1.77M7.12 7.12L5.35 5.35"/>
-    </svg>
+    <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.6v2.5M12 18.9v2.5M21.4 12h-2.5M5.1 12H2.6M18.65 5.35l-1.77 1.77M7.12 16.88l-1.77 1.77M18.65 18.65l-1.77-1.77M7.12 7.12L5.35 5.35"/></svg>
   </button>
 </header>
 
-<div id="chat">
-  <div class="welcome">
-    <div class="logo">DS</div>
-    <p>有什么可以帮你的？</p>
-  </div>
-</div>
-
+<div id="chat"><div class="welcome"><div class="logo">DS</div><p>有什么可以帮你的？</p></div></div>
 <div class="usage-bar" id="usageBar"></div>
 
 <div class="composer">
   <div class="quick-bar">
     <button class="quick-btn disabled" id="webSearchBtn" type="button" disabled title="暂未开放">
-      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="11" cy="11" r="7"/>
-        <path d="M21 21l-4.3-4.3"/>
-      </svg>
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
       <span>联网搜索</span>
     </button>
-
     <button class="quick-btn" id="skillBtn" type="button">
-      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4L12 17l-6.3 4.4L8 14 2 9.4h7.6z"/>
-      </svg>
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4L12 17l-6.3 4.4L8 14 2 9.4h7.6z"/></svg>
       <span id="skillBtnLabel">技能</span>
     </button>
-
     <button class="quick-btn active" id="fileToolBtn" type="button" title="点击启用/禁用文件读写工具">
-      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-        <path d="M14 2v6h6"/>
-      </svg>
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
       <span id="fileToolLabel">文件读写</span>
     </button>
   </div>
@@ -645,22 +214,12 @@ input[type=range]::-moz-range-thumb{
 
   <div class="composer-inner">
     <button class="btn-round" id="imageBtn" type="button" aria-label="上传图片">
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="3" y="3" width="18" height="18" rx="3"/>
-        <circle cx="8.6" cy="8.6" r="1.5"/>
-        <path d="M21 15.5l-4.6-4.6a1.6 1.6 0 0 0-2.3 0L5 20"/>
-      </svg>
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.6" cy="8.6" r="1.5"/><path d="M21 15.5l-4.6-4.6a1.6 1.6 0 0 0-2.3 0L5 20"/></svg>
     </button>
-
     <button class="btn-round" id="docBtn" type="button" aria-label="上传文档">
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-        <path d="M14 2v6h6"/>
-      </svg>
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
     </button>
-
     <textarea id="input" rows="1" placeholder="发消息…" enterkeyhint="send"></textarea>
-
     <button id="send" disabled aria-label="发送"></button>
   </div>
 
@@ -668,10 +227,7 @@ input[type=range]::-moz-range-thumb{
   <input type="file" id="docInput" accept=".txt,.md,.markdown,.json,.csv,.log,.html,.htm,.xml,.yaml,.yml,.js,.ts,.py,.java,.c,.cpp,.go,.rs,.sh,.css,text/*,application/json" multiple>
 </div>
 
-<div class="loading-mask" id="loadingMask">
-  <div class="spinner"></div>
-  <p id="loadingText">正在处理…</p>
-</div>
+<div class="loading-mask" id="loadingMask"><div class="spinner"></div><p id="loadingText">正在处理…</p></div>
 
 <div class="drawer" id="historyDrawer">
   <div class="drawer-backdrop"></div>
@@ -679,17 +235,11 @@ input[type=range]::-moz-range-thumb{
     <div class="drawer-head">
       <h2>历史对话</h2>
       <div class="drawer-head-actions">
-        <button class="icon-btn" id="newChatBtn" title="新对话" aria-label="新对话">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-        </button>
-        <button class="icon-btn" id="closeDrawer" title="关闭" aria-label="关闭">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-        </button>
+        <button class="icon-btn" id="newChatBtn" title="新对话"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+        <button class="icon-btn" id="closeDrawer" title="关闭"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
     </div>
-    <div class="drawer-search">
-      <input type="text" id="historySearch" placeholder="搜索对话标题或内容…" autocomplete="off" autocapitalize="off" spellcheck="false">
-    </div>
+    <div class="drawer-search"><input type="text" id="historySearch" placeholder="搜索对话标题或内容…" autocomplete="off"></div>
     <div class="drawer-list" id="historyList"></div>
   </div>
 </div>
@@ -698,16 +248,9 @@ input[type=range]::-moz-range-thumb{
   <div class="sheet-backdrop"></div>
   <div class="sheet-panel">
     <div class="sheet-handle"></div>
-    <div class="sheet-head">
-      <h2>技能</h2>
-      <button id="closeSkillSheet">关闭</button>
-    </div>
-
+    <div class="sheet-head"><h2>技能</h2><button id="closeSkillSheet">关闭</button></div>
     <div class="skill-editor" id="skillEditor">
-      <div class="skill-editor-title">
-        <span id="skillEditorTitle">新建技能</span>
-        <span class="skill-editor-hint" id="skillEditorHint"></span>
-      </div>
+      <div class="skill-editor-title"><span id="skillEditorTitle">新建技能</span><span class="skill-editor-hint" id="skillEditorHint"></span></div>
       <input type="text" id="skillNameInput" placeholder="技能名称，如：翻译" maxlength="30">
       <textarea id="skillPromptInput" rows="5" placeholder="技能提示词，将作为系统指令发送给模型。"></textarea>
       <div class="skill-editor-actions">
@@ -715,22 +258,12 @@ input[type=range]::-moz-range-thumb{
         <button type="button" class="btn-save" id="saveSkillBtn">保存</button>
       </div>
     </div>
-
     <div class="skill-list" id="skillList"></div>
-
     <div class="skill-upload-row">
-      <button type="button" class="btn-add-skill" id="addSkillBtn">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-        手动添加
-      </button>
-      <button type="button" class="btn-upload-skill" id="uploadSkillBtn">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
-        上传文件
-      </button>
+      <button type="button" class="btn-add-skill" id="addSkillBtn">+ 手动添加</button>
+      <button type="button" class="btn-upload-skill" id="uploadSkillBtn">↑ 上传文件</button>
     </div>
-    <p class="desc" style="text-align:center;margin-top:4px;margin-bottom:16px">
-      支持 <b>.md</b>（YAML frontmatter）、<b>.json</b>、<b>.txt</b> 格式。
-    </p>
+    <p class="desc" style="text-align:center;margin-top:4px;margin-bottom:16px">支持 <b>.md</b>（YAML frontmatter）、<b>.json</b>、<b>.txt</b> 格式。</p>
     <input type="file" id="skillFileInput" accept=".md,.markdown,.txt,.json,text/markdown,text/plain,application/json">
   </div>
 </div>
@@ -739,10 +272,7 @@ input[type=range]::-moz-range-thumb{
   <div class="sheet-backdrop"></div>
   <div class="sheet-panel">
     <div class="sheet-handle"></div>
-    <div class="sheet-head">
-      <h2>设置</h2>
-      <button id="closeSheet">完成</button>
-    </div>
+    <div class="sheet-head"><h2>设置</h2><button id="closeSheet">完成</button></div>
 
     <div class="field">
       <label for="systemPrompt">系统提示词（永久记忆 / 角色设定）</label>
@@ -752,10 +282,10 @@ input[type=range]::-moz-range-thumb{
     <div class="field">
       <label for="apiKey">API Key 密钥</label>
       <div class="input-wrap">
-        <input id="apiKey" type="password" placeholder="sk-..." autocomplete="off" autocapitalize="off" spellcheck="false">
+        <input id="apiKey" type="password" placeholder="sk-..." autocomplete="off" autocapitalize="off">
         <button class="eye" id="toggleKey" type="button">显示</button>
       </div>
-      <p class="desc">仅保存在本机浏览器。前往 platform.deepseek.com 获取。</p>
+      <p class="desc">仅保存在本机。前往 platform.deepseek.com 获取。</p>
     </div>
 
     <div class="field">
@@ -781,10 +311,7 @@ input[type=range]::-moz-range-thumb{
       <label for="streamToggle">流式输出 stream</label>
       <div class="segment" style="background:transparent;padding:0">
         <span style="flex:1"></span>
-        <label class="switch">
-          <input type="checkbox" id="streamToggle" checked>
-          <span class="slider"></span>
-        </label>
+        <label class="switch"><input type="checkbox" id="streamToggle" checked><span class="slider"></span></label>
       </div>
       <p class="desc">开启后回复会一个字一个字显示。</p>
     </div>
@@ -820,20 +347,14 @@ input[type=range]::-moz-range-thumb{
       <div class="tool-toggles">
         <div class="tool-toggle-row">
           <div class="tool-toggle-label">
-            <div class="tool-toggle-name">
-              <span class="status-dot" id="fsStatusDot"></span>
-              普通文件权限
-            </div>
+            <div class="tool-toggle-name"><span class="status-dot" id="fsStatusDot"></span>普通文件权限</div>
             <div class="tool-toggle-desc" id="fsStatusText">检测中…</div>
           </div>
           <button type="button" class="btn-add-skill" id="reqFsBtn" style="flex:0 0 auto;padding:8px 12px;font-size:12px">请求</button>
         </div>
         <div class="tool-toggle-row" style="border-top:1px solid var(--line);padding-top:10px;margin-top:10px">
           <div class="tool-toggle-label">
-            <div class="tool-toggle-name">
-              <span class="status-dot" id="shizukuStatusDot"></span>
-              Shizuku 高权限
-            </div>
+            <div class="tool-toggle-name"><span class="status-dot" id="shizukuStatusDot"></span>Shizuku 高权限</div>
             <div class="tool-toggle-desc" id="shizukuStatusText">检测中…</div>
           </div>
           <button type="button" class="btn-add-skill" id="reqShizukuBtn" style="flex:0 0 auto;padding:8px 12px;font-size:12px">授权</button>
@@ -861,21 +382,11 @@ input[type=range]::-moz-range-thumb{
   var API_URL = 'https://api.deepseek.com/chat/completions';
   var STORE_KEY = 'deepseek-mobile-cfg-v7';
   var DEFAULTS = {
-    apiKey: '',
-    systemPrompt: '',
-    model: 'deepseek-flash',
-    stream: true,
-    reasoning_effort: 'high',
-    temperature: 1,
-    top_p: 1,
-    max_tokens: 4096,
-    detail: 'auto',
-    skills: [],
-    activeSkillId: '',
-    conversations: [],
-    currentConvId: '',
-    fileToolEnabled: true,
-    fileRootPath: '/sdcard/'
+    apiKey: '', systemPrompt: '', model: 'deepseek-flash', stream: true,
+    reasoning_effort: 'high', temperature: 1, top_p: 1, max_tokens: 4096,
+    detail: 'auto', skills: [], activeSkillId: '',
+    conversations: [], currentConvId: '',
+    fileToolEnabled: true, fileRootPath: '/sdcard/'
   };
 
   var DESCS = {
@@ -897,11 +408,8 @@ input[type=range]::-moz-range-thumb{
   };
 
   var cfg;
-  try {
-    cfg = Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem(STORE_KEY) || '{}'));
-  } catch (e) {
-    cfg = Object.assign({}, DEFAULTS);
-  }
+  try { cfg = Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem(STORE_KEY) || '{}')); }
+  catch (e) { cfg = Object.assign({}, DEFAULTS); }
   if (!Array.isArray(cfg.skills)) cfg.skills = [];
   if (!Array.isArray(cfg.conversations)) cfg.conversations = [];
 
@@ -911,56 +419,32 @@ input[type=range]::-moz-range-thumb{
 
   var $ = function (id) { return document.getElementById(id); };
 
-  var chatEl       = $('chat');
-  var inputEl      = $('input');
-  var sendBtn      = $('send');
-  var sheetEl      = $('sheet');
-  var skillSheetEl = $('skillSheet');
-  var historyDrawer= $('historyDrawer');
-  var keyEl        = $('apiKey');
-  var sysEl        = $('systemPrompt');
-  var tempEl       = $('temp');
-  var tempValEl    = $('tempVal');
-  var topPEl       = $('topP');
-  var topPValEl    = $('topPVal');
-  var maxTokEl     = $('maxTokens');
-  var modelTag     = $('modelTag');
-  var streamEl     = $('streamToggle');
-  var skillBtn     = $('skillBtn');
-  var skillBtnLabel= $('skillBtnLabel');
-  var fileToolBtn  = $('fileToolBtn');
-  var fileToolLabel= $('fileToolLabel');
-  var skillListEl  = $('skillList');
-  var skillEditor  = $('skillEditor');
-  var skillEditorTitle = $('skillEditorTitle');
-  var skillEditorHint = $('skillEditorHint');
-  var skillNameInput = $('skillNameInput');
-  var skillPromptInput = $('skillPromptInput');
+  var chatEl = $('chat'), inputEl = $('input'), sendBtn = $('send');
+  var sheetEl = $('sheet'), skillSheetEl = $('skillSheet'), historyDrawer = $('historyDrawer');
+  var keyEl = $('apiKey'), sysEl = $('systemPrompt');
+  var tempEl = $('temp'), tempValEl = $('tempVal');
+  var topPEl = $('topP'), topPValEl = $('topPVal');
+  var maxTokEl = $('maxTokens'), modelTag = $('modelTag'), streamEl = $('streamToggle');
+  var skillBtn = $('skillBtn'), skillBtnLabel = $('skillBtnLabel');
+  var fileToolBtn = $('fileToolBtn'), fileToolLabel = $('fileToolLabel');
+  var skillListEl = $('skillList'), skillEditor = $('skillEditor');
+  var skillEditorTitle = $('skillEditorTitle'), skillEditorHint = $('skillEditorHint');
+  var skillNameInput = $('skillNameInput'), skillPromptInput = $('skillPromptInput');
   var skillFileInput = $('skillFileInput');
-  var fileInput    = $('fileInput');
-  var docInput     = $('docInput');
-  var imageBtn     = $('imageBtn');
-  var docBtn       = $('docBtn');
-  var previewBar   = $('previewBar');
-  var usageBar     = $('usageBar');
-  var historyListEl= $('historyList');
-  var historySearchEl = $('historySearch');
+  var fileInput = $('fileInput'), docInput = $('docInput');
+  var imageBtn = $('imageBtn'), docBtn = $('docBtn');
+  var previewBar = $('previewBar'), usageBar = $('usageBar');
+  var historyListEl = $('historyList'), historySearchEl = $('historySearch');
 
   var ICON_SEND = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>';
   var ICON_STOP = '<svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg>';
-  var ICON_RM   = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+  var ICON_RM = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
   var ICON_EDIT = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
-  var ICON_DEL  = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>';
+  var ICON_DEL = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>';
 
-  var messages   = [];
-  var generating = false;
-  var controller = null;
-  var stick      = true;
-  var pending    = [];
-  var pendingFiles = [];
-  var editingSkillId = null;
-
-  var MAX_INLINE     = 32 * 1024 * 1024;
+  var messages = [], generating = false, controller = null, stick = true;
+  var pending = [], pendingFiles = [], editingSkillId = null;
+  var MAX_INLINE = 32 * 1024 * 1024;
   var MAX_MEDIA_ITEMS = 32;
   var MAX_SKILL_FILE_SIZE = 512 * 1024;
   var MAX_DOC_FILE_SIZE = 2 * 1024 * 1024;
@@ -968,165 +452,82 @@ input[type=range]::-moz-range-thumb{
   var MAX_TOOL_LOOPS = 6;
 
   function toast(msg) {
-    var t = $('toast');
-    t.textContent = msg;
-    t.classList.add('show');
+    var t = $('toast'); t.textContent = msg; t.classList.add('show');
     clearTimeout(toast._timer);
     toast._timer = setTimeout(function () { t.classList.remove('show'); }, 2500);
   }
-
-  function nearBottom() {
-    return chatEl.scrollHeight - chatEl.scrollTop - chatEl.clientHeight < 70;
-  }
-  function scrollToBottom(force) {
-    if (force || stick) chatEl.scrollTop = chatEl.scrollHeight;
-  }
+  function nearBottom() { return chatEl.scrollHeight - chatEl.scrollTop - chatEl.clientHeight < 70; }
+  function scrollToBottom(force) { if (force || stick) chatEl.scrollTop = chatEl.scrollHeight; }
   chatEl.addEventListener('scroll', function () { stick = nearBottom(); }, { passive: true });
-
-  function autoGrow() {
-    inputEl.style.height = 'auto';
-    inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + 'px';
-  }
-
+  function autoGrow() { inputEl.style.height = 'auto'; inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + 'px'; }
   function syncSeg(containerId, value) {
     var btns = document.querySelectorAll('#' + containerId + ' button');
-    Array.prototype.forEach.call(btns, function (b) {
-      b.classList.toggle('active', b.dataset.value === value);
-    });
+    Array.prototype.forEach.call(btns, function (b) { b.classList.toggle('active', b.dataset.value === value); });
   }
-
-  function isVisionModel() { return true; }
-
-  function genId(prefix) {
-    return (prefix || 'id_') + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
-  }
-
+  function genId(prefix) { return (prefix || 'id_') + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7); }
   function getActiveSkill() {
     if (!cfg.activeSkillId) return null;
-    for (var i = 0; i < cfg.skills.length; i++) {
-      if (cfg.skills[i].id === cfg.activeSkillId) return cfg.skills[i];
-    }
+    for (var i = 0; i < cfg.skills.length; i++) if (cfg.skills[i].id === cfg.activeSkillId) return cfg.skills[i];
     return null;
   }
 
-  // ==================== 原生桥接（AndroidFile / AndroidShizuku）====================
-  function hasFileBridge() {
-    return !!(window.AndroidFile && typeof window.AndroidFile.readFile === 'function');
-  }
+  function hasFileBridge() { return !!(window.AndroidFile && typeof window.AndroidFile.readFile === 'function'); }
   function hasShizuku() {
     if (!window.AndroidShizuku) return false;
     try {
-      if (typeof window.AndroidShizuku.isReady === 'function') {
-        return !!window.AndroidShizuku.isReady();
-      }
+      if (typeof window.AndroidShizuku.isReady === 'function') return !!window.AndroidShizuku.isReady();
       return typeof window.AndroidShizuku.readFile === 'function';
     } catch (e) { return false; }
   }
 
   function nativeReadFile(path) {
     if (!hasFileBridge()) return '错误：文件系统不可用（请在打包好的 App 内运行）';
-    try { return window.AndroidFile.readFile(path); }
-    catch (e) { return '读取失败：' + (e.message || e); }
+    try { return window.AndroidFile.readFile(path); } catch (e) { return '读取失败：' + (e.message || e); }
   }
   function nativeWriteFile(path, content) {
-    if (!hasFileBridge()) return '错误：文件系统不可用（请在打包好的 App 内运行）';
-    try { return window.AndroidFile.writeFile(path, content); }
-    catch (e) { return '写入失败：' + (e.message || e); }
+    if (!hasFileBridge()) return '错误：文件系统不可用';
+    try { return window.AndroidFile.writeFile(path, content); } catch (e) { return '写入失败：' + (e.message || e); }
   }
   function nativeListDir(path) {
-    if (!hasFileBridge()) return '错误：文件系统不可用（请在打包好的 App 内运行）';
-    try { return window.AndroidFile.listDir(path); }
-    catch (e) { return '读取目录失败：' + (e.message || e); }
+    if (!hasFileBridge()) return '错误：文件系统不可用';
+    try { return window.AndroidFile.listDir(path); } catch (e) { return '读取目录失败：' + (e.message || e); }
   }
   function shizukuReadFile(path) {
     if (!hasShizuku()) return '错误：Shizuku 不可用';
-    try { return window.AndroidShizuku.readFile(path); }
-    catch (e) { return 'Shizuku 读取失败：' + (e.message || e); }
+    try { return window.AndroidShizuku.readFile(path); } catch (e) { return 'Shizuku 读取失败：' + (e.message || e); }
   }
   function shizukuWriteFile(path, content) {
     if (!hasShizuku()) return '错误：Shizuku 不可用';
-    try { return window.AndroidShizuku.writeFile(path, content); }
-    catch (e) { return 'Shizuku 写入失败：' + (e.message || e); }
+    try { return window.AndroidShizuku.writeFile(path, content); } catch (e) { return 'Shizuku 写入失败：' + (e.message || e); }
   }
   function shizukuListDir(path) {
     if (!hasShizuku()) return '错误：Shizuku 不可用';
-    if (typeof window.AndroidShizuku.listDir !== 'function') {
-      return 'Shizuku 桥接未实现 listDir';
-    }
-    try { return window.AndroidShizuku.listDir(path); }
-    catch (e) { return 'Shizuku 列目录失败：' + (e.message || e); }
+    if (typeof window.AndroidShizuku.listDir !== 'function') return 'Shizuku 桥接未实现 listDir';
+    try { return window.AndroidShizuku.listDir(path); } catch (e) { return 'Shizuku 列目录失败：' + (e.message || e); }
   }
 
   function buildTools() {
     var tools = [];
     if (cfg.fileToolEnabled) {
-      tools.push({
-        type: 'function',
-        function: {
-          name: 'read_file',
-          description: '读取手机上的文本文件内容。路径支持绝对路径（如 /sdcard/Documents/note.txt）。如果普通权限失败，可尝试 use_shizuku=true 使用高权限。',
-          parameters: {
-            type: 'object',
-            properties: {
-              path: { type: 'string', description: '文件的绝对路径' },
-              use_shizuku: { type: 'boolean', description: '是否使用 Shizuku 高权限读取（默认 false）' }
-            },
-            required: ['path']
-          }
-        }
-      });
-      tools.push({
-        type: 'function',
-        function: {
-          name: 'write_file',
-          description: '向手机文件写入文本内容。如果文件已存在会覆盖。父目录不存在会自动创建。',
-          parameters: {
-            type: 'object',
-            properties: {
-              path: { type: 'string', description: '文件的绝对路径' },
-              content: { type: 'string', description: '要写入的文本内容' },
-              use_shizuku: { type: 'boolean', description: '是否使用 Shizuku 高权限写入（默认 false）' }
-            },
-            required: ['path', 'content']
-          }
-        }
-      });
-      tools.push({
-        type: 'function',
-        function: {
-          name: 'list_dir',
-          description: '列出手机某个目录下的文件和子目录。',
-          parameters: {
-            type: 'object',
-            properties: {
-              path: { type: 'string', description: '目录的绝对路径' },
-              use_shizuku: { type: 'boolean', description: '是否使用 Shizuku 高权限读取（默认 false）' }
-            },
-            required: ['path']
-          }
-        }
-      });
+      tools.push({ type: 'function', function: { name: 'read_file', description: '读取手机上的文本文件内容。路径支持绝对路径（如 /sdcard/Documents/note.txt）。如果普通权限失败，可尝试 use_shizuku=true 使用高权限。', parameters: { type: 'object', properties: { path: { type: 'string', description: '文件的绝对路径' }, use_shizuku: { type: 'boolean', description: '是否使用 Shizuku 高权限读取（默认 false）' } }, required: ['path'] } } });
+      tools.push({ type: 'function', function: { name: 'write_file', description: '向手机文件写入文本内容。如果文件已存在会覆盖。父目录不存在会自动创建。', parameters: { type: 'object', properties: { path: { type: 'string', description: '文件的绝对路径' }, content: { type: 'string', description: '要写入的文本内容' }, use_shizuku: { type: 'boolean', description: '是否使用 Shizuku 高权限写入（默认 false）' } }, required: ['path', 'content'] } } });
+      tools.push({ type: 'function', function: { name: 'list_dir', description: '列出手机某个目录下的文件和子目录。', parameters: { type: 'object', properties: { path: { type: 'string', description: '目录的绝对路径' }, use_shizuku: { type: 'boolean', description: '是否使用 Shizuku 高权限读取（默认 false）' } }, required: ['path'] } } });
     }
     return tools;
   }
 
   async function executeTool(name, args) {
     var useShizuku = args.use_shizuku === true;
-
     if (name === 'read_file') {
       if (useShizuku && hasShizuku()) return shizukuReadFile(args.path);
       var r = nativeReadFile(args.path);
-      if (r.indexOf('失败') >= 0 && hasShizuku()) {
-        r += '\n\n（提示：如果该路径受限，可重新调用并设置 use_shizuku=true）';
-      }
+      if (r.indexOf('失败') >= 0 && hasShizuku()) r += '\n\n（提示：如果该路径受限，可重新调用并设置 use_shizuku=true）';
       return r;
     }
     if (name === 'write_file') {
       if (useShizuku && hasShizuku()) return shizukuWriteFile(args.path, args.content);
       var w = nativeWriteFile(args.path, args.content);
-      if (w.indexOf('失败') >= 0 && hasShizuku()) {
-        w += '\n\n（提示：如果该路径受限，可重新调用并设置 use_shizuku=true）';
-      }
+      if (w.indexOf('失败') >= 0 && hasShizuku()) w += '\n\n（提示：如果该路径受限，可重新调用并设置 use_shizuku=true）';
       return w;
     }
     if (name === 'list_dir') {
@@ -1136,7 +537,6 @@ input[type=range]::-moz-range-thumb{
     return '未知工具：' + name;
   }
 
-  // ==================== UI 初始化 ====================
   function initUI() {
     keyEl.value = cfg.apiKey || '';
     sysEl.value = cfg.systemPrompt || '';
@@ -1147,7 +547,6 @@ input[type=range]::-moz-range-thumb{
     topPValEl.textContent = Number(cfg.top_p).toFixed(2);
     maxTokEl.value = cfg.max_tokens;
     $('fileRootPath').value = cfg.fileRootPath || '/sdcard/';
-
     syncSeg('modelSeg', cfg.model);
     syncSeg('effortSeg', cfg.reasoning_effort);
     syncSeg('detailSeg', cfg.detail);
@@ -1155,117 +554,63 @@ input[type=range]::-moz-range-thumb{
     updateDesc('modelDesc', DESCS.model[cfg.model]);
     updateDesc('detailDesc', DESCS.detail[cfg.detail]);
     updateDesc('effortDesc', DESCS.effort[cfg.reasoning_effort]);
-
-    syncSkillBtn();
-    syncFileToolBtn();
-    renderSkillList();
-    renderHistoryList('');
-    updateFsStatus();
-
+    syncSkillBtn(); syncFileToolBtn();
+    renderSkillList(); renderHistoryList(''); updateFsStatus();
     if (cfg.currentConvId) {
       var conv = findConv(cfg.currentConvId);
-      if (conv && conv.messages.length) {
-        messages = conv.messages.slice();
-        renderLoadedConversation();
-      }
+      if (conv && conv.messages.length) { messages = conv.messages.slice(); renderLoadedConversation(); }
     }
   }
-
-  function updateDesc(id, text) {
-    var el = $(id);
-    if (el) el.innerHTML = text || '';
-  }
-
-  function syncSkillBtn() {
-    var skill = getActiveSkill();
-    skillBtnLabel.textContent = skill ? skill.name : '技能';
-    skillBtn.classList.toggle('active', !!skill);
-  }
-
-  function syncFileToolBtn() {
-    fileToolBtn.classList.toggle('active', !!cfg.fileToolEnabled);
-    fileToolLabel.textContent = cfg.fileToolEnabled ? '文件读写' : '文件读写(关)';
-  }
-
+  function updateDesc(id, text) { var el = $(id); if (el) el.innerHTML = text || ''; }
+  function syncSkillBtn() { var s = getActiveSkill(); skillBtnLabel.textContent = s ? s.name : '技能'; skillBtn.classList.toggle('active', !!s); }
+  function syncFileToolBtn() { fileToolBtn.classList.toggle('active', !!cfg.fileToolEnabled); fileToolLabel.textContent = cfg.fileToolEnabled ? '文件读写' : '文件读写(关)'; }
   function updateFsStatus() {
-    var fsDot = $('fsStatusDot');
-    var fsText = $('fsStatusText');
-    var shDot = $('shizukuStatusDot');
-    var shText = $('shizukuStatusText');
-
-    if (hasFileBridge()) {
-      fsDot.className = 'status-dot ok';
-      fsText.textContent = '已就绪（AndroidFile 桥接）';
-    } else {
-      fsDot.className = 'status-dot err';
-      fsText.textContent = '不可用（请在打包好的 App 内运行）';
-    }
-
-    if (hasShizuku()) {
-      shDot.className = 'status-dot ok';
-      shText.textContent = '已就绪（Shizuku 已授权）';
-    } else {
-      shDot.className = 'status-dot warn';
-      shText.textContent = '未授权（点击右侧按钮请求）';
-    }
+    var fsDot = $('fsStatusDot'), fsText = $('fsStatusText');
+    var shDot = $('shizukuStatusDot'), shText = $('shizukuStatusText');
+    if (hasFileBridge()) { fsDot.className = 'status-dot ok'; fsText.textContent = '已就绪（AndroidFile 桥接）'; }
+    else { fsDot.className = 'status-dot err'; fsText.textContent = '不可用（请在打包好的 App 内运行）'; }
+    if (hasShizuku()) { shDot.className = 'status-dot ok'; shText.textContent = '已就绪（Shizuku 已授权）'; }
+    else { shDot.className = 'status-dot warn'; shText.textContent = '未授权（点击右侧按钮请求）'; }
   }
 
   initUI();
 
-  // ==================== 设置项事件 ====================
   keyEl.addEventListener('input', function () { cfg.apiKey = keyEl.value.trim(); save(); });
   sysEl.addEventListener('input', function () { cfg.systemPrompt = sysEl.value.trim(); save(); });
   $('fileRootPath').addEventListener('input', function () { cfg.fileRootPath = $('fileRootPath').value.trim(); save(); });
-
   $('toggleKey').addEventListener('click', function () {
     var show = keyEl.type === 'password';
     keyEl.type = show ? 'text' : 'password';
     this.textContent = show ? '隐藏' : '显示';
   });
-
   Array.prototype.forEach.call(document.querySelectorAll('#modelSeg button'), function (btn) {
     btn.addEventListener('click', function () {
-      cfg.model = btn.dataset.value;
-      syncSeg('modelSeg', cfg.model);
-      modelTag.textContent = cfg.model;
-      save();
+      cfg.model = btn.dataset.value; syncSeg('modelSeg', cfg.model);
+      modelTag.textContent = cfg.model; save();
       updateDesc('modelDesc', DESCS.model[cfg.model]);
     });
   });
   Array.prototype.forEach.call(document.querySelectorAll('#effortSeg button'), function (btn) {
     btn.addEventListener('click', function () {
-      cfg.reasoning_effort = btn.dataset.value;
-      syncSeg('effortSeg', cfg.reasoning_effort);
-      save();
-      updateDesc('effortDesc', DESCS.effort[cfg.reasoning_effort]);
+      cfg.reasoning_effort = btn.dataset.value; syncSeg('effortSeg', cfg.reasoning_effort);
+      save(); updateDesc('effortDesc', DESCS.effort[cfg.reasoning_effort]);
     });
   });
   Array.prototype.forEach.call(document.querySelectorAll('#detailSeg button'), function (btn) {
     btn.addEventListener('click', function () {
-      cfg.detail = btn.dataset.value;
-      syncSeg('detailSeg', cfg.detail);
-      save();
-      updateDesc('detailDesc', DESCS.detail[cfg.detail]);
+      cfg.detail = btn.dataset.value; syncSeg('detailSeg', cfg.detail);
+      save(); updateDesc('detailDesc', DESCS.detail[cfg.detail]);
     });
   });
-
   streamEl.addEventListener('change', function () { cfg.stream = streamEl.checked; save(); });
-
   fileToolBtn.addEventListener('click', function () {
-    cfg.fileToolEnabled = !cfg.fileToolEnabled;
-    syncFileToolBtn();
-    save();
+    cfg.fileToolEnabled = !cfg.fileToolEnabled; syncFileToolBtn(); save();
     toast(cfg.fileToolEnabled ? '文件读写已启用' : '文件读写已关闭');
   });
-
   $('reqFsBtn').addEventListener('click', function () {
-    if (!hasFileBridge()) {
-      toast('请在打包好的 App 内运行');
-      return;
-    }
-    toast('文件桥接已就绪，首次安装请到系统设置里授予「所有文件访问权限」');
+    if (!hasFileBridge()) { toast('请在打包好的 App 内运行'); return; }
+    toast('文件桥接已就绪，首次安装请到系统设置授予「所有文件访问权限」');
   });
-
   $('reqShizukuBtn').addEventListener('click', function () {
     if (!window.AndroidShizuku) { toast('Shizuku 桥接不可用'); return; }
     try {
@@ -1276,19 +621,16 @@ input[type=range]::-moz-range-thumb{
       setTimeout(updateFsStatus, 1000);
     } catch (e) { toast('Shizuku 授权失败：' + (e.message || e)); }
   });
-
   tempEl.addEventListener('input', function () {
     cfg.temperature = parseFloat(tempEl.value);
     tempValEl.textContent = cfg.temperature.toFixed(1);
   });
   tempEl.addEventListener('change', save);
-
   topPEl.addEventListener('input', function () {
     cfg.top_p = parseFloat(topPEl.value);
     topPValEl.textContent = cfg.top_p.toFixed(2);
   });
   topPEl.addEventListener('change', save);
-
   maxTokEl.addEventListener('input', function () {
     var v = parseInt(maxTokEl.value, 10);
     cfg.max_tokens = (isNaN(v) || v < 1) ? 4096 : Math.min(v, 65536);
@@ -1296,254 +638,104 @@ input[type=range]::-moz-range-thumb{
   });
   maxTokEl.addEventListener('blur', function () { maxTokEl.value = cfg.max_tokens; });
 
-  // ==================== 面板开关 ====================
-  function openSheet()  { sheetEl.classList.add('open'); }
+  function openSheet() { sheetEl.classList.add('open'); }
   function closeSheet() { sheetEl.classList.remove('open'); }
-
   $('settingsBtn').addEventListener('click', openSheet);
   $('closeSheet').addEventListener('click', closeSheet);
   sheetEl.querySelector('.sheet-backdrop').addEventListener('click', closeSheet);
 
   $('clearBtn').addEventListener('click', function () {
     if (messages.length && !confirm('确定清空当前对话？')) return;
-    messages = [];
-    clearPending();
-    clearPendingFiles();
+    messages = []; clearPending(); clearPendingFiles();
     chatEl.innerHTML = '<div class="welcome"><div class="logo">DS</div><p>有什么可以帮你的？</p></div>';
-    usageBar.classList.remove('show');
-    closeSheet();
-    saveCurrentConversation();
-    toast('已清空');
+    usageBar.classList.remove('show'); closeSheet(); saveCurrentConversation(); toast('已清空');
   });
 
-  // ==================== 历史对话 ====================
-  $('menuBtn').addEventListener('click', function () {
-    renderHistoryList(historySearchEl.value);
-    historyDrawer.classList.add('open');
-  });
-  $('closeDrawer').addEventListener('click', function () {
-    historyDrawer.classList.remove('open');
-  });
-  historyDrawer.querySelector('.drawer-backdrop').addEventListener('click', function () {
-    historyDrawer.classList.remove('open');
-  });
-
+  $('menuBtn').addEventListener('click', function () { renderHistoryList(historySearchEl.value); historyDrawer.classList.add('open'); });
+  $('closeDrawer').addEventListener('click', function () { historyDrawer.classList.remove('open'); });
+  historyDrawer.querySelector('.drawer-backdrop').addEventListener('click', function () { historyDrawer.classList.remove('open'); });
   $('newChatBtn').addEventListener('click', function () {
     if (generating) { toast('正在生成中，请稍后'); return; }
-    saveCurrentConversation();
-    cfg.currentConvId = genId('conv_');
-    messages = [];
-    clearPending();
-    clearPendingFiles();
+    saveCurrentConversation(); cfg.currentConvId = genId('conv_'); messages = [];
+    clearPending(); clearPendingFiles();
     chatEl.innerHTML = '<div class="welcome"><div class="logo">DS</div><p>有什么可以帮你的？</p></div>';
-    usageBar.classList.remove('show');
-    save();
-    historyDrawer.classList.remove('open');
-    toast('已开始新对话');
+    usageBar.classList.remove('show'); save(); historyDrawer.classList.remove('open'); toast('已开始新对话');
   });
+  historySearchEl.addEventListener('input', function () { renderHistoryList(historySearchEl.value); });
 
-  historySearchEl.addEventListener('input', function () {
-    renderHistoryList(historySearchEl.value);
-  });
-
-  function findConv(id) {
-    for (var i = 0; i < cfg.conversations.length; i++) {
-      if (cfg.conversations[i].id === id) return cfg.conversations[i];
-    }
-    return null;
-  }
-
+  function findConv(id) { for (var i = 0; i < cfg.conversations.length; i++) if (cfg.conversations[i].id === id) return cfg.conversations[i]; return null; }
   function saveCurrentConversation() {
     if (!messages.length) return;
     var conv = findConv(cfg.currentConvId);
-    if (!conv) {
-      conv = {
-        id: cfg.currentConvId || genId('conv_'),
-        title: '',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        messages: []
-      };
-      cfg.currentConvId = conv.id;
-      cfg.conversations.unshift(conv);
-    }
-    conv.messages = messages.slice();
-    conv.updatedAt = Date.now();
-    if (!conv.title) {
-      var firstUser = null;
-      for (var i = 0; i < messages.length; i++) {
-        if (messages[i].role === 'user') { firstUser = messages[i].content; break; }
-      }
-      conv.title = firstUser ? String(firstUser).slice(0, 24) : '新对话';
-    }
-    if (cfg.conversations.length > 50) {
-      cfg.conversations = cfg.conversations.slice(0, 50);
-    }
+    if (!conv) { conv = { id: cfg.currentConvId || genId('conv_'), title: '', createdAt: Date.now(), updatedAt: Date.now(), messages: [] }; cfg.currentConvId = conv.id; cfg.conversations.unshift(conv); }
+    conv.messages = messages.slice(); conv.updatedAt = Date.now();
+    if (!conv.title) { for (var i = 0; i < messages.length; i++) if (messages[i].role === 'user') { conv.title = String(messages[i].content).slice(0, 24); break; } if (!conv.title) conv.title = '新对话'; }
+    if (cfg.conversations.length > 50) cfg.conversations = cfg.conversations.slice(0, 50);
     save();
   }
-
   function renderHistoryList(filter) {
     var q = String(filter || '').trim().toLowerCase();
     historyListEl.innerHTML = '';
-
-    var list = cfg.conversations.slice().sort(function (a, b) {
-      return (b.updatedAt || 0) - (a.updatedAt || 0);
-    });
-
+    var list = cfg.conversations.slice().sort(function (a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); });
     var matched = [];
     list.forEach(function (c) {
       if (!q) { matched.push({ conv: c, snippet: '' }); return; }
       var titleHit = (c.title || '').toLowerCase().indexOf(q) > -1;
       var contentHit = '';
-      if (!titleHit) {
-        for (var i = 0; i < c.messages.length; i++) {
-          var msg = c.messages[i];
-          if (msg.content && msg.content.toLowerCase().indexOf(q) > -1) {
-            var idx = msg.content.toLowerCase().indexOf(q);
-            var start = Math.max(0, idx - 12);
-            contentHit = msg.content.slice(start, idx + q.length + 12);
-            break;
-          }
-        }
-      }
+      if (!titleHit) for (var i = 0; i < c.messages.length; i++) { var msg = c.messages[i]; if (msg.content && msg.content.toLowerCase().indexOf(q) > -1) { var idx = msg.content.toLowerCase().indexOf(q); contentHit = msg.content.slice(Math.max(0, idx - 12), idx + q.length + 12); break; } }
       if (titleHit || contentHit) matched.push({ conv: c, snippet: contentHit });
     });
-
-    if (!matched.length) {
-      var empty = document.createElement('div');
-      empty.className = 'history-empty';
-      empty.textContent = q ? '没有匹配的对话' : '还没有历史对话';
-      historyListEl.appendChild(empty);
-      return;
-    }
-
+    if (!matched.length) { historyListEl.innerHTML = '<div class="history-empty">' + (q ? '没有匹配的对话' : '还没有历史对话') + '</div>'; return; }
     matched.forEach(function (item) {
       var c = item.conv;
       var row = document.createElement('div');
       row.className = 'history-item' + (c.id === cfg.currentConvId ? ' active' : '');
-
-      var body = document.createElement('div');
-      body.className = 'history-item-body';
-
-      var title = document.createElement('div');
-      title.className = 'history-item-title';
-      title.textContent = c.title || '未命名对话';
-
-      var meta = document.createElement('div');
-      meta.className = 'history-item-meta';
-      meta.textContent = formatTime(c.updatedAt || c.createdAt) + ' · ' + (c.messages ? c.messages.length : 0) + ' 条';
-      if (item.snippet) meta.textContent += ' · ' + item.snippet;
-
-      body.appendChild(title);
-      body.appendChild(meta);
-
-      var actions = document.createElement('div');
-      actions.className = 'history-item-actions';
-
-      var editBtn = document.createElement('button');
-      editBtn.className = 'history-icon-btn';
-      editBtn.type = 'button';
-      editBtn.innerHTML = ICON_EDIT;
-      editBtn.addEventListener('click', function (e) {
-        e.stopPropagation();
-        var newTitle = prompt('重命名对话：', c.title || '');
-        if (newTitle === null) return;
-        newTitle = newTitle.trim();
-        if (!newTitle) return;
-        c.title = newTitle.slice(0, 30);
-        save();
-        renderHistoryList(historySearchEl.value);
-      });
-
-      var delBtn = document.createElement('button');
-      delBtn.className = 'history-icon-btn';
-      delBtn.type = 'button';
-      delBtn.innerHTML = ICON_DEL;
-      delBtn.addEventListener('click', function (e) {
-        e.stopPropagation();
-        if (!confirm('删除对话「' + (c.title || '未命名') + '」？')) return;
-        cfg.conversations = cfg.conversations.filter(function (x) { return x.id !== c.id; });
-        if (cfg.currentConvId === c.id) {
-          cfg.currentConvId = '';
-          messages = [];
-          chatEl.innerHTML = '<div class="welcome"><div class="logo">DS</div><p>有什么可以帮你的？</p></div>';
-          usageBar.classList.remove('show');
-        }
-        save();
-        renderHistoryList(historySearchEl.value);
-      });
-
-      actions.appendChild(editBtn);
-      actions.appendChild(delBtn);
-
-      row.appendChild(body);
-      row.appendChild(actions);
-
-      row.addEventListener('click', function () {
-        if (generating) { toast('正在生成中，请稍后'); return; }
-        loadConversation(c.id);
-        historyDrawer.classList.remove('open');
-      });
-
+      var body = document.createElement('div'); body.className = 'history-item-body';
+      var title = document.createElement('div'); title.className = 'history-item-title'; title.textContent = c.title || '未命名对话';
+      var meta = document.createElement('div'); meta.className = 'history-item-meta';
+      meta.textContent = formatTime(c.updatedAt || c.createdAt) + ' · ' + (c.messages ? c.messages.length : 0) + ' 条' + (item.snippet ? ' · ' + item.snippet : '');
+      body.appendChild(title); body.appendChild(meta);
+      var actions = document.createElement('div'); actions.className = 'history-item-actions';
+      var editBtn = document.createElement('button'); editBtn.className = 'history-icon-btn'; editBtn.innerHTML = ICON_EDIT;
+      editBtn.addEventListener('click', function (e) { e.stopPropagation(); var nt = prompt('重命名：', c.title || ''); if (nt === null) return; nt = nt.trim(); if (!nt) return; c.title = nt.slice(0, 30); save(); renderHistoryList(historySearchEl.value); });
+      var delBtn = document.createElement('button'); delBtn.className = 'history-icon-btn'; delBtn.innerHTML = ICON_DEL;
+      delBtn.addEventListener('click', function (e) { e.stopPropagation(); if (!confirm('删除「' + (c.title || '未命名') + '」？')) return; cfg.conversations = cfg.conversations.filter(function (x) { return x.id !== c.id; }); if (cfg.currentConvId === c.id) { cfg.currentConvId = ''; messages = []; chatEl.innerHTML = '<div class="welcome"><div class="logo">DS</div><p>有什么可以帮你的？</p></div>'; usageBar.classList.remove('show'); } save(); renderHistoryList(historySearchEl.value); });
+      actions.appendChild(editBtn); actions.appendChild(delBtn);
+      row.appendChild(body); row.appendChild(actions);
+      row.addEventListener('click', function () { if (generating) { toast('正在生成中'); return; } loadConversation(c.id); historyDrawer.classList.remove('open'); });
       historyListEl.appendChild(row);
     });
   }
-
   function loadConversation(id) {
     if (cfg.currentConvId === id) return;
     saveCurrentConversation();
-    var conv = findConv(id);
-    if (!conv) return;
-    cfg.currentConvId = id;
-    messages = conv.messages.slice();
-    save();
-    renderLoadedConversation();
+    var c = findConv(id); if (!c) return;
+    cfg.currentConvId = id; messages = c.messages.slice(); save(); renderLoadedConversation();
   }
-
   function renderLoadedConversation() {
-    chatEl.innerHTML = '';
-    usageBar.classList.remove('show');
-    if (!messages.length) {
-      chatEl.innerHTML = '<div class="welcome"><div class="logo">DS</div><p>有什么可以帮你的？</p></div>';
-      return;
-    }
+    chatEl.innerHTML = ''; usageBar.classList.remove('show');
+    if (!messages.length) { chatEl.innerHTML = '<div class="welcome"><div class="logo">DS</div><p>有什么可以帮你的？</p></div>'; return; }
     messages.forEach(function (m) {
-      if (m.role === 'user') {
-        addMessage('user', m.content);
-      } else if (m.role === 'assistant') {
-        if (m.content) addMessage('ai', m.content);
-      }
+      if (m.role === 'user') addMessage('user', m.content);
+      else if (m.role === 'assistant' && m.content) addMessage('ai', m.content);
     });
-    scrollToBottom(true);
-    stick = true;
+    scrollToBottom(true); stick = true;
   }
-
   function formatTime(ts) {
     if (!ts) return '';
-    var d = new Date(ts);
-    var now = new Date();
+    var d = new Date(ts), now = new Date();
     var pad = function (n) { return n < 10 ? '0' + n : '' + n; };
     if (d.toDateString() === now.toDateString()) return pad(d.getHours()) + ':' + pad(d.getMinutes());
-    var yesterday = new Date(now);
-    yesterday.setDate(now.getDate() - 1);
-    if (d.toDateString() === yesterday.toDateString()) return '昨天';
+    var y = new Date(now); y.setDate(now.getDate() - 1);
+    if (d.toDateString() === y.toDateString()) return '昨天';
     return (d.getMonth() + 1) + '月' + d.getDate() + '日';
   }
 
-  // ==================== 技能面板 ====================
-  function openSkillSheet() {
-    closeSkillEditor();
-    renderSkillList();
-    skillSheetEl.classList.add('open');
-  }
-  function closeSkillSheet() {
-    skillSheetEl.classList.remove('open');
-    closeSkillEditor();
-  }
+  function openSkillSheet() { closeSkillEditor(); renderSkillList(); skillSheetEl.classList.add('open'); }
+  function closeSkillSheet() { skillSheetEl.classList.remove('open'); closeSkillEditor(); }
   skillBtn.addEventListener('click', openSkillSheet);
   $('closeSkillSheet').addEventListener('click', closeSkillSheet);
   skillSheetEl.querySelector('.sheet-backdrop').addEventListener('click', closeSkillSheet);
-
   $('addSkillBtn').addEventListener('click', function () { openSkillEditor(null); });
   $('uploadSkillBtn').addEventListener('click', function () { skillFileInput.click(); });
   $('cancelSkillBtn').addEventListener('click', closeSkillEditor);
@@ -1566,174 +758,85 @@ input[type=range]::-moz-range-thumb{
   });
 
   function parseSkillFile(raw, filename) {
-    var text = raw.replace(/^\uFEFF/, '');
-    var trimmed = text.trim();
+    var text = raw.replace(/^\uFEFF/, ''), trimmed = text.trim();
     if (!trimmed) return null;
-
     var fmMatch = trimmed.match(/^---\s*\r?\n([\s\S]*?)\r?\n---\s*\r?\n?([\s\S]*)$/);
     if (fmMatch) {
-      var fmText = fmMatch[1];
-      var body = (fmMatch[2] || '').trim();
-      var name = '';
+      var fmText = fmMatch[1], body = (fmMatch[2] || '').trim(), name = '';
       fmText.split(/\r?\n/).forEach(function (line) {
         var m = line.match(/^([a-zA-Z_][a-zA-Z0-9_-]*)\s*:\s*(.*)$/);
         if (!m) return;
-        var key = m[1].toLowerCase();
-        var val = m[2].trim().replace(/^["']|["']$/g, '');
+        var key = m[1].toLowerCase(), val = m[2].trim().replace(/^["']|["']$/g, '');
         if ((key === 'name' || key === 'title') && !name) name = val;
       });
       if (body) return { name: name || filenameToName(filename), prompt: body, formatLabel: 'Markdown' };
     }
-
     if (/^[\{\[]/.test(trimmed)) {
       try {
-        var j = JSON.parse(trimmed);
-        var obj = Array.isArray(j) ? j[0] : j;
+        var j = JSON.parse(trimmed), obj = Array.isArray(j) ? j[0] : j;
         if (obj && typeof obj === 'object') {
           var jName = obj.name || obj.title || obj.display_name || '';
           var jPrompt = obj.prompt || obj.content || obj.instructions || obj.body || obj.system || obj.text || '';
-          if (jPrompt) {
-            return { name: (jName || filenameToName(filename)).slice(0, 30), prompt: String(jPrompt).trim(), formatLabel: 'JSON' };
-          }
+          if (jPrompt) return { name: (jName || filenameToName(filename)).slice(0, 30), prompt: String(jPrompt).trim(), formatLabel: 'JSON' };
         }
       } catch (e) {}
     }
-
     return { name: filenameToName(filename), prompt: trimmed, formatLabel: '纯文本' };
   }
-
   function filenameToName(filename) {
     var base = String(filename || '未命名').replace(/\.[^.]+$/, '');
     if (base.length > 30) base = base.slice(0, 30);
     return base || '未命名技能';
   }
-
   function renderSkillList() {
     skillListEl.innerHTML = '';
-    if (!cfg.skills.length) {
-      var empty = document.createElement('div');
-      empty.className = 'skill-empty';
-      empty.textContent = '还没有技能。手动添加，或上传 .md / .json / .txt 文件';
-      skillListEl.appendChild(empty);
-      return;
-    }
+    if (!cfg.skills.length) { skillListEl.innerHTML = '<div class="skill-empty">还没有技能。手动添加，或上传 .md / .json / .txt 文件</div>'; return; }
     cfg.skills.forEach(function (sk) {
       var item = document.createElement('div');
       item.className = 'skill-item' + (sk.id === cfg.activeSkillId ? ' active' : '');
-      var body = document.createElement('div');
-      body.className = 'skill-item-body';
-      var name = document.createElement('div');
-      name.className = 'skill-item-name';
-      name.textContent = sk.name;
-      if (sk.source === 'file') {
-        var badge = document.createElement('span');
-        badge.className = 'skill-badge';
-        badge.textContent = '文件';
-        name.appendChild(badge);
-      }
-      var preview = document.createElement('div');
-      preview.className = 'skill-item-preview';
-      preview.textContent = sk.prompt;
-      body.appendChild(name);
-      body.appendChild(preview);
-      var actions = document.createElement('div');
-      actions.className = 'skill-item-actions';
-      var editBtn = document.createElement('button');
-      editBtn.className = 'skill-icon-btn';
-      editBtn.type = 'button';
-      editBtn.innerHTML = ICON_EDIT;
+      var body = document.createElement('div'); body.className = 'skill-item-body';
+      var name = document.createElement('div'); name.className = 'skill-item-name'; name.textContent = sk.name;
+      if (sk.source === 'file') { var bg = document.createElement('span'); bg.className = 'skill-badge'; bg.textContent = '文件'; name.appendChild(bg); }
+      var preview = document.createElement('div'); preview.className = 'skill-item-preview'; preview.textContent = sk.prompt;
+      body.appendChild(name); body.appendChild(preview);
+      var actions = document.createElement('div'); actions.className = 'skill-item-actions';
+      var editBtn = document.createElement('button'); editBtn.className = 'skill-icon-btn'; editBtn.innerHTML = ICON_EDIT;
       editBtn.addEventListener('click', function (e) { e.stopPropagation(); openSkillEditor(sk.id); });
-      var delBtn = document.createElement('button');
-      delBtn.className = 'skill-icon-btn';
-      delBtn.type = 'button';
-      delBtn.innerHTML = ICON_DEL;
-      delBtn.addEventListener('click', function (e) {
-        e.stopPropagation();
-        if (!confirm('删除技能「' + sk.name + '」？')) return;
-        cfg.skills = cfg.skills.filter(function (s) { return s.id !== sk.id; });
-        if (cfg.activeSkillId === sk.id) cfg.activeSkillId = '';
-        save();
-        renderSkillList();
-        syncSkillBtn();
-      });
-      actions.appendChild(editBtn);
-      actions.appendChild(delBtn);
-      item.appendChild(body);
-      item.appendChild(actions);
-      item.addEventListener('click', function () {
-        cfg.activeSkillId = (cfg.activeSkillId === sk.id) ? '' : sk.id;
-        save();
-        renderSkillList();
-        syncSkillBtn();
-      });
+      var delBtn = document.createElement('button'); delBtn.className = 'skill-icon-btn'; delBtn.innerHTML = ICON_DEL;
+      delBtn.addEventListener('click', function (e) { e.stopPropagation(); if (!confirm('删除技能「' + sk.name + '」？')) return; cfg.skills = cfg.skills.filter(function (s) { return s.id !== sk.id; }); if (cfg.activeSkillId === sk.id) cfg.activeSkillId = ''; save(); renderSkillList(); syncSkillBtn(); });
+      actions.appendChild(editBtn); actions.appendChild(delBtn);
+      item.appendChild(body); item.appendChild(actions);
+      item.addEventListener('click', function () { cfg.activeSkillId = (cfg.activeSkillId === sk.id) ? '' : sk.id; save(); renderSkillList(); syncSkillBtn(); });
       skillListEl.appendChild(item);
     });
   }
-
   function openSkillEditor(id) {
-    editingSkillId = id || null;
-    skillEditorHint.textContent = '';
-    if (id) {
-      var sk = cfg.skills.find(function (s) { return s.id === id; });
-      if (sk) {
-        skillNameInput.value = sk.name;
-        skillPromptInput.value = sk.prompt;
-        skillEditorTitle.textContent = '编辑技能';
-      }
-    } else {
-      skillNameInput.value = '';
-      skillPromptInput.value = '';
-      skillEditorTitle.textContent = '新建技能';
-    }
+    editingSkillId = id || null; skillEditorHint.textContent = '';
+    if (id) { var sk = cfg.skills.find(function (s) { return s.id === id; }); if (sk) { skillNameInput.value = sk.name; skillPromptInput.value = sk.prompt; skillEditorTitle.textContent = '编辑技能'; } }
+    else { skillNameInput.value = ''; skillPromptInput.value = ''; skillEditorTitle.textContent = '新建技能'; }
     skillEditor.classList.add('show');
     setTimeout(function () { skillEditor.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, 100);
   }
-
   function openSkillEditorWithData(name, prompt, formatLabel) {
     editingSkillId = null;
-    skillNameInput.value = name;
-    skillPromptInput.value = prompt;
+    skillNameInput.value = name; skillPromptInput.value = prompt;
     skillEditorTitle.textContent = '确认上传的 Skill';
     skillEditorHint.textContent = '已解析：' + (formatLabel || '');
     skillEditor.classList.add('show');
     setTimeout(function () { skillEditor.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, 100);
   }
-
-  function closeSkillEditor() {
-    skillEditor.classList.remove('show');
-    editingSkillId = null;
-    skillEditorHint.textContent = '';
-  }
-
+  function closeSkillEditor() { skillEditor.classList.remove('show'); editingSkillId = null; skillEditorHint.textContent = ''; }
   function saveSkill() {
-    var name = skillNameInput.value.trim();
-    var prompt = skillPromptInput.value.trim();
+    var name = skillNameInput.value.trim(), prompt = skillPromptInput.value.trim();
     if (!name) { toast('请填写技能名称'); skillNameInput.focus(); return; }
     if (!prompt) { toast('请填写技能提示词'); skillPromptInput.focus(); return; }
     if (name.length > 30) name = name.slice(0, 30);
-
-    if (editingSkillId) {
-      var sk = cfg.skills.find(function (s) { return s.id === editingSkillId; });
-      if (sk) { sk.name = name; sk.prompt = prompt; }
-      toast('已更新');
-    } else {
-      var newSk = { id: genId('sk_'), name: name, prompt: prompt, source: skillEditorHint.textContent ? 'file' : 'manual' };
-      cfg.skills.push(newSk);
-      cfg.activeSkillId = newSk.id;
-      toast('已添加并启用');
-    }
-    save();
-    closeSkillEditor();
-    renderSkillList();
-    syncSkillBtn();
+    if (editingSkillId) { var sk = cfg.skills.find(function (s) { return s.id === editingSkillId; }); if (sk) { sk.name = name; sk.prompt = prompt; } toast('已更新'); }
+    else { var ns = { id: genId('sk_'), name: name, prompt: prompt, source: skillEditorHint.textContent ? 'file' : 'manual' }; cfg.skills.push(ns); cfg.activeSkillId = ns.id; toast('已添加并启用'); }
+    save(); closeSkillEditor(); renderSkillList(); syncSkillBtn();
   }
 
-  // ==================== 图片/文档上传 ====================
-  imageBtn.addEventListener('click', function () {
-    if (!isVisionModel()) { toast('当前模型不支持图片'); return; }
-    fileInput.click();
-  });
-
+  imageBtn.addEventListener('click', function () { fileInput.click(); });
   fileInput.addEventListener('change', function () {
     var files = Array.prototype.slice.call(fileInput.files || []);
     fileInput.value = '';
@@ -1744,17 +847,12 @@ input[type=range]::-moz-range-thumb{
     files.forEach(function (file) {
       if (file.size > MAX_INLINE) { toast(file.name + ' 超过 32MB，已跳过'); return; }
       var reader = new FileReader();
-      reader.onload = function () {
-        pending.push({ dataUrl: String(reader.result), name: file.name, size: file.size });
-        renderPreview();
-      };
+      reader.onload = function () { pending.push({ dataUrl: String(reader.result), name: file.name, size: file.size }); renderPreview(); };
       reader.onerror = function () { toast('读取图片失败'); };
       reader.readAsDataURL(file);
     });
   });
-
   docBtn.addEventListener('click', function () { docInput.click(); });
-
   docInput.addEventListener('change', function () {
     var files = Array.prototype.slice.call(docInput.files || []);
     docInput.value = '';
@@ -1766,11 +864,8 @@ input[type=range]::-moz-range-thumb{
       if (file.size > MAX_DOC_FILE_SIZE) { toast(file.name + ' 超过 2MB，已跳过'); return; }
       var reader = new FileReader();
       reader.onload = function () {
-        var content = String(reader.result || '');
-        var MAX_CHARS = 80000;
-        if (content.length > MAX_CHARS) {
-          content = content.slice(0, MAX_CHARS) + '\n\n...（内容过长已截断）';
-        }
+        var content = String(reader.result || ''), MAX_CHARS = 80000;
+        if (content.length > MAX_CHARS) content = content.slice(0, MAX_CHARS) + '\n\n...（已截断）';
         pendingFiles.push({ name: file.name, size: file.size, content: content });
         renderPreview();
       };
@@ -1778,284 +873,135 @@ input[type=range]::-moz-range-thumb{
       reader.readAsText(file, 'utf-8');
     });
   });
-
   function renderPreview() {
     previewBar.innerHTML = '';
     previewBar.classList.toggle('has-items', pending.length > 0 || pendingFiles.length > 0);
-
     pending.forEach(function (item, idx) {
-      var box = document.createElement('div');
-      box.className = 'preview-item';
-      var img = document.createElement('img');
-      img.src = item.dataUrl;
-      img.alt = item.name || 'image';
-      box.appendChild(img);
-      var rm = document.createElement('button');
-      rm.className = 'rm';
-      rm.type = 'button';
-      rm.innerHTML = ICON_RM;
-      rm.addEventListener('click', function () {
-        pending.splice(idx, 1);
-        renderPreview();
-      });
-      box.appendChild(rm);
-      previewBar.appendChild(box);
+      var box = document.createElement('div'); box.className = 'preview-item';
+      var img = document.createElement('img'); img.src = item.dataUrl; img.alt = item.name || 'image'; box.appendChild(img);
+      var rm = document.createElement('button'); rm.className = 'rm'; rm.type = 'button'; rm.innerHTML = ICON_RM;
+      rm.addEventListener('click', function () { pending.splice(idx, 1); renderPreview(); });
+      box.appendChild(rm); previewBar.appendChild(box);
     });
-
     pendingFiles.forEach(function (item, idx) {
-      var box = document.createElement('div');
-      box.className = 'preview-item file-preview';
-      var icon = document.createElement('div');
-      icon.className = 'file-icon';
-      var ext = (item.name.split('.').pop() || 'TXT').toUpperCase().slice(0, 4);
-      icon.textContent = ext;
-      var meta = document.createElement('div');
-      meta.className = 'file-meta';
-      var nm = document.createElement('div');
-      nm.className = 'file-name';
-      nm.textContent = item.name;
-      var sz = document.createElement('div');
-      sz.className = 'file-size';
-      sz.textContent = formatSize(item.size);
-      meta.appendChild(nm);
-      meta.appendChild(sz);
-      box.appendChild(icon);
-      box.appendChild(meta);
-      var rm = document.createElement('button');
-      rm.className = 'rm';
-      rm.type = 'button';
-      rm.innerHTML = ICON_RM;
-      rm.addEventListener('click', function () {
-        pendingFiles.splice(idx, 1);
-        renderPreview();
-      });
-      box.appendChild(rm);
-      previewBar.appendChild(box);
+      var box = document.createElement('div'); box.className = 'preview-item file-preview';
+      var icon = document.createElement('div'); icon.className = 'file-icon';
+      icon.textContent = (item.name.split('.').pop() || 'TXT').toUpperCase().slice(0, 4);
+      var meta = document.createElement('div'); meta.className = 'file-meta';
+      var nm = document.createElement('div'); nm.className = 'file-name'; nm.textContent = item.name;
+      var sz = document.createElement('div'); sz.className = 'file-size'; sz.textContent = formatSize(item.size);
+      meta.appendChild(nm); meta.appendChild(sz);
+      box.appendChild(icon); box.appendChild(meta);
+      var rm = document.createElement('button'); rm.className = 'rm'; rm.type = 'button'; rm.innerHTML = ICON_RM;
+      rm.addEventListener('click', function () { pendingFiles.splice(idx, 1); renderPreview(); });
+      box.appendChild(rm); previewBar.appendChild(box);
     });
-
     updateSendState();
   }
-
   function formatSize(bytes) {
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
     return (bytes / 1024 / 1024).toFixed(1) + ' MB';
   }
-
   function clearPending() { pending = []; renderPreview(); }
   function clearPendingFiles() { pendingFiles = []; renderPreview(); }
+  function updateSendState() { if (generating) return; sendBtn.disabled = !inputEl.value.trim() && pending.length === 0 && pendingFiles.length === 0; }
 
-  function updateSendState() {
-    if (generating) return;
-    sendBtn.disabled = !inputEl.value.trim() && pending.length === 0 && pendingFiles.length === 0;
-  }
-
-  // ==================== 消息渲染 ====================
   function addMessage(role, text, images, files) {
-    var wrap = document.createElement('div');
-    wrap.className = 'msg ' + role;
-
-    var bubble = document.createElement('div');
-    bubble.className = 'bubble';
-
+    var wrap = document.createElement('div'); wrap.className = 'msg ' + role;
+    var bubble = document.createElement('div'); bubble.className = 'bubble';
     var reason = null, reasonText = null;
     if (role === 'ai') {
-      reason = document.createElement('details');
-      reason.className = 'reason';
-      reason.style.display = 'none';
-      var summary = document.createElement('summary');
-      summary.textContent = '思考过程';
-      reasonText = document.createElement('div');
-      reasonText.className = 'reason-text';
-      reason.appendChild(summary);
-      reason.appendChild(reasonText);
-      bubble.appendChild(reason);
+      reason = document.createElement('details'); reason.className = 'reason'; reason.style.display = 'none';
+      var summary = document.createElement('summary'); summary.textContent = '思考过程';
+      reasonText = document.createElement('div'); reasonText.className = 'reason-text';
+      reason.appendChild(summary); reason.appendChild(reasonText); bubble.appendChild(reason);
     }
-
     if (role === 'user' && images && images.length) {
-      var imgBox = document.createElement('div');
-      imgBox.className = 'msg-images';
-      var showMax = 12;
-      var show = images.slice(0, showMax);
-      show.forEach(function (it) {
-        var im = document.createElement('img');
-        im.src = it.dataUrl;
-        im.alt = it.name || 'media';
-        imgBox.appendChild(im);
-      });
-      if (images.length > showMax) {
-        var more = document.createElement('div');
-        more.style.cssText = 'width:110px;height:110px;border-radius:9px;background:rgba(255,255,255,.18);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;';
-        more.textContent = '+' + (images.length - showMax);
-        imgBox.appendChild(more);
-      }
+      var imgBox = document.createElement('div'); imgBox.className = 'msg-images';
+      images.slice(0, 12).forEach(function (it) { var im = document.createElement('img'); im.src = it.dataUrl; im.alt = it.name || 'media'; imgBox.appendChild(im); });
+      if (images.length > 12) { var more = document.createElement('div'); more.style.cssText = 'width:110px;height:110px;border-radius:9px;background:rgba(255,255,255,.18);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;'; more.textContent = '+' + (images.length - 12); imgBox.appendChild(more); }
       bubble.appendChild(imgBox);
     }
-
     if (role === 'user' && files && files.length) {
-      var fileBox = document.createElement('div');
-      fileBox.className = 'msg-files';
-      files.forEach(function (f) {
-        var tag = document.createElement('span');
-        tag.className = 'msg-file-tag';
-        tag.textContent = '📄 ' + f.name;
-        fileBox.appendChild(tag);
-      });
+      var fileBox = document.createElement('div'); fileBox.className = 'msg-files';
+      files.forEach(function (f) { var tag = document.createElement('span'); tag.className = 'msg-file-tag'; tag.textContent = '📄 ' + f.name; fileBox.appendChild(tag); });
       bubble.appendChild(fileBox);
     }
-
-    var content = document.createElement('div');
-    content.className = 'content';
+    var content = document.createElement('div'); content.className = 'content';
     if (text) content.textContent = text;
     bubble.appendChild(content);
-
-    wrap.appendChild(bubble);
-    chatEl.appendChild(wrap);
-    scrollToBottom(true);
-
+    wrap.appendChild(bubble); chatEl.appendChild(wrap); scrollToBottom(true);
     return { wrap: wrap, bubble: bubble, content: content, reason: reason, reasonText: reasonText };
   }
-
   function addToolTip(aiEl, text) {
-    var tip = document.createElement('div');
-    tip.className = 'tool-call-tip';
-    tip.textContent = text;
+    var tip = document.createElement('div'); tip.className = 'tool-call-tip'; tip.textContent = text;
     aiEl.bubble.insertBefore(tip, aiEl.content);
   }
-
   function setGenerating(g) {
     generating = g;
-    if (g) {
-      sendBtn.classList.add('stop');
-      sendBtn.innerHTML = ICON_STOP;
-      sendBtn.disabled = false;
-      imageBtn.disabled = true;
-      docBtn.disabled = true;
-    } else {
-      sendBtn.classList.remove('stop');
-      sendBtn.innerHTML = ICON_SEND;
-      imageBtn.disabled = false;
-      docBtn.disabled = false;
-      updateSendState();
-    }
+    if (g) { sendBtn.classList.add('stop'); sendBtn.innerHTML = ICON_STOP; sendBtn.disabled = false; imageBtn.disabled = true; docBtn.disabled = true; }
+    else { sendBtn.classList.remove('stop'); sendBtn.innerHTML = ICON_SEND; imageBtn.disabled = false; docBtn.disabled = false; updateSendState(); }
   }
   setGenerating(false);
-
   inputEl.addEventListener('input', function () { autoGrow(); updateSendState(); });
-  sendBtn.addEventListener('click', function () {
-    if (generating) { if (controller) controller.abort(); }
-    else { send(); }
-  });
+  sendBtn.addEventListener('click', function () { if (generating) { if (controller) controller.abort(); } else { send(); } });
 
   function readError(res) {
     return res.text().then(function (raw) {
       var msg = '';
-      try {
-        var j = JSON.parse(raw);
-        msg = (j.error && j.error.message) || j.message || '';
-      } catch (e) {}
+      try { var j = JSON.parse(raw); msg = (j.error && j.error.message) || j.message || ''; } catch (e) {}
       if (!msg) msg = (raw || '').slice(0, 300).trim();
       if (!msg) msg = 'HTTP ' + res.status;
       return msg;
     }).catch(function () { return 'HTTP ' + res.status; });
   }
-
   function buildUserContent(text, images) {
     if (!images || !images.length) return text;
     var blocks = [];
     if (text) blocks.push({ type: 'text', text: text });
-    images.forEach(function (it) {
-      blocks.push({ type: 'image_url', image_url: { url: it.dataUrl, detail: cfg.detail } });
-    });
+    images.forEach(function (it) { blocks.push({ type: 'image_url', image_url: { url: it.dataUrl, detail: cfg.detail } }); });
     return blocks;
   }
-
   function showUsage(usage) {
     if (!usage) return;
-    var inputTokens = usage.prompt_tokens || 0;
-    var outputTokens = usage.completion_tokens || 0;
-    var totalTokens = usage.total_tokens || 0;
-    var cachedTokens = (usage.prompt_tokens_details && usage.prompt_tokens_details.cached_tokens) || 0;
-    var hit = inputTokens > 0 ? Math.round((cachedTokens / inputTokens) * 100) : 0;
-    var html = '';
-    html += '<span>输入: ' + inputTokens + '</span>';
-    html += '<span>输出: ' + outputTokens + '</span>';
-    html += '<span>总计: ' + totalTokens + '</span>';
-    if (cachedTokens > 0) html += '<span class="usage-accent">缓存命中: ' + hit + '%</span>';
-    usageBar.innerHTML = html;
-    usageBar.classList.add('show');
+    var i = usage.prompt_tokens || 0, o = usage.completion_tokens || 0, t = usage.total_tokens || 0;
+    var c = (usage.prompt_tokens_details && usage.prompt_tokens_details.cached_tokens) || 0;
+    var h = i > 0 ? Math.round((c / i) * 100) : 0;
+    var html = '<span>输入: ' + i + '</span><span>输出: ' + o + '</span><span>总计: ' + t + '</span>';
+    if (c > 0) html += '<span class="usage-accent">缓存命中: ' + h + '%</span>';
+    usageBar.innerHTML = html; usageBar.classList.add('show');
   }
 
-  // ==================== 发送主流程 ====================
   async function send() {
     var text = inputEl.value.trim();
     if ((!text && !pending.length && !pendingFiles.length) || generating) return;
-
-    if (!cfg.apiKey) {
-      openSheet();
-      toast('请先填写 API Key');
-      setTimeout(function () { keyEl.focus(); }, 320);
-      return;
-    }
-
-    var imagesToSend = pending.slice();
-    var filesToSend = pendingFiles.slice();
-
-    var welcome = chatEl.querySelector('.welcome');
-    if (welcome) welcome.remove();
-
-    inputEl.value = '';
-    autoGrow();
-    clearPending();
-    clearPendingFiles();
-    sendBtn.disabled = true;
-    stick = true;
-
+    if (!cfg.apiKey) { openSheet(); toast('请先填写 API Key'); setTimeout(function () { keyEl.focus(); }, 320); return; }
+    var imagesToSend = pending.slice(), filesToSend = pendingFiles.slice();
+    var welcome = chatEl.querySelector('.welcome'); if (welcome) welcome.remove();
+    inputEl.value = ''; autoGrow(); clearPending(); clearPendingFiles(); sendBtn.disabled = true; stick = true;
     addMessage('user', text, imagesToSend, filesToSend);
-
     var fullText = text;
     if (filesToSend.length) {
       var parts = [];
-      filesToSend.forEach(function (f) {
-        parts.push('<file name="' + f.name + '">\n' + f.content + '\n</file>');
-      });
+      filesToSend.forEach(function (f) { parts.push('<file name="' + f.name + '">\n' + f.content + '\n</file>'); });
       fullText = (text ? text + '\n\n' : '') + parts.join('\n\n');
     }
-
     var userContent = buildUserContent(fullText, imagesToSend);
-
     var historyText = text || (imagesToSend.length ? '[图片]' : '') || (filesToSend.length ? '[文件]' : '');
-    if (filesToSend.length) {
-      historyText = (text ? text + ' ' : '') + '[文件: ' + filesToSend.map(function (f) { return f.name; }).join(', ') + ']';
-    }
+    if (filesToSend.length) historyText = (text ? text + ' ' : '') + '[文件: ' + filesToSend.map(function (f) { return f.name; }).join(', ') + ']';
     messages.push({ role: 'user', content: historyText });
-
     var ai = addMessage('ai', '');
-    ai.bubble.classList.add('streaming');
-    usageBar.classList.remove('show');
-
-    setGenerating(true);
-    controller = new AbortController();
-
-    try {
-      await runToolLoop(ai, userContent);
-    } catch (err) {
-      if (err && err.name === 'AbortError') {
-        if (!ai.content.textContent) ai.content.textContent = '（已停止）';
-      } else {
-        ai.bubble.classList.add('error');
-        var prefix = ai.content.textContent ? ai.content.textContent + '\n\n' : '';
-        ai.content.textContent = prefix + '⚠️ ' + (err && err.message ? err.message : '请求失败');
-      }
+    ai.bubble.classList.add('streaming'); usageBar.classList.remove('show');
+    setGenerating(true); controller = new AbortController();
+    try { await runToolLoop(ai, userContent); }
+    catch (err) {
+      if (err && err.name === 'AbortError') { if (!ai.content.textContent) ai.content.textContent = '（已停止）'; }
+      else { ai.bubble.classList.add('error'); var prefix = ai.content.textContent ? ai.content.textContent + '\n\n' : ''; ai.content.textContent = prefix + '⚠️ ' + (err && err.message ? err.message : '请求失败'); }
     } finally {
-      ai.bubble.classList.remove('streaming');
-      controller = null;
-      setGenerating(false);
-      if (!ai.content.textContent && !ai.bubble.classList.contains('error')) {
-        ai.content.textContent = '（无内容）';
-      }
-      saveCurrentConversation();
-      scrollToBottom();
+      ai.bubble.classList.remove('streaming'); controller = null; setGenerating(false);
+      if (!ai.content.textContent && !ai.bubble.classList.contains('error')) ai.content.textContent = '（无内容）';
+      saveCurrentConversation(); scrollToBottom();
     }
   }
 
@@ -2063,188 +1009,106 @@ input[type=range]::-moz-range-thumb{
     var loopCount = 0;
     var tools = buildTools();
 
-    function buildMessages() {
-      var list = [];
-      var sysParts = [];
-      if (cfg.systemPrompt) sysParts.push(cfg.systemPrompt);
-      var activeSkill = getActiveSkill();
-      if (activeSkill) sysParts.push(activeSkill.prompt);
-      if (sysParts.length) list.push({ role: 'system', content: sysParts.join('\n\n') });
+    var apiMessages = [];
+    var sysParts = [];
+    if (cfg.systemPrompt) sysParts.push(cfg.systemPrompt);
+    var activeSkill = getActiveSkill();
+    if (activeSkill) sysParts.push(activeSkill.prompt);
+    if (sysParts.length) apiMessages.push({ role: 'system', content: sysParts.join('\n\n') });
 
-      for (var i = 0; i < messages.length - 1; i++) {
-        list.push(messages[i]);
-      }
-      list.push({ role: 'user', content: firstUserContent });
-      return list;
+    for (var i = 0; i < messages.length - 1; i++) {
+      var m = messages[i];
+      if (m.tool_calls || m.role === 'tool') continue;
+      apiMessages.push({ role: m.role, content: m.content });
     }
+    apiMessages.push({ role: 'user', content: firstUserContent });
 
     while (loopCount < MAX_TOOL_LOOPS) {
       loopCount++;
       var payload = {
-        model: cfg.model,
-        messages: buildMessages(),
-        temperature: cfg.temperature,
-        top_p: cfg.top_p,
-        max_tokens: cfg.max_tokens,
-        stream: !!cfg.stream
+        model: cfg.model, messages: apiMessages,
+        temperature: cfg.temperature, top_p: cfg.top_p,
+        max_tokens: cfg.max_tokens, stream: !!cfg.stream
       };
-      if (tools.length) {
-        payload.tools = tools;
-        payload.tool_choice = 'auto';
-      }
+      if (tools.length) { payload.tools = tools; payload.tool_choice = 'auto'; }
 
       var response = await fetch(API_URL, {
-        method: 'POST',
-        signal: controller.signal,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + cfg.apiKey
-        },
+        method: 'POST', signal: controller.signal,
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.apiKey },
         body: JSON.stringify(payload)
       });
-
-      if (!response.ok) {
-        var errMsg = await readError(response);
-        throw new Error(errMsg);
-      }
+      if (!response.ok) { var errMsg = await readError(response); throw new Error(errMsg); }
 
       var assistantMsg;
-
-      if (cfg.stream) {
-        assistantMsg = await handleStream(response, aiEl);
-      } else {
+      if (cfg.stream) { assistantMsg = await handleStream(response, aiEl); }
+      else {
         var data = await response.json();
         var choice = data.choices && data.choices[0];
         if (!choice) throw new Error('返回数据为空');
         assistantMsg = choice.message;
         if (data.usage) showUsage(data.usage);
-
-        if (assistantMsg.reasoning_content && aiEl.reason) {
-          aiEl.reason.style.display = '';
-          aiEl.reason.open = true;
-          aiEl.reasonText.textContent = assistantMsg.reasoning_content;
-        }
-        if (assistantMsg.content) {
-          aiEl.content.textContent += assistantMsg.content;
-        }
+        if (assistantMsg.reasoning_content && aiEl.reason) { aiEl.reason.style.display = ''; aiEl.reason.open = true; aiEl.reasonText.textContent = assistantMsg.reasoning_content; }
+        if (assistantMsg.content) aiEl.content.textContent += assistantMsg.content;
       }
 
       if (!assistantMsg.tool_calls || !assistantMsg.tool_calls.length) {
-        if (assistantMsg.content) {
-          messages.push({ role: 'assistant', content: assistantMsg.content });
-        }
+        if (assistantMsg.content) messages.push({ role: 'assistant', content: assistantMsg.content });
         return;
       }
 
-      messages.push({
-        role: 'assistant',
-        content: assistantMsg.content || '',
-        tool_calls: assistantMsg.tool_calls
-      });
+      apiMessages.push({ role: 'assistant', content: assistantMsg.content || '', tool_calls: assistantMsg.tool_calls });
 
-      for (var i = 0; i < assistantMsg.tool_calls.length; i++) {
-        var tc = assistantMsg.tool_calls[i];
+      for (var j = 0; j < assistantMsg.tool_calls.length; j++) {
+        var tc = assistantMsg.tool_calls[j];
         var fnName = tc.function.name;
         var args = {};
         try { args = JSON.parse(tc.function.arguments || '{}'); } catch (e) {}
-
-        var tipText = '调用 ' + fnName + '：' + (args.path || JSON.stringify(args));
-        addToolTip(aiEl, tipText);
-
+        addToolTip(aiEl, '调用 ' + fnName + '：' + (args.path || JSON.stringify(args)));
         var result = await executeTool(fnName, args);
-
-        messages.push({
-          role: 'tool',
-          tool_call_id: tc.id,
-          content: String(result)
-        });
+        apiMessages.push({ role: 'tool', tool_call_id: tc.id, content: String(result) });
       }
     }
-
     throw new Error('工具调用次数过多，已停止');
   }
 
   function handleStream(response, aiEl) {
     return new Promise(function (resolve, reject) {
-      if (!response.body) return reject(new Error('当前浏览器不支持流式响应'));
-      var reader = response.body.getReader();
-      var decoder = new TextDecoder('utf-8');
-      var buffer = '';
-      var content = '';
-      var reasoning = '';
-      var toolCallsMap = {};
-      var receivedUsage = null;
+      if (!response.body) return reject(new Error('不支持流式响应'));
+      var reader = response.body.getReader(), decoder = new TextDecoder('utf-8'), buffer = '';
+      var content = '', reasoning = '', toolCallsMap = {}, receivedUsage = null;
 
       function pump() {
         reader.read().then(function (r) {
           if (r.done) {
             if (receivedUsage) showUsage(receivedUsage);
-
-            var toolCalls = Object.keys(toolCallsMap).sort(function (a, b) {
-              return parseInt(a, 10) - parseInt(b, 10);
-            }).map(function (k) {
+            var toolCalls = Object.keys(toolCallsMap).sort(function (a, b) { return parseInt(a, 10) - parseInt(b, 10); }).map(function (k) {
               var t = toolCallsMap[k];
-              return {
-                id: t.id || ('call_' + k),
-                type: 'function',
-                function: { name: t.name, arguments: t.args || '{}' }
-              };
+              return { id: t.id || ('call_' + k), type: 'function', function: { name: t.name, arguments: t.args || '{}' } };
             });
-
-            resolve({
-              content: content,
-              reasoning_content: reasoning,
-              tool_calls: toolCalls.length ? toolCalls : null
-            });
+            resolve({ content: content, reasoning_content: reasoning, tool_calls: toolCalls.length ? toolCalls : null });
             return;
           }
-
           buffer += decoder.decode(r.value, { stream: true });
           var idx;
           while ((idx = buffer.indexOf('\n')) >= 0) {
-            var line = buffer.slice(0, idx).trim();
-            buffer = buffer.slice(idx + 1);
-            if (!line) continue;
-            if (line.indexOf('data:') !== 0) continue;
+            var line = buffer.slice(0, idx).trim(); buffer = buffer.slice(idx + 1);
+            if (!line || line.indexOf('data:') !== 0) continue;
             var data = line.slice(5).trim();
             if (!data || data === '[DONE]') continue;
-
-            var json;
-            try { json = JSON.parse(data); } catch (e) { continue; }
-
+            var json; try { json = JSON.parse(data); } catch (e) { continue; }
             if (json.usage) receivedUsage = json.usage;
-
-            var choice = json.choices && json.choices[0];
-            if (!choice) continue;
-            var delta = choice.delta;
-            if (!delta) continue;
-
-            if (delta.reasoning_content) {
-              reasoning += delta.reasoning_content;
-              if (aiEl.reason) {
-                aiEl.reason.style.display = '';
-                if (!aiEl.reason.open) aiEl.reason.open = true;
-                aiEl.reasonText.textContent = reasoning;
-              }
-            }
-
-            if (delta.content) {
-              content += delta.content;
-              aiEl.content.textContent = content;
-            }
-
+            var choice = json.choices && json.choices[0]; if (!choice) continue;
+            var delta = choice.delta; if (!delta) continue;
+            if (delta.reasoning_content) { reasoning += delta.reasoning_content; if (aiEl.reason) { aiEl.reason.style.display = ''; if (!aiEl.reason.open) aiEl.reason.open = true; aiEl.reasonText.textContent = reasoning; } }
+            if (delta.content) { content += delta.content; aiEl.content.textContent = content; }
             if (delta.tool_calls) {
               delta.tool_calls.forEach(function (tc) {
                 var index = tc.index !== undefined ? tc.index : 0;
                 if (!toolCallsMap[index]) toolCallsMap[index] = { id: '', name: '', args: '' };
                 if (tc.id) toolCallsMap[index].id = tc.id;
-                if (tc.function) {
-                  if (tc.function.name) toolCallsMap[index].name = tc.function.name;
-                  if (tc.function.arguments) toolCallsMap[index].args += tc.function.arguments;
-                }
+                if (tc.function) { if (tc.function.name) toolCallsMap[index].name = tc.function.name; if (tc.function.arguments) toolCallsMap[index].args += tc.function.arguments; }
               });
             }
-
             if (stick) chatEl.scrollTop = chatEl.scrollHeight;
           }
           pump();
@@ -2254,15 +1118,12 @@ input[type=range]::-moz-range-thumb{
     });
   }
 
-  // ==================== 软键盘适配 ====================
   if (window.visualViewport) {
-    var vv = window.visualViewport;
-    var lastH = 0;
+    var vv = window.visualViewport, lastH = 0;
     var onVV = function () {
       var h = Math.round(vv.height);
       if (Math.abs(h - lastH) < 2) return;
-      lastH = h;
-      document.body.style.height = h + 'px';
+      lastH = h; document.body.style.height = h + 'px';
       if (stick) chatEl.scrollTop = chatEl.scrollHeight;
     };
     vv.addEventListener('resize', onVV);
@@ -2270,16 +1131,9 @@ input[type=range]::-moz-range-thumb{
     onVV();
   }
 
-  // ==================== 首次使用 ====================
   window.addEventListener('load', function () {
     setTimeout(updateFsStatus, 200);
-
-    if (!cfg.apiKey) {
-      setTimeout(function () {
-        openSheet();
-        toast('请先填写 API Key');
-      }, 400);
-    }
+    if (!cfg.apiKey) setTimeout(function () { openSheet(); toast('请先填写 API Key'); }, 400);
   });
 
 })();
