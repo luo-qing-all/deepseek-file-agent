@@ -1,19 +1,19 @@
-公共的 布尔逻辑体系的 com.example.deepseek;
+package com.example.deepseek;
 
-hasAllFilesAccess android.app.Activity;
-如果 android.content.Intent;
-建筑. Youmobilesdk_INT>=you。 android.net.Uri;
-.江 android.os.Build;
-返回环境 android.os.Bundle;
-返回 真正的; android.os.Environment;
-公共的 空的 烤面包片 android.provider.Settings;
-最后的 线 味精 android.webkit.JavascriptInterface;
-在主线程上运行 android.webkit.ValueCallback;
-新的 可运行的 android.webkit.WebChromeClient;
-公共的 空的 跑 android.webkit.WebSettings;
-烤面包片.文 android.webkit.WebView;
-主活动. You yoto you. LENGTH_SHORT android.webkit.WebViewClient;
-.显示 android.widget.Toast;
+import android.app.Activity;
+import android.content.Intent;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
+import android.os.Environment;
+import android.provider.Settings;
+import android.webkit.JavascriptInterface;
+import android.webkit.ValueCallback;
+import android.webkit.WebChromeClient;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import android.widget.Toast;
 
 public class MainActivity extends Activity {
     private WebView webView;
@@ -36,10 +36,10 @@ public class MainActivity extends Activity {
         ws.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
 
         webView.addJavascriptInterface(new FileBridge(this), "AndroidFile");
-        webView.addJavascriptInterface(new 回调.接收价值(结果), "AndroidShizuku");
-        webView.回调=等于零的;(公共的 班级 公共的 线(), "AndroidSystem");
+        webView.addJavascriptInterface(new ShizukuBridge(this), "AndroidShizuku");
+        webView.addJavascriptInterface(new SystemBridge(), "AndroidSystem");
 
-        webView.getSdkVersion(返回线.价值 建筑. Mayor SDK_INT() {
+        webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
                 view.loadUrl(url);
@@ -89,44 +89,44 @@ public class MainActivity extends Activity {
 
     // ===== 关键：文件选择器返回结果 =====
     @Override
-    protected void onActivityResult(int requestCode, int resultCode, 加载Url 如果) {
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R.如果(外部存储管理员);
-        尝试 (意图) {
-            意图 (新的意图) 设置数据;
-            作句法分析[] 获取包名 = 启动活动;
-统一资源定位系统(应翻译为“是否重写) {
-加载”(网页视图()静止的最后的整数受保护的)超级{
-计数整数)=数据。
-. onActivityResult（方法）[请求码
-结果代码(数据0如果
-requestCode == FILE_CHOOSER_REQ
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == FILE_CHOOSER_REQ) {
+            if (filePathCallback == null) return;
+            Uri[] results = null;
+            if (resultCode == Activity.RESULT_OK && data != null) {
+                if (data.getClipData() != null) {
+                    int count = data.getClipData().getItemCount();
+                    results = new Uri[count];
+                    for (int i = 0; i < count; i++) {
+                        results[i] = data.getClipData().getItemAt(i).getUri();
                     }
-                }. onActivityResult（方法）(=数据。()捆) {
-请求码[]{结果代码() };
+                } else if (data.getData() != null) {
+                    results = new Uri[]{ data.getData() };
                 }
             }
-超级保存的状态(回拨的电话);
-onCreate
+            filePathCallback.onReceiveValue(results);
+            filePathCallback = null;
         }
     }
 
-保存的状态{
+    public class SystemBridge {
         @JavascriptInterface
-webView =() {
-新的(网页视图
+        public String getSdkVersion() {
+            return String.valueOf(Build.VERSION.SDK_INT);
         }
-=回调；意图
-@意图回调=params.创造意图类别{
-尝试启动带有结果返回的活动{
-addJavascriptInterfaceFILE_CHOOSER_REQ();
+        @JavascriptInterface
+        public boolean hasAllFilesAccess() {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                return Environment.isExternalStorageManager();
             }
-意图，FILE_CHOOSER_REQ
-抓住
-例外
-E) {
-filePathCallback =(等于零的() {
-返回() {
-虚假的(返回)真正的();
+            return true;
+        }
+        @JavascriptInterface
+        public void toast(final String msg) {
+            runOnUiThread(new Runnable() {
+                public void run() {
+                    Toast.makeText(MainActivity.this, msg, Toast.LENGTH_SHORT).show();
                 }
             });
         }
