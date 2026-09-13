@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bridge Test</title>
+<style>
+body{font-family:sans-serif;padding:16px;font-size:15px}
+button{display:block;width:100%;padding:12px;margin:8px 0;font-size:15px;border-radius:10px;border:1px solid #ddd;background:#4d6bfe;color:#fff}
+pre{background:#f4f5f7;padding:12px;border-radius:8px;white-space:pre-wrap;word-break:break-all;font-size:13px}
+</style>
+</head>
+<body>
+<h3>Bridge Test</h3>
+<p>AndroidFile: <span id="f">checking</span></p>
+<p>AndroidShizuku: <span id="s">checking</span></p>
+<button onclick="testRead()">Read /sdcard/test.txt</button>
+<button onclick="testWrite()">Write /sdcard/test.txt</button>
+<button onclick="testList()">List /sdcard/</button>
+<button onclick="testShizuku()">Request Shizuku Permission</button>
+<button onclick="testShizukuList()">Shizuku list /sdcard/Android/data/</button>
+<pre id="out">Click buttons above</pre>
+<script>
+var out = document.getElementById('out');
+function log(s) { out.textContent += "\n" + s; }
+document.getElementById('f').textContent =
+  (window.AndroidFile && window.AndroidFile.readFile) ? "OK" : "NOT AVAILABLE";
+document.getElementById('s').textContent =
+  (window.AndroidShizuku && window.AndroidShizuku.isReady) ? "OK" : "NOT AVAILABLE";
+function testRead() { out.textContent = "== Read =="; try { log(window.AndroidFile.readFile('/sdcard/test.txt')); } catch (e) { log("Error: " + e.message); } }
+function testWrite() { out.textContent = "== Write =="; try { log(window.AndroidFile.writeFile('/sdcard/test.txt', 'Hello ' + new Date())); } catch (e) { log("Error: " + e.message); } }
+function testList() { out.textContent = "== List =="; try { log(window.AndroidFile.listDir('/sdcard/')); } catch (e) { log("Error: " + e.message); } }
+function testShizuku() { out.textContent = "== Shizuku =="; try { log(window.AndroidShizuku.requestPermission()); } catch (e) { log("Error: " + e.message); } }
+function testShizukuList() { out.textContent = "== Shizuku List =="; try { log(window.AndroidShizuku.listDir('/sdcard/Android/data/')); } catch (e) { log("Error: " + e.message); } }
+</script>
+</body>
+</html>
