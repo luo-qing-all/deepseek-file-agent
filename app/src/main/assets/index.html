@@ -11,7 +11,7 @@
 html,body{height:100%}
 body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;background:var(--bg);color:var(--fg);display:flex;flex-direction:column;height:100vh;height:100dvh;overflow:hidden;font-size:16px;-webkit-font-smoothing:antialiased}
 header{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;padding:calc(10px + env(safe-area-inset-top)) 16px 10px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.92);backdrop-filter:saturate(180%) blur(12px);-webkit-backdrop-filter:saturate(180%) blur(12px)}
-header .title{font-size:17px;font-weight:600;letter-spacing:.2px}
+header .title{font-size:17px;font-weight:600}
 header .title small{font-size:11px;font-weight:400;color:var(--muted);margin-left:6px}
 .icon-btn{border:none;background:transparent;color:var(--fg);width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;padding:0}
 .icon-btn:active{background:#f0f1f4}
@@ -19,7 +19,7 @@ header .title small{font-size:11px;font-weight:400;color:var(--muted);margin-lef
 .header-left .icon-btn{margin-left:-8px;margin-right:4px}
 #chat{flex:1 1 auto;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:16px 14px 8px}
 .welcome{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:44vh;color:var(--muted);user-select:none}
-.welcome .logo{width:56px;height:56px;border-radius:18px;background:linear-gradient(135deg,#4d6bfe,#7d93ff);color:#fff;font-weight:700;font-size:20px;letter-spacing:.5px;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px rgba(77,107,254,.28);margin-bottom:14px}
+.welcome .logo{width:56px;height:56px;border-radius:18px;background:linear-gradient(135deg,#4d6bfe,#7d93ff);color:#fff;font-weight:700;font-size:20px;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px rgba(77,107,254,.28);margin-bottom:14px}
 .welcome p{margin:0;font-size:14px}
 .msg{display:flex;margin-bottom:14px;animation:pop .22s ease}
 @keyframes pop{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
@@ -30,6 +30,7 @@ header .title small{font-size:11px;font-weight:400;color:var(--muted);margin-lef
 .msg.ai .bubble.error{background:#fff2f2;color:#c0392b}
 .tool-call-tip{display:inline-flex;align-items:center;gap:5px;margin:0 0 8px;padding:5px 10px;background:rgba(52,199,89,.1);border-radius:10px;font-size:12px;color:#34c759;font-weight:500}
 .tool-call-tip::before{content:'🔧';font-size:13px}
+.sys-tip{display:block;margin:6px 0;padding:6px 10px;background:rgba(255,149,0,.1);border-radius:10px;font-size:12px;color:#ff9500;line-height:1.5}
 .msg.user .msg-images{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
 .msg.user .msg-images img{max-width:110px;max-height:110px;border-radius:9px;display:block;object-fit:cover;border:1px solid rgba(255,255,255,.35)}
 .msg.user .msg-files{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
@@ -38,7 +39,7 @@ header .title small{font-size:11px;font-weight:400;color:var(--muted);margin-lef
 .msg.ai .bubble.streaming .content::after{content:'';display:inline-block;width:2px;height:1em;background:var(--accent);vertical-align:-.15em;margin-left:3px;border-radius:1px;animation:blink 1s step-end infinite}
 @keyframes blink{50%{opacity:0}}
 .reason{margin:0 0 8px;padding:8px 10px;background:rgba(0,0,0,.035);border-radius:12px;font-size:12.5px;color:#6b7280;line-height:1.55}
-.reason summary{cursor:pointer;list-style:none;font-weight:600;color:#8a8f99;outline:none}
+.reason summary{cursor:pointer;list-style:none;font-weight:600;color:#8a8f99}
 .reason summary::-webkit-details-marker{display:none}
 .reason summary::before{content:'▸ ';display:inline-block;transition:transform .2s}
 .reason[open] summary::before{transform:rotate(90deg)}
@@ -50,34 +51,31 @@ header .title small{font-size:11px;font-weight:400;color:var(--muted);margin-lef
 .composer{flex:0 0 auto;padding:10px 12px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:#fff}
 .composer-inner{display:flex;align-items:flex-end;gap:6px}
 .quick-bar{display:flex;align-items:center;gap:8px;padding:0 4px 8px;overflow-x:auto;-webkit-overflow-scrolling:touch}
-.quick-btn{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:16px;border:1px solid var(--line);background:#fff;color:var(--muted);font-size:12px;font-family:inherit;font-weight:500;transition:all .18s;cursor:pointer;flex:0 0 auto;max-width:180px}
-.quick-btn:active{transform:scale(.95)}
+.quick-btn{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:16px;border:1px solid var(--line);background:#fff;color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;flex:0 0 auto;max-width:180px}
 .quick-btn.active{background:rgba(77,107,254,.08);border-color:var(--accent);color:var(--accent)}
 .quick-btn.disabled{opacity:.4;cursor:not-allowed}
-.quick-btn.disabled:active{transform:none}
 .quick-btn svg{flex:0 0 auto}
 .quick-btn span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.preview-bar{display:none;gap:8px;padding:0 4px 10px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.preview-bar{display:none;gap:8px;padding:0 4px 10px;overflow-x:auto}
 .preview-bar.has-items{display:flex}
 .preview-item{position:relative;flex:0 0 auto;width:64px;height:64px}
 .preview-item img{width:100%;height:100%;object-fit:cover;border-radius:10px;display:block;border:1px solid var(--line)}
 .preview-item.file-preview{width:auto;min-width:100px;max-width:160px;height:64px;background:#f4f5f7;border-radius:10px;display:flex;align-items:center;gap:8px;padding:0 12px;border:1px solid var(--line)}
 .preview-item.file-preview .file-icon{width:30px;height:30px;flex:0 0 auto;background:var(--accent);color:#fff;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}
 .preview-item.file-preview .file-meta{flex:1;min-width:0}
-.preview-item.file-preview .file-name{font-size:12px;font-weight:500;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.preview-item.file-preview .file-name{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .preview-item.file-preview .file-size{font-size:10.5px;color:var(--muted);margin-top:2px}
 .preview-item .rm{position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;background:rgba(22,24,29,.82);color:#fff;border:2px solid #fff;display:flex;align-items:center;justify-content:center;padding:0}
 .preview-item .rm svg{display:block}
-#input{flex:1;resize:none;border:none;outline:none;background:#f4f5f7;border-radius:20px;padding:11px 15px;font-size:16px;line-height:1.4;font-family:inherit;color:inherit;max-height:120px;min-height:42px;transition:background .15s;min-width:0}
+#input{flex:1;resize:none;border:none;outline:none;background:#f4f5f7;border-radius:20px;padding:11px 15px;font-size:16px;line-height:1.4;font-family:inherit;max-height:120px;min-height:42px;min-width:0}
 #input:focus{background:#eef0f4}
-.btn-round{flex:0 0 auto;width:38px;height:38px;border-radius:50%;border:none;background:#f4f5f7;color:#5b6069;display:flex;align-items:center;justify-content:center;padding:0;transition:transform .12s,opacity .15s,background .15s}
+.btn-round{flex:0 0 auto;width:38px;height:38px;border-radius:50%;border:none;background:#f4f5f7;color:#5b6069;display:flex;align-items:center;justify-content:center;padding:0}
 .btn-round:active{transform:scale(.92);background:#e8eaef}
 .btn-round:disabled{opacity:.4}
-#send{flex:0 0 auto;width:42px;height:42px;border-radius:50%;border:none;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;padding:0;transition:transform .12s,opacity .15s}
-#send:active{transform:scale(.92)}
-#send:disabled{background:#dfe1e6;color:#fff}
+#send{flex:0 0 auto;width:42px;height:42px;border-radius:50%;border:none;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;padding:0}
+#send:disabled{background:#dfe1e6}
 #send.stop{background:#16181d}
-.loading-mask{position:fixed;inset:0;z-index:90;background:rgba(255,255,255,.78);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px}
+.loading-mask{position:fixed;inset:0;z-index:90;background:rgba(255,255,255,.78);display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px}
 .loading-mask.show{display:flex}
 .spinner{width:38px;height:38px;border-radius:50%;border:3px solid #dfe1e6;border-top-color:var(--accent);animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -86,89 +84,89 @@ header .title small{font-size:11px;font-weight:400;color:var(--muted);margin-lef
 .drawer.open{pointer-events:auto}
 .drawer-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.35);opacity:0;transition:opacity .28s}
 .drawer.open .drawer-backdrop{opacity:1}
-.drawer-panel{position:absolute;left:0;top:0;bottom:0;width:86%;max-width:340px;background:#fff;transform:translateX(-101%);transition:transform .3s cubic-bezier(.32,.72,0,1);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);box-shadow:4px 0 20px rgba(0,0,0,.06)}
+.drawer-panel{position:absolute;left:0;top:0;bottom:0;width:86%;max-width:340px;background:#fff;transform:translateX(-101%);transition:transform .3s cubic-bezier(.32,.72,0,1);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
 .drawer.open .drawer-panel{transform:translateX(0)}
 .drawer-head{padding:16px 18px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}
 .drawer-head h2{margin:0;font-size:17px;font-weight:600}
 .drawer-head-actions{display:flex;gap:2px}
 .drawer-search{padding:10px 14px 6px}
-.drawer-search input{width:100%;padding:9px 13px;border:1px solid var(--line);border-radius:10px;font-size:14px;font-family:inherit;color:inherit;background:#f7f8fa;outline:none;-webkit-appearance:none}
+.drawer-search input{width:100%;padding:9px 13px;border:1px solid var(--line);border-radius:10px;font-size:14px;font-family:inherit;background:#f7f8fa;outline:none;-webkit-appearance:none}
 .drawer-search input:focus{border-color:var(--accent);background:#fff}
-.drawer-list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:6px 8px}
+.drawer-list{flex:1;overflow-y:auto;padding:6px 8px}
 .history-item{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:12px;cursor:pointer}
 .history-item:active{background:#f4f5f7}
 .history-item.active{background:rgba(77,107,254,.08)}
 .history-item-body{flex:1;min-width:0}
-.history-item-title{font-size:14px;font-weight:500;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
+.history-item-title{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
 .history-item-meta{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .history-item-actions{display:flex;gap:0;flex:0 0 auto}
-.history-icon-btn{width:30px;height:30px;border:none;background:transparent;color:var(--muted);border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer}
+.history-icon-btn{width:30px;height:30px;border:none;background:transparent;color:var(--muted);border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0}
 .history-icon-btn:active{background:#eef0f4}
 .history-empty{text-align:center;padding:40px 20px;color:var(--muted);font-size:13px}
 .sheet{position:fixed;inset:0;z-index:60;pointer-events:none}
 .sheet.open{pointer-events:auto}
 .sheet-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.35);opacity:0;transition:opacity .28s}
 .sheet.open .sheet-backdrop{opacity:1}
-.sheet-panel{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:22px 22px 0 0;padding:8px 20px calc(22px + env(safe-area-inset-bottom));transform:translateY(101%);transition:transform .3s cubic-bezier(.32,.72,0,1);max-height:88vh;max-height:88dvh;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.sheet-panel{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:22px 22px 0 0;padding:8px 20px calc(22px + env(safe-area-inset-bottom));transform:translateY(101%);transition:transform .3s cubic-bezier(.32,.72,0,1);max-height:88vh;overflow-y:auto}
 .sheet.open .sheet-panel{transform:translateY(0)}
 .sheet-handle{width:38px;height:4px;border-radius:2px;background:#dcdfe5;margin:6px auto 12px}
 .sheet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
 .sheet-head h2{margin:0;font-size:17px;font-weight:600}
-.sheet-head button{border:none;background:transparent;color:var(--accent);font-size:15px;font-family:inherit;padding:4px 0}
+.sheet-head button{border:none;background:transparent;color:var(--accent);font-size:15px;padding:4px 0}
 .field{margin-bottom:20px}
-.field > label{display:flex;align-items:center;justify-content:space-between;font-size:13.5px;font-weight:600;color:#3f434b;margin-bottom:8px;letter-spacing:.2px}
-.field .val{font-weight:500;color:var(--accent);font-size:12.5px;font-variant-numeric:tabular-nums}
-input[type=text],input[type=password],input[type=number],textarea{width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:12px;font-size:16px;font-family:inherit;color:inherit;background:#fafbfc;outline:none;transition:border-color .15s,background .15s;-webkit-appearance:none;resize:vertical}
-input[type=text]:focus,input[type=password]:focus,input[type=number]:focus,textarea:focus{border-color:var(--accent);background:#fff}
+.field > label{display:flex;align-items:center;justify-content:space-between;font-size:13.5px;font-weight:600;color:#3f434b;margin-bottom:8px}
+.field .val{color:var(--accent);font-size:12.5px}
+input[type=text],input[type=password],input[type=number],textarea{width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:12px;font-size:16px;font-family:inherit;color:inherit;background:#fafbfc;outline:none;-webkit-appearance:none;resize:vertical}
+input:focus,textarea:focus{border-color:var(--accent);background:#fff}
 .input-wrap{position:relative}
 .input-wrap input{padding-right:66px}
-.eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);border:none;background:transparent;color:var(--accent);font-size:14px;font-family:inherit;padding:8px 12px}
+.eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);border:none;background:transparent;color:var(--accent);font-size:14px;padding:8px 12px}
 .segment{display:flex;background:#f4f5f7;border-radius:12px;padding:3px;gap:3px}
-.segment button{flex:1;border:none;background:transparent;padding:9px 2px;border-radius:9px;font-size:11.5px;font-family:inherit;font-weight:500;color:var(--muted);transition:background .15s,color .15s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.segment button{flex:1;border:none;background:transparent;padding:9px 2px;border-radius:9px;font-size:11.5px;font-weight:500;color:var(--muted)}
 .segment button.active{background:#fff;color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.08)}
-input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:2px;background:#e6e8ec;outline:none;margin:10px 0 2px}
-input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;border:2px solid var(--accent);box-shadow:0 1px 5px rgba(0,0,0,.18);cursor:pointer}
-.switch{position:relative;display:inline-block;width:48px;height:28px;flex:0 0 auto}
-.switch input{opacity:0;width:0;height:0;position:absolute}
-.switch .slider{position:absolute;inset:0;background:#dfe1e6;border-radius:14px;transition:background .2s;cursor:pointer}
-.switch .slider::before{content:'';position:absolute;width:24px;height:24px;left:2px;top:2px;background:#fff;border-radius:50%;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.22)}
+input[type=range]{-webkit-appearance:none;width:100%;height:4px;border-radius:2px;background:#e6e8ec;outline:none;margin:10px 0 2px}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;border:2px solid var(--accent)}
+.switch{position:relative;display:inline-block;width:48px;height:28px}
+.switch input{opacity:0;width:0;height:0}
+.slider{position:absolute;inset:0;background:#dfe1e6;border-radius:14px;transition:background .2s}
+.slider::before{content:'';position:absolute;width:24px;height:24px;left:2px;top:2px;background:#fff;border-radius:50%;transition:transform .2s}
 .switch input:checked + .slider{background:var(--accent)}
 .switch input:checked + .slider::before{transform:translateX(20px)}
-.btn-ghost{width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:#fff;color:#e5484d;font-size:15px;font-family:inherit;font-weight:500}
-.btn-ghost:active{background:#fafafa}
-.desc{font-size:11.5px;color:var(--muted);line-height:1.65;margin:7px 0 0;letter-spacing:.1px;min-height:18px}
-.desc b{color:#7a8090;font-weight:600}
+.btn-ghost{width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:#fff;color:#e5484d;font-size:15px;font-weight:500}
+.desc{font-size:11.5px;color:var(--muted);line-height:1.65;margin:7px 0 0}
+.desc b{color:#7a8090}
+.advanced-group{background:#fafbfc;border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
+.advanced-group .field:last-child{margin-bottom:0}
+.advanced-group-title{font-size:12px;font-weight:600;color:#5b6069;margin-bottom:12px;letter-spacing:.3px}
 .skill-list{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
-.skill-item{display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:#fafbfc;transition:all .15s;cursor:pointer}
+.skill-item{display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:#fafbfc;cursor:pointer}
 .skill-item.active{border-color:var(--accent);background:rgba(77,107,254,.06)}
 .skill-item-body{flex:1;min-width:0}
-.skill-item-name{font-size:14px;font-weight:600;color:var(--fg);margin-bottom:2px;display:flex;align-items:center;gap:6px}
+.skill-item-name{font-size:14px;font-weight:600;margin-bottom:2px;display:flex;align-items:center;gap:6px}
 .skill-badge{display:inline-block;padding:1px 6px;border-radius:6px;font-size:9.5px;font-weight:600;background:rgba(77,107,254,.12);color:var(--accent)}
 .skill-item-preview{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .skill-item-actions{display:flex;gap:2px;flex:0 0 auto}
-.skill-icon-btn{width:32px;height:32px;border:none;background:transparent;color:var(--muted);border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer}
+.skill-icon-btn{width:32px;height:32px;border:none;background:transparent;color:var(--muted);border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0}
 .skill-icon-btn:active{background:#eef0f4}
 .skill-empty{text-align:center;padding:24px 0;color:var(--muted);font-size:13px}
 .skill-editor{padding:14px;border:1px solid var(--accent);border-radius:14px;background:#fff;margin-bottom:16px;display:none}
 .skill-editor.show{display:block}
-.skill-editor-title{font-size:13px;font-weight:600;color:#5b6069;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
+.skill-editor-title{font-size:13px;font-weight:600;color:#5b6069;margin-bottom:10px;display:flex;justify-content:space-between}
 .skill-editor-hint{font-size:11px;color:var(--muted);font-weight:400}
-.skill-editor input[type=text],.skill-editor textarea{width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:12px;font-size:15px;font-family:inherit;color:inherit;background:#fafbfc;outline:none;margin-bottom:10px;-webkit-appearance:none;resize:vertical}
-.skill-editor input[type=text]:focus,.skill-editor textarea:focus{border-color:var(--accent);background:#fff}
 .skill-editor-actions{display:flex;gap:8px}
-.skill-editor-actions button{flex:1;padding:10px;border-radius:10px;border:none;font-size:14px;font-family:inherit;font-weight:500;cursor:pointer}
+.skill-editor-actions button{flex:1;padding:10px;border-radius:10px;border:none;font-size:14px;font-weight:500}
 .skill-editor-actions .btn-cancel{background:#f4f5f7;color:var(--fg)}
 .skill-editor-actions .btn-save{background:var(--accent);color:#fff}
 .skill-upload-row{display:flex;gap:8px;margin-bottom:8px}
-.btn-add-skill,.btn-upload-skill{flex:1;padding:12px;border:1.5px dashed var(--line);background:#fff;font-size:13.5px;font-family:inherit;font-weight:500;border-radius:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px}
+.btn-add-skill,.btn-upload-skill{flex:1;padding:12px;border:1.5px dashed var(--line);background:#fff;font-size:13.5px;font-weight:500;border-radius:12px;display:flex;align-items:center;justify-content:center;gap:5px}
 .btn-add-skill{color:var(--accent)}
 .btn-upload-skill{color:#34c759}
 .tool-toggles{display:flex;flex-direction:column;gap:10px;padding:12px 14px;background:#fafbfc;border-radius:14px;border:1px solid var(--line);margin-bottom:12px}
 .tool-toggle-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .tool-toggle-label{flex:1}
-.tool-toggle-name{font-size:13.5px;font-weight:600;color:var(--fg);display:flex;align-items:center;gap:6px}
-.tool-toggle-desc{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.5}
-.status-dot{width:7px;height:7px;border-radius:50%;background:#ccc;flex:0 0 auto}
+.tool-toggle-name{font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:6px}
+.tool-toggle-desc{font-size:11px;color:var(--muted);margin-top:3px}
+.status-dot{width:7px;height:7px;border-radius:50%;background:#ccc}
 .status-dot.ok{background:#34c759}
 .status-dot.warn{background:#ff9500}
 .status-dot.err{background:#ff3b30}
@@ -181,14 +179,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
 
 <header>
   <div class="header-left">
-    <button class="icon-btn" id="menuBtn" aria-label="历史对话">
-      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
-    </button>
+    <button class="icon-btn" id="menuBtn"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
     <div class="title">DeepSeek<small id="modelTag">deepseek-flash</small></div>
   </div>
-  <button class="icon-btn" id="settingsBtn" aria-label="设置">
-    <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.6v2.5M12 18.9v2.5M21.4 12h-2.5M5.1 12H2.6M18.65 5.35l-1.77 1.77M7.12 16.88l-1.77 1.77M18.65 18.65l-1.77-1.77M7.12 7.12L5.35 5.35"/></svg>
-  </button>
+  <button class="icon-btn" id="settingsBtn"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.6v2.5M12 18.9v2.5M21.4 12h-2.5M5.1 12H2.6M18.65 5.35l-1.77 1.77M7.12 16.88l-1.77 1.77M18.65 18.65l-1.77-1.77M7.12 7.12L5.35 5.35"/></svg></button>
 </header>
 
 <div id="chat"><div class="welcome"><div class="logo">DS</div><p>有什么可以帮你的？</p></div></div>
@@ -197,14 +191,14 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
 <div class="composer">
   <div class="quick-bar">
     <button class="quick-btn disabled" id="webSearchBtn" type="button" disabled title="暂未开放">
-      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
       <span>联网搜索</span>
     </button>
     <button class="quick-btn" id="skillBtn" type="button">
       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4L12 17l-6.3 4.4L8 14 2 9.4h7.6z"/></svg>
       <span id="skillBtnLabel">技能</span>
     </button>
-    <button class="quick-btn active" id="fileToolBtn" type="button" title="点击启用/禁用文件读写工具">
+    <button class="quick-btn active" id="fileToolBtn" type="button">
       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
       <span id="fileToolLabel">文件读写</span>
     </button>
@@ -213,14 +207,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
   <div class="preview-bar" id="previewBar"></div>
 
   <div class="composer-inner">
-    <button class="btn-round" id="imageBtn" type="button" aria-label="上传图片">
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.6" cy="8.6" r="1.5"/><path d="M21 15.5l-4.6-4.6a1.6 1.6 0 0 0-2.3 0L5 20"/></svg>
-    </button>
-    <button class="btn-round" id="docBtn" type="button" aria-label="上传文档">
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
-    </button>
+    <button class="btn-round" id="imageBtn"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.6" cy="8.6" r="1.5"/><path d="M21 15.5l-4.6-4.6a1.6 1.6 0 0 0-2.3 0L5 20"/></svg></button>
+    <button class="btn-round" id="docBtn"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></button>
     <textarea id="input" rows="1" placeholder="发消息…" enterkeyhint="send"></textarea>
-    <button id="send" disabled aria-label="发送"></button>
+    <button id="send" disabled></button>
   </div>
 
   <input type="file" id="fileInput" accept="image/jpeg,image/png,image/gif,image/webp" multiple>
@@ -235,11 +225,11 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
     <div class="drawer-head">
       <h2>历史对话</h2>
       <div class="drawer-head-actions">
-        <button class="icon-btn" id="newChatBtn" title="新对话"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
-        <button class="icon-btn" id="closeDrawer" title="关闭"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        <button class="icon-btn" id="newChatBtn"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+        <button class="icon-btn" id="closeDrawer"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
     </div>
-    <div class="drawer-search"><input type="text" id="historySearch" placeholder="搜索对话标题或内容…" autocomplete="off"></div>
+    <div class="drawer-search"><input type="text" id="historySearch" placeholder="搜索对话…" autocomplete="off"></div>
     <div class="drawer-list" id="historyList"></div>
   </div>
 </div>
@@ -251,8 +241,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
     <div class="sheet-head"><h2>技能</h2><button id="closeSkillSheet">关闭</button></div>
     <div class="skill-editor" id="skillEditor">
       <div class="skill-editor-title"><span id="skillEditorTitle">新建技能</span><span class="skill-editor-hint" id="skillEditorHint"></span></div>
-      <input type="text" id="skillNameInput" placeholder="技能名称，如：翻译" maxlength="30">
-      <textarea id="skillPromptInput" rows="5" placeholder="技能提示词，将作为系统指令发送给模型。"></textarea>
+      <input type="text" id="skillNameInput" placeholder="技能名称" maxlength="30">
+      <textarea id="skillPromptInput" rows="5" placeholder="技能提示词"></textarea>
       <div class="skill-editor-actions">
         <button type="button" class="btn-cancel" id="cancelSkillBtn">取消</button>
         <button type="button" class="btn-save" id="saveSkillBtn">保存</button>
@@ -263,7 +253,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
       <button type="button" class="btn-add-skill" id="addSkillBtn">+ 手动添加</button>
       <button type="button" class="btn-upload-skill" id="uploadSkillBtn">↑ 上传文件</button>
     </div>
-    <p class="desc" style="text-align:center;margin-top:4px;margin-bottom:16px">支持 <b>.md</b>（YAML frontmatter）、<b>.json</b>、<b>.txt</b> 格式。</p>
+    <p class="desc" style="text-align:center;margin-bottom:16px">支持 <b>.md</b>、<b>.json</b>、<b>.txt</b></p>
     <input type="file" id="skillFileInput" accept=".md,.markdown,.txt,.json,text/markdown,text/plain,application/json">
   </div>
 </div>
@@ -275,17 +265,16 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
     <div class="sheet-head"><h2>设置</h2><button id="closeSheet">完成</button></div>
 
     <div class="field">
-      <label for="systemPrompt">系统提示词（永久记忆 / 角色设定）</label>
-      <textarea id="systemPrompt" rows="3" placeholder="例如：你是一个科学严谨的助手。"></textarea>
+      <label for="apiKey">API Key 密钥</label>
+      <div class="input-wrap">
+        <input id="apiKey" type="password" placeholder="sk-..." autocomplete="off">
+        <button class="eye" id="toggleKey" type="button">显示</button>
+      </div>
     </div>
 
     <div class="field">
-      <label for="apiKey">API Key 密钥</label>
-      <div class="input-wrap">
-        <input id="apiKey" type="password" placeholder="sk-..." autocomplete="off" autocapitalize="off">
-        <button class="eye" id="toggleKey" type="button">显示</button>
-      </div>
-      <p class="desc">仅保存在本机。前往 platform.deepseek.com 获取。</p>
+      <label for="systemPrompt">系统提示词（永久记忆）</label>
+      <textarea id="systemPrompt" rows="3" placeholder="例如：你是一个科学严谨的助手。"></textarea>
     </div>
 
     <div class="field">
@@ -294,26 +283,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
         <button type="button" data-value="deepseek-flash">V4.1 Flash</button>
         <button type="button" data-value="deepseek-v4-pro">V4 Pro</button>
       </div>
-      <p class="desc" id="modelDesc"></p>
-    </div>
-
-    <div class="field">
-      <label>图片精度 detail</label>
-      <div class="segment" id="detailSeg">
-        <button type="button" data-value="auto">自动</button>
-        <button type="button" data-value="low">低</button>
-        <button type="button" data-value="high">高</button>
-      </div>
-      <p class="desc" id="detailDesc"></p>
-    </div>
-
-    <div class="field">
-      <label for="streamToggle">流式输出 stream</label>
-      <div class="segment" style="background:transparent;padding:0">
-        <span style="flex:1"></span>
-        <label class="switch"><input type="checkbox" id="streamToggle" checked><span class="slider"></span></label>
-      </div>
-      <p class="desc">开启后回复会一个字一个字显示。</p>
     </div>
 
     <div class="field">
@@ -324,7 +293,13 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
         <button type="button" data-value="high">高</button>
         <button type="button" data-value="max">最高</button>
       </div>
-      <p class="desc" id="effortDesc"></p>
+    </div>
+
+    <div class="field">
+      <label for="streamToggle">流式输出</label>
+      <div style="text-align:right">
+        <label class="switch"><input type="checkbox" id="streamToggle" checked><span class="slider"></span></label>
+      </div>
     </div>
 
     <div class="field">
@@ -337,9 +312,63 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
       <input type="range" id="topP" min="0" max="1" step="0.05" value="1">
     </div>
 
-    <div class="field">
-      <label for="maxTokens">最大回复长度 max_tokens</label>
-      <input type="number" id="maxTokens" min="1" max="65536" step="1" value="4096" inputmode="numeric">
+    <div class="advanced-group">
+      <div class="advanced-group-title">⚙️ 高级参数（全部由你决定）</div>
+
+      <div class="field">
+        <label for="maxTokens">最大回复长度 max_tokens</label>
+        <input type="number" id="maxTokens" min="0" step="1" value="4096" inputmode="numeric">
+        <p class="desc">单次回复最多生成多少 token。<b>填 0 表示不向 API 传该参数</b>（用 API 默认上限）。</p>
+      </div>
+
+      <div class="field">
+        <label for="maxTokensLimit">max_tokens 硬上限</label>
+        <input type="number" id="maxTokensLimit" min="0" step="1" value="131072" inputmode="numeric">
+        <p class="desc">防止手滑输入过大。<b>填 0 表示不限制</b>。</p>
+      </div>
+
+      <div class="field">
+        <label for="maxToolLoops">工具调用最大轮数</label>
+        <input type="number" id="maxToolLoops" min="0" step="1" value="30" inputmode="numeric">
+        <p class="desc">单次对话最多调用多少次工具。<b>填 0 表示不限制</b>（由「连续错误阈值」兜底）。</p>
+      </div>
+
+      <div class="field">
+        <label for="maxConsecutiveErrors">连续错误阈值</label>
+        <input type="number" id="maxConsecutiveErrors" min="0" step="1" value="5" inputmode="numeric">
+        <p class="desc">连续发生多少次错误后停止（错误信息会先喂给 AI 让它尝试自救）。<b>填 0 表示不限制</b>。</p>
+      </div>
+
+      <div class="field">
+        <label for="maxMediaItems">最多图片数量</label>
+        <input type="number" id="maxMediaItems" min="1" step="1" value="32" inputmode="numeric">
+        <p class="desc">单次发送最多带多少张图片。</p>
+      </div>
+
+      <div class="field">
+        <label for="maxInlineMB">单张图片大小上限 (MB)</label>
+        <input type="number" id="maxInlineMB" min="1" step="1" value="32" inputmode="numeric">
+      </div>
+
+      <div class="field">
+        <label for="maxDocTotal">最多文档数量</label>
+        <input type="number" id="maxDocTotal" min="1" step="1" value="5" inputmode="numeric">
+      </div>
+
+      <div class="field">
+        <label for="maxDocFileMB">单个文档大小上限 (MB)</label>
+        <input type="number" id="maxDocFileMB" min="1" step="1" value="2" inputmode="numeric">
+      </div>
+
+      <div class="field">
+        <label for="maxDocChars">单文档注入字符数上限</label>
+        <input type="number" id="maxDocChars" min="1000" step="1000" value="80000" inputmode="numeric">
+      </div>
+
+      <div class="field">
+        <label for="maxSkillFileKB">技能文件大小上限 (KB)</label>
+        <input type="number" id="maxSkillFileKB" min="1" step="1" value="512" inputmode="numeric">
+      </div>
     </div>
 
     <div class="field">
@@ -350,23 +379,20 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
             <div class="tool-toggle-name"><span class="status-dot" id="fsStatusDot"></span>普通文件权限</div>
             <div class="tool-toggle-desc" id="fsStatusText">检测中…</div>
           </div>
-          <button type="button" class="btn-add-skill" id="reqFsBtn" style="flex:0 0 auto;padding:8px 12px;font-size:12px">请求</button>
         </div>
-        <div class="tool-toggle-row" style="border-top:1px solid var(--line);padding-top:10px;margin-top:10px">
+        <div class="tool-toggle-row" style="border-top:1px solid var(--line);padding-top:10px">
           <div class="tool-toggle-label">
             <div class="tool-toggle-name"><span class="status-dot" id="shizukuStatusDot"></span>Shizuku 高权限</div>
             <div class="tool-toggle-desc" id="shizukuStatusText">检测中…</div>
           </div>
-          <button type="button" class="btn-add-skill" id="reqShizukuBtn" style="flex:0 0 auto;padding:8px 12px;font-size:12px">授权</button>
+          <button type="button" id="reqShizukuBtn" style="padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:#fff;font-size:12px;color:var(--accent)">授权</button>
         </div>
       </div>
-      <p class="desc">普通权限可读写 /sdcard/ 大部分目录；Shizuku 可访问 /Android/data/ 等受限目录。</p>
     </div>
 
     <div class="field">
-      <label for="fileRootPath">文件根路径（相对）</label>
-      <input type="text" id="fileRootPath" placeholder="/sdcard/" value="/sdcard/">
-      <p class="desc">AI 操作文件时的默认根目录。</p>
+      <label for="fileRootPath">文件根路径</label>
+      <input type="text" id="fileRootPath" value="/sdcard/">
     </div>
 
     <button class="btn-ghost" id="clearBtn" type="button">清空当前对话</button>
@@ -380,31 +406,22 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
   'use strict';
 
   var API_URL = 'https://api.deepseek.com/chat/completions';
-  var STORE_KEY = 'deepseek-mobile-cfg-v7';
+  var STORE_KEY = 'deepseek-mobile-cfg-v9';
   var DEFAULTS = {
     apiKey: '', systemPrompt: '', model: 'deepseek-flash', stream: true,
     reasoning_effort: 'high', temperature: 1, top_p: 1, max_tokens: 4096,
     detail: 'auto', skills: [], activeSkillId: '',
     conversations: [], currentConvId: '',
-    fileToolEnabled: true, fileRootPath: '/sdcard/'
-  };
-
-  var DESCS = {
-    model: {
-      'deepseek-flash': 'DeepSeek V4.1 Flash，速度快、成本低，支持图片与工具调用，日常首选。',
-      'deepseek-v4-pro': 'DeepSeek V4 Pro，能力更强，适合复杂任务。'
-    },
-    detail: {
-      'auto': '由模型自行判断图片处理方式。',
-      'low': '缩放到 512×512，最快最省。',
-      'high': '保留原图细节，适合截图、文档。'
-    },
-    effort: {
-      'none': '直接作答，速度最快。',
-      'low': '轻量思考。',
-      'high': '深度思考，推荐默认。',
-      'max': '最高强度思考。'
-    }
+    fileToolEnabled: true, fileRootPath: '/sdcard/',
+    maxTokensLimit: 131072,
+    maxToolLoops: 30,
+    maxConsecutiveErrors: 5,
+    maxMediaItems: 32,
+    maxInlineMB: 32,
+    maxDocTotal: 5,
+    maxDocFileMB: 2,
+    maxDocChars: 80000,
+    maxSkillFileKB: 512
   };
 
   var cfg;
@@ -413,10 +430,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
   if (!Array.isArray(cfg.skills)) cfg.skills = [];
   if (!Array.isArray(cfg.conversations)) cfg.conversations = [];
 
-  function save() {
-    try { localStorage.setItem(STORE_KEY, JSON.stringify(cfg)); } catch (e) {}
-  }
-
+  function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(cfg)); } catch (e) {} }
   var $ = function (id) { return document.getElementById(id); };
 
   var chatEl = $('chat'), inputEl = $('input'), sendBtn = $('send');
@@ -444,12 +458,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
 
   var messages = [], generating = false, controller = null, stick = true;
   var pending = [], pendingFiles = [], editingSkillId = null;
-  var MAX_INLINE = 32 * 1024 * 1024;
-  var MAX_MEDIA_ITEMS = 32;
-  var MAX_SKILL_FILE_SIZE = 512 * 1024;
-  var MAX_DOC_FILE_SIZE = 2 * 1024 * 1024;
-  var MAX_DOC_TOTAL = 5;
-  var MAX_TOOL_LOOPS = 6;
 
   function toast(msg) {
     var t = $('toast'); t.textContent = msg; t.classList.add('show');
@@ -481,7 +489,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
   }
 
   function nativeReadFile(path) {
-    if (!hasFileBridge()) return '错误：文件系统不可用（请在打包好的 App 内运行）';
+    if (!hasFileBridge()) return '错误：文件系统不可用';
     try { return window.AndroidFile.readFile(path); } catch (e) { return '读取失败：' + (e.message || e); }
   }
   function nativeWriteFile(path, content) {
@@ -509,9 +517,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
   function buildTools() {
     var tools = [];
     if (cfg.fileToolEnabled) {
-      tools.push({ type: 'function', function: { name: 'read_file', description: '读取手机上的文本文件内容。路径支持绝对路径（如 /sdcard/Documents/note.txt）。如果普通权限失败，可尝试 use_shizuku=true 使用高权限。', parameters: { type: 'object', properties: { path: { type: 'string', description: '文件的绝对路径' }, use_shizuku: { type: 'boolean', description: '是否使用 Shizuku 高权限读取（默认 false）' } }, required: ['path'] } } });
-      tools.push({ type: 'function', function: { name: 'write_file', description: '向手机文件写入文本内容。如果文件已存在会覆盖。父目录不存在会自动创建。', parameters: { type: 'object', properties: { path: { type: 'string', description: '文件的绝对路径' }, content: { type: 'string', description: '要写入的文本内容' }, use_shizuku: { type: 'boolean', description: '是否使用 Shizuku 高权限写入（默认 false）' } }, required: ['path', 'content'] } } });
-      tools.push({ type: 'function', function: { name: 'list_dir', description: '列出手机某个目录下的文件和子目录。', parameters: { type: 'object', properties: { path: { type: 'string', description: '目录的绝对路径' }, use_shizuku: { type: 'boolean', description: '是否使用 Shizuku 高权限读取（默认 false）' } }, required: ['path'] } } });
+      tools.push({ type: 'function', function: { name: 'read_file', description: '读取手机上的文本文件内容。路径如 /sdcard/Documents/note.txt。如果普通权限失败，可尝试 use_shizuku=true 使用高权限。', parameters: { type: 'object', properties: { path: { type: 'string' }, use_shizuku: { type: 'boolean' } }, required: ['path'] } } });
+      tools.push({ type: 'function', function: { name: 'write_file', description: '向手机文件写入文本内容。父目录不存在会自动创建。', parameters: { type: 'object', properties: { path: { type: 'string' }, content: { type: 'string' }, use_shizuku: { type: 'boolean' } }, required: ['path', 'content'] } } });
+      tools.push({ type: 'function', function: { name: 'list_dir', description: '列出手机某个目录下的文件和子目录。', parameters: { type: 'object', properties: { path: { type: 'string' }, use_shizuku: { type: 'boolean' } }, required: ['path'] } } });
     }
     return tools;
   }
@@ -547,13 +555,19 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
     topPValEl.textContent = Number(cfg.top_p).toFixed(2);
     maxTokEl.value = cfg.max_tokens;
     $('fileRootPath').value = cfg.fileRootPath || '/sdcard/';
+    $('maxTokensLimit').value = cfg.maxTokensLimit;
+    $('maxToolLoops').value = cfg.maxToolLoops;
+    $('maxConsecutiveErrors').value = cfg.maxConsecutiveErrors;
+    $('maxMediaItems').value = cfg.maxMediaItems;
+    $('maxInlineMB').value = cfg.maxInlineMB;
+    $('maxDocTotal').value = cfg.maxDocTotal;
+    $('maxDocFileMB').value = cfg.maxDocFileMB;
+    $('maxDocChars').value = cfg.maxDocChars;
+    $('maxSkillFileKB').value = cfg.maxSkillFileKB;
     syncSeg('modelSeg', cfg.model);
     syncSeg('effortSeg', cfg.reasoning_effort);
     syncSeg('detailSeg', cfg.detail);
     modelTag.textContent = cfg.model;
-    updateDesc('modelDesc', DESCS.model[cfg.model]);
-    updateDesc('detailDesc', DESCS.detail[cfg.detail]);
-    updateDesc('effortDesc', DESCS.effort[cfg.reasoning_effort]);
     syncSkillBtn(); syncFileToolBtn();
     renderSkillList(); renderHistoryList(''); updateFsStatus();
     if (cfg.currentConvId) {
@@ -561,7 +575,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
       if (conv && conv.messages.length) { messages = conv.messages.slice(); renderLoadedConversation(); }
     }
   }
-  function updateDesc(id, text) { var el = $(id); if (el) el.innerHTML = text || ''; }
   function syncSkillBtn() { var s = getActiveSkill(); skillBtnLabel.textContent = s ? s.name : '技能'; skillBtn.classList.toggle('active', !!s); }
   function syncFileToolBtn() { fileToolBtn.classList.toggle('active', !!cfg.fileToolEnabled); fileToolLabel.textContent = cfg.fileToolEnabled ? '文件读写' : '文件读写(关)'; }
   function updateFsStatus() {
@@ -570,7 +583,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
     if (hasFileBridge()) { fsDot.className = 'status-dot ok'; fsText.textContent = '已就绪（AndroidFile 桥接）'; }
     else { fsDot.className = 'status-dot err'; fsText.textContent = '不可用（请在打包好的 App 内运行）'; }
     if (hasShizuku()) { shDot.className = 'status-dot ok'; shText.textContent = '已就绪（Shizuku 已授权）'; }
-    else { shDot.className = 'status-dot warn'; shText.textContent = '未授权（点击右侧按钮请求）'; }
+    else { shDot.className = 'status-dot warn'; shText.textContent = '未授权'; }
   }
 
   initUI();
@@ -584,42 +597,18 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
     this.textContent = show ? '隐藏' : '显示';
   });
   Array.prototype.forEach.call(document.querySelectorAll('#modelSeg button'), function (btn) {
-    btn.addEventListener('click', function () {
-      cfg.model = btn.dataset.value; syncSeg('modelSeg', cfg.model);
-      modelTag.textContent = cfg.model; save();
-      updateDesc('modelDesc', DESCS.model[cfg.model]);
-    });
+    btn.addEventListener('click', function () { cfg.model = btn.dataset.value; syncSeg('modelSeg', cfg.model); modelTag.textContent = cfg.model; save(); });
   });
   Array.prototype.forEach.call(document.querySelectorAll('#effortSeg button'), function (btn) {
-    btn.addEventListener('click', function () {
-      cfg.reasoning_effort = btn.dataset.value; syncSeg('effortSeg', cfg.reasoning_effort);
-      save(); updateDesc('effortDesc', DESCS.effort[cfg.reasoning_effort]);
-    });
+    btn.addEventListener('click', function () { cfg.reasoning_effort = btn.dataset.value; syncSeg('effortSeg', cfg.reasoning_effort); save(); });
   });
   Array.prototype.forEach.call(document.querySelectorAll('#detailSeg button'), function (btn) {
-    btn.addEventListener('click', function () {
-      cfg.detail = btn.dataset.value; syncSeg('detailSeg', cfg.detail);
-      save(); updateDesc('detailDesc', DESCS.detail[cfg.detail]);
-    });
+    btn.addEventListener('click', function () { cfg.detail = btn.dataset.value; syncSeg('detailSeg', cfg.detail); save(); });
   });
   streamEl.addEventListener('change', function () { cfg.stream = streamEl.checked; save(); });
   fileToolBtn.addEventListener('click', function () {
     cfg.fileToolEnabled = !cfg.fileToolEnabled; syncFileToolBtn(); save();
     toast(cfg.fileToolEnabled ? '文件读写已启用' : '文件读写已关闭');
-  });
-  $('reqFsBtn').addEventListener('click', function () {
-    if (!hasFileBridge()) { toast('请在打包好的 App 内运行'); return; }
-    toast('文件桥接已就绪，首次安装请到系统设置授予「所有文件访问权限」');
-  });
-  $('reqShizukuBtn').addEventListener('click', function () {
-    if (!window.AndroidShizuku) { toast('Shizuku 桥接不可用'); return; }
-    try {
-      if (typeof window.AndroidShizuku.requestPermission === 'function') {
-        var r = window.AndroidShizuku.requestPermission();
-        toast(String(r || '已发送授权请求'));
-      }
-      setTimeout(updateFsStatus, 1000);
-    } catch (e) { toast('Shizuku 授权失败：' + (e.message || e)); }
   });
   tempEl.addEventListener('input', function () {
     cfg.temperature = parseFloat(tempEl.value);
@@ -631,12 +620,43 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
     topPValEl.textContent = cfg.top_p.toFixed(2);
   });
   topPEl.addEventListener('change', save);
+
   maxTokEl.addEventListener('input', function () {
     var v = parseInt(maxTokEl.value, 10);
-    cfg.max_tokens = (isNaN(v) || v < 1) ? 4096 : Math.min(v, 65536);
+    if (isNaN(v) || v < 0) v = 0;
+    if (cfg.maxTokensLimit > 0 && v > cfg.maxTokensLimit) v = cfg.maxTokensLimit;
+    cfg.max_tokens = v;
     save();
   });
-  maxTokEl.addEventListener('blur', function () { maxTokEl.value = cfg.max_tokens; });
+  function numberField(id, key, min, fallback) {
+    $(id).addEventListener('input', function () {
+      var v = parseInt(this.value, 10);
+      if (isNaN(v) || v < min) v = fallback;
+      cfg[key] = v;
+      save();
+    });
+    $(id).addEventListener('blur', function () { this.value = cfg[key]; });
+  }
+  numberField('maxTokensLimit', 'maxTokensLimit', 0, 131072);
+  numberField('maxToolLoops', 'maxToolLoops', 0, 30);
+  numberField('maxConsecutiveErrors', 'maxConsecutiveErrors', 0, 5);
+  numberField('maxMediaItems', 'maxMediaItems', 1, 32);
+  numberField('maxInlineMB', 'maxInlineMB', 1, 32);
+  numberField('maxDocTotal', 'maxDocTotal', 1, 5);
+  numberField('maxDocFileMB', 'maxDocFileMB', 1, 2);
+  numberField('maxDocChars', 'maxDocChars', 100, 80000);
+  numberField('maxSkillFileKB', 'maxSkillFileKB', 1, 512);
+
+  $('reqShizukuBtn').addEventListener('click', function () {
+    if (!window.AndroidShizuku) { toast('Shizuku 桥接不可用'); return; }
+    try {
+      if (typeof window.AndroidShizuku.requestPermission === 'function') {
+        var r = window.AndroidShizuku.requestPermission();
+        toast(String(r || '已发送授权请求'));
+      }
+      setTimeout(updateFsStatus, 1000);
+    } catch (e) { toast('Shizuku 授权失败：' + (e.message || e)); }
+  });
 
   function openSheet() { sheetEl.classList.add('open'); }
   function closeSheet() { sheetEl.classList.remove('open'); }
@@ -645,7 +665,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
   sheetEl.querySelector('.sheet-backdrop').addEventListener('click', closeSheet);
 
   $('clearBtn').addEventListener('click', function () {
-    if (messages.length && !confirm('确定清空当前对话？')) return;
+    if (messages.length && !confirm('确定清空？')) return;
     messages = []; clearPending(); clearPendingFiles();
     chatEl.innerHTML = '<div class="welcome"><div class="logo">DS</div><p>有什么可以帮你的？</p></div>';
     usageBar.classList.remove('show'); closeSheet(); saveCurrentConversation(); toast('已清空');
@@ -655,7 +675,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
   $('closeDrawer').addEventListener('click', function () { historyDrawer.classList.remove('open'); });
   historyDrawer.querySelector('.drawer-backdrop').addEventListener('click', function () { historyDrawer.classList.remove('open'); });
   $('newChatBtn').addEventListener('click', function () {
-    if (generating) { toast('正在生成中，请稍后'); return; }
+    if (generating) { toast('正在生成中'); return; }
     saveCurrentConversation(); cfg.currentConvId = genId('conv_'); messages = [];
     clearPending(); clearPendingFiles();
     chatEl.innerHTML = '<div class="welcome"><div class="logo">DS</div><p>有什么可以帮你的？</p></div>';
@@ -670,7 +690,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
     if (!conv) { conv = { id: cfg.currentConvId || genId('conv_'), title: '', createdAt: Date.now(), updatedAt: Date.now(), messages: [] }; cfg.currentConvId = conv.id; cfg.conversations.unshift(conv); }
     conv.messages = messages.slice(); conv.updatedAt = Date.now();
     if (!conv.title) { for (var i = 0; i < messages.length; i++) if (messages[i].role === 'user') { conv.title = String(messages[i].content).slice(0, 24); break; } if (!conv.title) conv.title = '新对话'; }
-    if (cfg.conversations.length > 50) cfg.conversations = cfg.conversations.slice(0, 50);
+    if (cfg.conversations.length > 100) cfg.conversations = cfg.conversations.slice(0, 100);
     save();
   }
   function renderHistoryList(filter) {
@@ -685,13 +705,13 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
       if (!titleHit) for (var i = 0; i < c.messages.length; i++) { var msg = c.messages[i]; if (msg.content && msg.content.toLowerCase().indexOf(q) > -1) { var idx = msg.content.toLowerCase().indexOf(q); contentHit = msg.content.slice(Math.max(0, idx - 12), idx + q.length + 12); break; } }
       if (titleHit || contentHit) matched.push({ conv: c, snippet: contentHit });
     });
-    if (!matched.length) { historyListEl.innerHTML = '<div class="history-empty">' + (q ? '没有匹配的对话' : '还没有历史对话') + '</div>'; return; }
+    if (!matched.length) { historyListEl.innerHTML = '<div class="history-empty">' + (q ? '没有匹配' : '还没有历史对话') + '</div>'; return; }
     matched.forEach(function (item) {
       var c = item.conv;
       var row = document.createElement('div');
       row.className = 'history-item' + (c.id === cfg.currentConvId ? ' active' : '');
       var body = document.createElement('div'); body.className = 'history-item-body';
-      var title = document.createElement('div'); title.className = 'history-item-title'; title.textContent = c.title || '未命名对话';
+      var title = document.createElement('div'); title.className = 'history-item-title'; title.textContent = c.title || '未命名';
       var meta = document.createElement('div'); meta.className = 'history-item-meta';
       meta.textContent = formatTime(c.updatedAt || c.createdAt) + ' · ' + (c.messages ? c.messages.length : 0) + ' 条' + (item.snippet ? ' · ' + item.snippet : '');
       body.appendChild(title); body.appendChild(meta);
@@ -745,7 +765,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
     var file = skillFileInput.files && skillFileInput.files[0];
     skillFileInput.value = '';
     if (!file) return;
-    if (file.size > MAX_SKILL_FILE_SIZE) { toast('文件超过 512KB'); return; }
+    if (file.size > cfg.maxSkillFileKB * 1024) { toast('文件超过 ' + cfg.maxSkillFileKB + 'KB'); return; }
     var reader = new FileReader();
     reader.onload = function () {
       var text = String(reader.result || '');
@@ -786,11 +806,11 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
   function filenameToName(filename) {
     var base = String(filename || '未命名').replace(/\.[^.]+$/, '');
     if (base.length > 30) base = base.slice(0, 30);
-    return base || '未命名技能';
+    return base || '未命名';
   }
   function renderSkillList() {
     skillListEl.innerHTML = '';
-    if (!cfg.skills.length) { skillListEl.innerHTML = '<div class="skill-empty">还没有技能。手动添加，或上传 .md / .json / .txt 文件</div>'; return; }
+    if (!cfg.skills.length) { skillListEl.innerHTML = '<div class="skill-empty">还没有技能</div>'; return; }
     cfg.skills.forEach(function (sk) {
       var item = document.createElement('div');
       item.className = 'skill-item' + (sk.id === cfg.activeSkillId ? ' active' : '');
@@ -803,7 +823,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
       var editBtn = document.createElement('button'); editBtn.className = 'skill-icon-btn'; editBtn.innerHTML = ICON_EDIT;
       editBtn.addEventListener('click', function (e) { e.stopPropagation(); openSkillEditor(sk.id); });
       var delBtn = document.createElement('button'); delBtn.className = 'skill-icon-btn'; delBtn.innerHTML = ICON_DEL;
-      delBtn.addEventListener('click', function (e) { e.stopPropagation(); if (!confirm('删除技能「' + sk.name + '」？')) return; cfg.skills = cfg.skills.filter(function (s) { return s.id !== sk.id; }); if (cfg.activeSkillId === sk.id) cfg.activeSkillId = ''; save(); renderSkillList(); syncSkillBtn(); });
+      delBtn.addEventListener('click', function (e) { e.stopPropagation(); if (!confirm('删除「' + sk.name + '」？')) return; cfg.skills = cfg.skills.filter(function (s) { return s.id !== sk.id; }); if (cfg.activeSkillId === sk.id) cfg.activeSkillId = ''; save(); renderSkillList(); syncSkillBtn(); });
       actions.appendChild(editBtn); actions.appendChild(delBtn);
       item.appendChild(body); item.appendChild(actions);
       item.addEventListener('click', function () { cfg.activeSkillId = (cfg.activeSkillId === sk.id) ? '' : sk.id; save(); renderSkillList(); syncSkillBtn(); });
@@ -815,24 +835,22 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
     if (id) { var sk = cfg.skills.find(function (s) { return s.id === id; }); if (sk) { skillNameInput.value = sk.name; skillPromptInput.value = sk.prompt; skillEditorTitle.textContent = '编辑技能'; } }
     else { skillNameInput.value = ''; skillPromptInput.value = ''; skillEditorTitle.textContent = '新建技能'; }
     skillEditor.classList.add('show');
-    setTimeout(function () { skillEditor.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, 100);
   }
   function openSkillEditorWithData(name, prompt, formatLabel) {
     editingSkillId = null;
     skillNameInput.value = name; skillPromptInput.value = prompt;
-    skillEditorTitle.textContent = '确认上传的 Skill';
+    skillEditorTitle.textContent = '确认上传';
     skillEditorHint.textContent = '已解析：' + (formatLabel || '');
     skillEditor.classList.add('show');
-    setTimeout(function () { skillEditor.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, 100);
   }
   function closeSkillEditor() { skillEditor.classList.remove('show'); editingSkillId = null; skillEditorHint.textContent = ''; }
   function saveSkill() {
     var name = skillNameInput.value.trim(), prompt = skillPromptInput.value.trim();
-    if (!name) { toast('请填写技能名称'); skillNameInput.focus(); return; }
-    if (!prompt) { toast('请填写技能提示词'); skillPromptInput.focus(); return; }
+    if (!name) { toast('请填写名称'); return; }
+    if (!prompt) { toast('请填写提示词'); return; }
     if (name.length > 30) name = name.slice(0, 30);
     if (editingSkillId) { var sk = cfg.skills.find(function (s) { return s.id === editingSkillId; }); if (sk) { sk.name = name; sk.prompt = prompt; } toast('已更新'); }
-    else { var ns = { id: genId('sk_'), name: name, prompt: prompt, source: skillEditorHint.textContent ? 'file' : 'manual' }; cfg.skills.push(ns); cfg.activeSkillId = ns.id; toast('已添加并启用'); }
+    else { var ns = { id: genId('sk_'), name: name, prompt: prompt, source: skillEditorHint.textContent ? 'file' : 'manual' }; cfg.skills.push(ns); cfg.activeSkillId = ns.id; toast('已添加'); }
     save(); closeSkillEditor(); renderSkillList(); syncSkillBtn();
   }
 
@@ -841,14 +859,14 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
     var files = Array.prototype.slice.call(fileInput.files || []);
     fileInput.value = '';
     if (!files.length) return;
-    var room = MAX_MEDIA_ITEMS - pending.length;
-    if (room <= 0) { toast('最多添加 ' + MAX_MEDIA_ITEMS + ' 张图片'); return; }
+    var room = cfg.maxMediaItems - pending.length;
+    if (room <= 0) { toast('最多 ' + cfg.maxMediaItems + ' 张图片'); return; }
     files = files.slice(0, room);
     files.forEach(function (file) {
-      if (file.size > MAX_INLINE) { toast(file.name + ' 超过 32MB，已跳过'); return; }
+      if (file.size > cfg.maxInlineMB * 1024 * 1024) { toast(file.name + ' 超过 ' + cfg.maxInlineMB + 'MB'); return; }
       var reader = new FileReader();
       reader.onload = function () { pending.push({ dataUrl: String(reader.result), name: file.name, size: file.size }); renderPreview(); };
-      reader.onerror = function () { toast('读取图片失败'); };
+      reader.onerror = function () { toast('读取失败'); };
       reader.readAsDataURL(file);
     });
   });
@@ -857,15 +875,15 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
     var files = Array.prototype.slice.call(docInput.files || []);
     docInput.value = '';
     if (!files.length) return;
-    var room = MAX_DOC_TOTAL - pendingFiles.length;
-    if (room <= 0) { toast('最多添加 ' + MAX_DOC_TOTAL + ' 个文档'); return; }
+    var room = cfg.maxDocTotal - pendingFiles.length;
+    if (room <= 0) { toast('最多 ' + cfg.maxDocTotal + ' 个文档'); return; }
     files = files.slice(0, room);
     files.forEach(function (file) {
-      if (file.size > MAX_DOC_FILE_SIZE) { toast(file.name + ' 超过 2MB，已跳过'); return; }
+      if (file.size > cfg.maxDocFileMB * 1024 * 1024) { toast(file.name + ' 超过 ' + cfg.maxDocFileMB + 'MB'); return; }
       var reader = new FileReader();
       reader.onload = function () {
-        var content = String(reader.result || ''), MAX_CHARS = 80000;
-        if (content.length > MAX_CHARS) content = content.slice(0, MAX_CHARS) + '\n\n...（已截断）';
+        var content = String(reader.result || '');
+        if (content.length > cfg.maxDocChars) content = content.slice(0, cfg.maxDocChars) + '\n\n...（已截断）';
         pendingFiles.push({ name: file.name, size: file.size, content: content });
         renderPreview();
       };
@@ -878,8 +896,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
     previewBar.classList.toggle('has-items', pending.length > 0 || pendingFiles.length > 0);
     pending.forEach(function (item, idx) {
       var box = document.createElement('div'); box.className = 'preview-item';
-      var img = document.createElement('img'); img.src = item.dataUrl; img.alt = item.name || 'image'; box.appendChild(img);
-      var rm = document.createElement('button'); rm.className = 'rm'; rm.type = 'button'; rm.innerHTML = ICON_RM;
+      var img = document.createElement('img'); img.src = item.dataUrl; box.appendChild(img);
+      var rm = document.createElement('button'); rm.className = 'rm'; rm.innerHTML = ICON_RM;
       rm.addEventListener('click', function () { pending.splice(idx, 1); renderPreview(); });
       box.appendChild(rm); previewBar.appendChild(box);
     });
@@ -892,7 +910,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
       var sz = document.createElement('div'); sz.className = 'file-size'; sz.textContent = formatSize(item.size);
       meta.appendChild(nm); meta.appendChild(sz);
       box.appendChild(icon); box.appendChild(meta);
-      var rm = document.createElement('button'); rm.className = 'rm'; rm.type = 'button'; rm.innerHTML = ICON_RM;
+      var rm = document.createElement('button'); rm.className = 'rm'; rm.innerHTML = ICON_RM;
       rm.addEventListener('click', function () { pendingFiles.splice(idx, 1); renderPreview(); });
       box.appendChild(rm); previewBar.appendChild(box);
     });
@@ -919,7 +937,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
     }
     if (role === 'user' && images && images.length) {
       var imgBox = document.createElement('div'); imgBox.className = 'msg-images';
-      images.slice(0, 12).forEach(function (it) { var im = document.createElement('img'); im.src = it.dataUrl; im.alt = it.name || 'media'; imgBox.appendChild(im); });
+      images.slice(0, 12).forEach(function (it) { var im = document.createElement('img'); im.src = it.dataUrl; imgBox.appendChild(im); });
       if (images.length > 12) { var more = document.createElement('div'); more.style.cssText = 'width:110px;height:110px;border-radius:9px;background:rgba(255,255,255,.18);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;'; more.textContent = '+' + (images.length - 12); imgBox.appendChild(more); }
       bubble.appendChild(imgBox);
     }
@@ -936,6 +954,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
   }
   function addToolTip(aiEl, text) {
     var tip = document.createElement('div'); tip.className = 'tool-call-tip'; tip.textContent = text;
+    aiEl.bubble.insertBefore(tip, aiEl.content);
+  }
+  function addSysTip(aiEl, text) {
+    var tip = document.createElement('div'); tip.className = 'sys-tip'; tip.textContent = text;
     aiEl.bubble.insertBefore(tip, aiEl.content);
   }
   function setGenerating(g) {
@@ -976,7 +998,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
   async function send() {
     var text = inputEl.value.trim();
     if ((!text && !pending.length && !pendingFiles.length) || generating) return;
-    if (!cfg.apiKey) { openSheet(); toast('请先填写 API Key'); setTimeout(function () { keyEl.focus(); }, 320); return; }
+    if (!cfg.apiKey) { openSheet(); toast('请先填写 API Key'); return; }
     var imagesToSend = pending.slice(), filesToSend = pendingFiles.slice();
     var welcome = chatEl.querySelector('.welcome'); if (welcome) welcome.remove();
     inputEl.value = ''; autoGrow(); clearPending(); clearPendingFiles(); sendBtn.disabled = true; stick = true;
@@ -1007,7 +1029,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
 
   async function runToolLoop(aiEl, firstUserContent) {
     var loopCount = 0;
+    var consecutiveErrors = 0;
     var tools = buildTools();
+    var toolLoopLimit = cfg.maxToolLoops > 0 ? cfg.maxToolLoops : 999999;
+    var errLimit = cfg.maxConsecutiveErrors; // 0 = 不限制
 
     var apiMessages = [];
     var sysParts = [];
@@ -1015,7 +1040,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
     var activeSkill = getActiveSkill();
     if (activeSkill) sysParts.push(activeSkill.prompt);
     if (sysParts.length) apiMessages.push({ role: 'system', content: sysParts.join('\n\n') });
-
     for (var i = 0; i < messages.length - 1; i++) {
       var m = messages[i];
       if (m.tool_calls || m.role === 'tool') continue;
@@ -1023,60 +1047,111 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
     }
     apiMessages.push({ role: 'user', content: firstUserContent });
 
-    while (loopCount < MAX_TOOL_LOOPS) {
+    while (loopCount < toolLoopLimit) {
       loopCount++;
       var payload = {
         model: cfg.model, messages: apiMessages,
         temperature: cfg.temperature, top_p: cfg.top_p,
-        max_tokens: cfg.max_tokens, stream: !!cfg.stream
+        stream: !!cfg.stream
       };
+      if (cfg.max_tokens > 0) payload.max_tokens = cfg.max_tokens;
       if (tools.length) { payload.tools = tools; payload.tool_choice = 'auto'; }
 
-      var response = await fetch(API_URL, {
-        method: 'POST', signal: controller.signal,
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.apiKey },
-        body: JSON.stringify(payload)
-      });
-      if (!response.ok) { var errMsg = await readError(response); throw new Error(errMsg); }
+      var response;
+      try {
+        response = await fetch(API_URL, {
+          method: 'POST', signal: controller.signal,
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.apiKey },
+          body: JSON.stringify(payload)
+        });
+      } catch (fetchErr) {
+        // 网络层错误 → 喂回给 AI
+        consecutiveErrors++;
+        if (errLimit > 0 && consecutiveErrors >= errLimit) {
+          throw new Error('连续 ' + consecutiveErrors + ' 次请求失败：' + (fetchErr.message || fetchErr));
+        }
+        var netMsg = '[系统] 上一次网络请求失败：' + (fetchErr.message || fetchErr) + '。请判断是否可以重试或调整方案后继续回答。';
+        addSysTip(aiEl, '请求失败，让 AI 尝试自救…');
+        apiMessages.push({ role: 'user', content: netMsg });
+        continue;
+      }
+
+      if (!response.ok) {
+        var errMsg = await readError(response);
+        consecutiveErrors++;
+        if (errLimit > 0 && consecutiveErrors >= errLimit) {
+          throw new Error('连续 ' + consecutiveErrors + ' 次 API 错误：' + errMsg);
+        }
+        addSysTip(aiEl, 'API 错误，让 AI 尝试自救…');
+        apiMessages.push({ role: 'user', content: '[系统] API 返回错误：' + errMsg + '。请尝试调整参数或换一种思路继续。' });
+        continue;
+      }
+
+      // 请求成功 → 重置连续错误计数
+      consecutiveErrors = 0;
 
       var assistantMsg;
-      if (cfg.stream) { assistantMsg = await handleStream(response, aiEl); }
-      else {
-        var data = await response.json();
-        var choice = data.choices && data.choices[0];
-        if (!choice) throw new Error('返回数据为空');
-        assistantMsg = choice.message;
-        if (data.usage) showUsage(data.usage);
-        if (assistantMsg.reasoning_content && aiEl.reason) { aiEl.reason.style.display = ''; aiEl.reason.open = true; aiEl.reasonText.textContent = assistantMsg.reasoning_content; }
-        if (assistantMsg.content) aiEl.content.textContent += assistantMsg.content;
+      try {
+        if (cfg.stream) { assistantMsg = await handleStream(response, aiEl); }
+        else {
+          var data = await response.json();
+          var choice = data.choices && data.choices[0];
+          if (!choice) throw new Error('返回数据为空');
+          assistantMsg = choice.message;
+          if (data.usage) showUsage(data.usage);
+          if (assistantMsg.reasoning_content && aiEl.reason) { aiEl.reason.style.display = ''; aiEl.reason.open = true; aiEl.reasonText.textContent = assistantMsg.reasoning_content; }
+          if (assistantMsg.content) aiEl.content.textContent += assistantMsg.content;
+        }
+      } catch (parseErr) {
+        consecutiveErrors++;
+        if (errLimit > 0 && consecutiveErrors >= errLimit) {
+          throw new Error('连续 ' + consecutiveErrors + ' 次响应解析失败：' + (parseErr.message || parseErr));
+        }
+        addSysTip(aiEl, '解析失败，让 AI 尝试自救…');
+        apiMessages.push({ role: 'user', content: '[系统] 响应解析失败：' + (parseErr.message || parseErr) + '。请重试。' });
+        continue;
       }
 
       if (!assistantMsg.tool_calls || !assistantMsg.tool_calls.length) {
         if (assistantMsg.content) messages.push({ role: 'assistant', content: assistantMsg.content });
         return;
       }
-
       apiMessages.push({ role: 'assistant', content: assistantMsg.content || '', tool_calls: assistantMsg.tool_calls });
 
       for (var j = 0; j < assistantMsg.tool_calls.length; j++) {
         var tc = assistantMsg.tool_calls[j];
         var fnName = tc.function.name;
         var args = {};
-        try { args = JSON.parse(tc.function.arguments || '{}'); } catch (e) {}
+        try { args = JSON.parse(tc.function.arguments || '{}'); } catch (parseErr) {
+          // 参数解析失败 → 告诉 AI
+          apiMessages.push({
+            role: 'tool',
+            tool_call_id: tc.id,
+            content: '[系统] 工具参数 JSON 解析失败：' + (parseErr.message || parseErr) + '。请重新构造参数。'
+          });
+          continue;
+        }
         addToolTip(aiEl, '调用 ' + fnName + '：' + (args.path || JSON.stringify(args)));
-        var result = await executeTool(fnName, args);
+
+        var result;
+        try {
+          result = await executeTool(fnName, args);
+        } catch (toolErr) {
+          // 工具执行异常 → 作为 tool 结果返回给 AI，让它继续
+          result = '[工具执行异常] ' + (toolErr.message || toolErr) + '。请判断是否需要换参数、换工具或直接回答。';
+          addSysTip(aiEl, '工具异常，已反馈给 AI');
+        }
         apiMessages.push({ role: 'tool', tool_call_id: tc.id, content: String(result) });
       }
     }
-    throw new Error('工具调用次数过多，已停止');
+    throw new Error('工具调用达到 ' + toolLoopLimit + ' 轮上限，已停止。可到设置中把「工具调用最大轮数」改为 0（不限制）或更大值。');
   }
 
   function handleStream(response, aiEl) {
     return new Promise(function (resolve, reject) {
-      if (!response.body) return reject(new Error('不支持流式响应'));
+      if (!response.body) return reject(new Error('不支持流式'));
       var reader = response.body.getReader(), decoder = new TextDecoder('utf-8'), buffer = '';
       var content = '', reasoning = '', toolCallsMap = {}, receivedUsage = null;
-
       function pump() {
         reader.read().then(function (r) {
           if (r.done) {
