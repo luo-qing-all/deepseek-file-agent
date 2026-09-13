@@ -4,15 +4,19 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.util.Base64;
 import android.webkit.JavascriptInterface;
+
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
+
 import rikka.shizuku.Shizuku;
 import rikka.shizuku.ShizukuRemoteProcess;
 
 public class ShizukuBridge {
     private static final int REQUEST_CODE = 1001;
     private final Context context;
+
     public ShizukuBridge(Context context) { this.context = context; }
 
     private boolean isAvailable() {
@@ -55,9 +59,16 @@ public class ShizukuBridge {
     private String execShell(String cmd) {
         if (!isAvailable()) return "Shizuku not authorized";
         try {
-            ShizukuRemoteProcess process = Shizuku.newProcess(new String[]{"sh", "-c", cmd}, null, null);
-            BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8));
-            BufferedReader er = new BufferedReader(new InputStreamReader(process.getErrorStream(), StandardCharsets.UTF_8));
+            Method m = Shizuku.class.getDeclaredMethod(
+                    "newProcess", String[].class, String[].class, String.class);
+            m.setAccessible(true);
+            ShizukuRemoteProcess process = (ShizukuRemoteProcess)
+                    m.invoke(null, new String[]{"sh", "-c", cmd}, null, null);
+
+            BufferedReader br = new BufferedReader(
+                    new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8));
+            BufferedReader er = new BufferedReader(
+                    new InputStreamReader(process.getErrorStream(), StandardCharsets.UTF_8));
             StringBuilder out = new StringBuilder();
             String line;
             while ((line = br.readLine()) != null) out.append(line).append("\n");
@@ -65,6 +76,8 @@ public class ShizukuBridge {
             process.waitFor();
             String result = out.toString().trim();
             return result.isEmpty() ? "(OK, no output)" : result;
-        } catch (Throwable t) { return "Shizuku exec failed: " + t.getMessage(); }
+        } catch (Throwable t) {
+            return "Shizuku exec failed: " + t.getMessage();
+        }
     }
 }
