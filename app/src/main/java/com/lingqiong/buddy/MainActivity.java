@@ -4,6 +4,7 @@ import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -17,11 +18,13 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
 
+import org.json.JSONArray;
+
 /**
  * 宿主 Activity：WebView 装载 index.html，并用 addJavascriptInterface 把
- * FileBridge / ShizukuBridge / SystemBridge 暴露成 JS 里的 window 对象。
+ * FileBridge / ShizukuBridge / TermuxBridge / SystemBridge 暴露成 JS 里的 window 对象。
  *
- * 这就是"AI 能操作文件"的物理接口——JS 只是喊一声，真正的执行在这里。
+ * 这就是"AI 能操作文件 / 终端"的物理接口——JS 只是喊一声，真正的执行在这里。
  */
 public class MainActivity extends Activity {
     private WebView webView;
@@ -47,6 +50,7 @@ public class MainActivity extends Activity {
         // ===== 桥接：把 Java 对象挂到 window 上 =====
         webView.addJavascriptInterface(new FileBridge(this), "AndroidFile");
         webView.addJavascriptInterface(new ShizukuBridge(this), "AndroidShizuku");
+        webView.addJavascriptInterface(new TermuxBridge(this), "AndroidTermux");
         webView.addJavascriptInterface(new SystemBridge(), "AndroidSystem");
 
         webView.setWebViewClient(new WebViewClient() {
@@ -132,7 +136,45 @@ public class MainActivity extends Activity {
             }
             filePathCallback.onReceiveValue(results);
             filePathCallback = null;
+
+            // 把真实文件路径推给前端：视频不读进内存，只靠这条路径交给 AI 处理
+            if (results != null && results.length > 0) {
+                JSONArray arr = new JSONArray();
+                for (Uri u : results) arr.put(resolvePath(u));
+                final String js = "window.__onNativePicker&&window.__onNativePicker(" + arr.toString() + ")";
+                webView.post(new Runnable() {
+                    @Override public void run() { webView.evaluateJavascript(js, null); }
+                });
+            }
         }
+    }
+
+    /** 尽力把 content:// 或 file:// 的 Uri 还原成真实文件路径。 */
+    private String resolvePath(Uri uri) {
+        if (uri == null) return "";
+        try {
+            String scheme = uri.getScheme();
+            if (scheme == null) return uri.toString();
+            if (scheme.equalsIgnoreCase("file")) {
+                String p = uri.getPath();
+                return p == null ? "" : p;
+            }
+            if (scheme.equalsIgnoreCase("content")) {
+                Cursor c = getContentResolver().query(uri, new String[]{"_data"}, null, null, null);
+                if (c != null) {
+                    try {
+                        if (c.moveToFirst()) {
+                            int idx = c.getColumnIndex("_data");
+                            if (idx >= 0) {
+                                String p = c.getString(idx);
+                                if (p != null && !p.isEmpty()) return p;
+                            }
+                        }
+                    } finally { c.close(); }
+                }
+            }
+        } catch (Throwable ignore) {}
+        return uri.toString();
     }
 
     public class SystemBridge {
@@ -154,8 +196,12 @@ public class MainActivity extends Activity {
         public String getVersionName() {
             try {
                 return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
-            } catch (PackageManager.NameNotFoundException e) { return "2.0.0"; }
+            } catch (PackageManager.NameNotFoundException e) { return "2.3.0"; }
         }
+
+        /** 宿主包名（com.lq.app，与官方 com.termux 等长，故可共存）。 */
+        @JavascriptInterface
+        public String getHostPackageName() { return getPackageName(); }
 
         @JavascriptInterface
         public void toast(final String msg) {

@@ -7,11 +7,29 @@ android {
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.lingqiong.buddy"
+        // ★ 关键：applicationId 决定了内置 Termux 环境所在的私有目录，
+        //   也决定了能不能与官方 Termux 共存。
+        //
+        //   Termux bootstrap 里每个二进制的库搜索路径(RUNPATH)都被编译期硬编码成
+        //       /data/data/com.termux/files/usr/lib
+        //   所以本 App 用不了官方那套目录。为此，CI 打包时会下载官方 bootstrap，
+        //   把里面所有 "com.termux" 等长替换成本 App 的 applicationId
+        //   （两者必须同为 10 字节，才能保证 ELF 内部字符串偏移不变、二进制不损坏）。
+        //
+        //   这样：
+        //     · getFilesDir() == /data/data/<applicationId>/files → 环境属于本 App；
+        //     · applicationId ≠ com.termux → 与官方 Termux 可以并存，互不干扰。
+        //   若你想换包名：改成任意 10 字符的包名即可，并同步改 .github/workflows/build.yml 里的 APP_ID。
+        applicationId "com.lq.app"
         minSdk 26
-        targetSdk 34
-        versionCode 2
-        versionName "2.0.0"
+
+        // ★ 关键：targetSdk 必须是 28。
+        //   Android 10+ 只对 targetSdk>=29 的应用禁止"从私有目录执行二进制"(W^X)，
+        //   28 可豁免。Termux 官方也是这么做的。
+        targetSdk 28
+
+        versionCode 5
+        versionName "2.3.0"
         multiDexEnabled true
     }
 
@@ -26,6 +44,11 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
         coreLibraryDesugaringEnabled true
+    }
+
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
     }
 }
 

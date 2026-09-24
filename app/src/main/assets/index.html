@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#ffffff">
 <title>LingQiongBuddy</title>
 <style>
-:root{--bg:#fff;--fg:#16181d;--muted:#8a8f99;--line:#eceef2;--accent:#4d6bfe;--bubble-ai:#f4f5f7;--radius:18px;--code-bg:#1e1f24;--code-fg:#e6e6e6}
+:root{--bg:#fff;--fg:#16181d;--muted:#8a8f99;--line:#eceef2;--accent:#4d6bfe;--bubble-ai:#f4f5f7;--radius:18px;--code-bg:#f6f8fa;--code-fg:#24292f}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html{font-size:16px}
 html,body{height:100%}
@@ -36,11 +36,11 @@ header .title small{font-size:.6875rem;font-weight:400;color:var(--muted);margin
 .msg.user .msg-file-tag{display:inline-flex;align-items:center;gap:4px;padding:4px 9px;border-radius:8px;background:rgba(255,255,255,.2);font-size:.75rem}
 .msg .content{display:block;white-space:pre-wrap;word-break:break-word}
 .msg .content p{margin:0 0 8px}
-.code-block{background:var(--code-bg);border-radius:10px;margin:8px 0;overflow:hidden;font-size:.8125rem}
-.code-head{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:rgba(255,255,255,.06);color:#b0b0b0;font-size:.71875rem;font-family:ui-monospace,Menlo,monospace}
-.code-head button{border:1px solid rgba(255,255,255,.2);background:transparent;color:#e6e6e6;font-size:.6875rem;padding:3px 10px;border-radius:6px;cursor:pointer;font-family:inherit}
-.code-head button:active{background:rgba(255,255,255,.15)}
-.code-head button.copied{color:#4ade80;border-color:#4ade80}
+.code-block{background:var(--code-bg);border:1px solid #e1e4e8;border-radius:10px;margin:8px 0;overflow:hidden;font-size:.8125rem}
+.code-head{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:#eaeef2;color:#57606a;font-size:.71875rem;font-family:ui-monospace,Menlo,monospace}
+.code-head button{border:1px solid #d0d7de;background:#fff;color:#57606a;font-size:.6875rem;padding:3px 10px;border-radius:6px;cursor:pointer;font-family:inherit}
+.code-head button:active{background:#eaeef2}
+.code-head button.copied{color:#1a7f37;border-color:#1a7f37}
 .code-block pre{margin:0;padding:10px 12px;overflow-x:auto;white-space:pre;color:var(--code-fg);font-family:ui-monospace,Menlo,monospace;line-height:1.5}
 .code-block code{font-family:inherit}
 .msg.ai .bubble.streaming .content::after{content:'';display:inline-block;width:2px;height:1em;background:var(--accent);vertical-align:-.15em;margin-left:3px;border-radius:1px;animation:blink 1s step-end infinite}
@@ -81,6 +81,7 @@ header .title small{font-size:.6875rem;font-weight:400;color:var(--muted);margin
 .preview-item img{width:100%;height:100%;object-fit:cover;border-radius:10px;display:block;border:1px solid var(--line)}
 .preview-item.file-preview{width:auto;min-width:100px;max-width:160px;height:64px;background:#f4f5f7;border-radius:10px;display:flex;align-items:center;gap:8px;padding:0 12px;border:1px solid var(--line)}
 .preview-item.file-preview .file-icon{width:30px;height:30px;flex:0 0 auto;background:var(--accent);color:#fff;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:.625rem;font-weight:700}
+.preview-item.file-preview .file-icon.vid{background:#e5484d}
 .preview-item.file-preview .file-meta{flex:1;min-width:0}
 .preview-item.file-preview .file-name{font-size:.75rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .preview-item.file-preview .file-size{font-size:.65625rem;color:var(--muted);margin-top:2px}
@@ -98,7 +99,7 @@ header .title small{font-size:.6875rem;font-weight:400;color:var(--muted);margin
 .loading-mask.show{display:flex}
 .spinner{width:38px;height:38px;border-radius:50%;border:3px solid #dfe1e6;border-top-color:var(--accent);animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-.loading-mask p{margin:0;font-size:.84375rem;color:#5b6069}
+.loading-mask p{margin:0;font-size:.84375rem;color:#5b6069;max-width:80vw;text-align:center;word-break:break-word}
 .drawer{position:fixed;inset:0;z-index:70;pointer-events:none}
 .drawer.open{pointer-events:auto}
 .drawer-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.35);opacity:0;transition:opacity .28s}
@@ -135,8 +136,9 @@ header .title small{font-size:.6875rem;font-weight:400;color:var(--muted);margin
 .field{margin-bottom:20px}
 .field > label{display:flex;align-items:center;justify-content:space-between;font-size:.84375rem;font-weight:600;color:#3f434b;margin-bottom:8px}
 .field .val{color:var(--accent);font-size:.78125rem}
-input[type=text],input[type=password],input[type=number],textarea{width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:12px;font-size:1rem;font-family:inherit;color:inherit;background:#fafbfc;outline:none;-webkit-appearance:none;resize:vertical}
-input:focus,textarea:focus{border-color:var(--accent);background:#fff}
+input[type=text],input[type=password],input[type=number],textarea,select{width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:12px;font-size:1rem;font-family:inherit;color:inherit;background:#fafbfc;outline:none;-webkit-appearance:none;resize:vertical}
+select{background-image:none;-webkit-appearance:none;appearance:none;background:#fafbfc url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a8f99' stroke-width='3'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 14px center}
+input:focus,textarea:focus,select:focus{border-color:var(--accent);background:#fff}
 .input-wrap{position:relative}
 .input-wrap input{padding-right:66px}
 .eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);border:none;background:transparent;color:var(--accent);font-size:.875rem;padding:8px 12px}
@@ -155,6 +157,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
 .btn-primary:active{opacity:.85}
 .btn-ghost{width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:#fff;color:#e5484d;font-size:.9375rem;font-weight:500}
 .btn-soft{width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:#fff;color:var(--accent);font-size:.9375rem;font-weight:500}
+.btn-soft:active{background:#f4f5f7}
 .desc{font-size:.71875rem;color:var(--muted);line-height:1.65;margin:7px 0 0}
 .desc b{color:#7a8090}
 .advanced-group{background:#fafbfc;border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
@@ -197,10 +200,21 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
 .tool-toggle-label{flex:1}
 .tool-toggle-name{font-size:.84375rem;font-weight:600;display:flex;align-items:center;gap:6px}
 .tool-toggle-desc{font-size:.6875rem;color:var(--muted);margin-top:3px}
-.status-dot{width:7px;height:7px;border-radius:50%;background:#ccc}
+.status-dot{width:7px;height:7px;border-radius:50%;background:#ccc;flex:0 0 auto}
 .status-dot.ok{background:#34c759}
 .status-dot.warn{background:#ff9500}
 .status-dot.err{background:#ff3b30}
+.mini-btn{padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:#fff;font-size:.75rem;color:var(--accent);flex:0 0 auto}
+.mini-btn:active{background:#f4f5f7}
+.term-output{background:#161b22;color:#c9d1d9;font-family:ui-monospace,Menlo,monospace;font-size:.75rem;line-height:1.55;padding:10px 12px;border-radius:12px;height:260px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;margin-bottom:10px;overscroll-behavior:contain}
+.term-output .t-cmd{color:#79c0ff}
+.term-output .t-err{color:#ff7b72}
+.term-output .t-ok{color:#7ee787}
+.term-output .t-dim{color:#6e7681}
+.term-input-row{display:flex;gap:8px}
+.term-input-row input{flex:1;min-width:0}
+.term-run{flex:0 0 auto;padding:0 18px;border-radius:12px;border:none;background:var(--accent);color:#fff;font-size:.875rem;font-weight:600}
+.term-run:disabled{background:#dfe1e6}
 #toast{position:fixed;left:50%;bottom:96px;transform:translate(-50%,10px);background:rgba(22,24,29,.92);color:#fff;padding:9px 16px;border-radius:20px;font-size:.84375rem;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;z-index:99;max-width:78vw;text-align:center}
 #toast.show{opacity:1;transform:translate(-50%,0)}
 #askOverlay{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.5);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;padding:20px}
@@ -221,7 +235,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
 .ask-cancel{background:#f4f5f7;color:var(--fg)}
 .ask-confirm{background:var(--accent);color:#fff}
 .ask-confirm:disabled{background:#dfe1e6;color:#fff}
-#fileInput,#docInput,#skillFileInput{display:none}
+#fileInput,#docInput,#videoInput,#skillFileInput{display:none}
 </style>
 </head>
 <body>
@@ -242,6 +256,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
 
 <div class="composer">
   <div class="quick-bar">
+    <button class="quick-btn" id="terminalBtn" type="button">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9l3 3-3 3M13 15h4"/></svg>
+      <span>终端</span>
+    </button>
     <button class="quick-btn disabled" id="webSearchBtn" type="button" disabled title="暂未开放">
       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
       <span>联网搜索</span>
@@ -259,13 +277,15 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
   <div class="preview-bar" id="previewBar"></div>
 
   <div class="composer-inner">
-    <button class="btn-round" id="imageBtn"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.6" cy="8.6" r="1.5"/><path d="M21 15.5l-4.6-4.6a1.6 1.6 0 0 0-2.3 0L5 20"/></svg></button>
-    <button class="btn-round" id="docBtn"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></button>
+    <button class="btn-round" id="imageBtn" title="图片"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.6" cy="8.6" r="1.5"/><path d="M21 15.5l-4.6-4.6a1.6 1.6 0 0 0-2.3 0L5 20"/></svg></button>
+    <button class="btn-round" id="videoBtn" title="视频"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="14" height="14" rx="3"/><path d="M16.5 10l5-3v10l-5-3z"/></svg></button>
+    <button class="btn-round" id="docBtn" title="文档"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></button>
     <textarea id="input" rows="1" placeholder="发消息…" enterkeyhint="send"></textarea>
     <button id="send" disabled></button>
   </div>
 
   <input type="file" id="fileInput" accept="image/jpeg,image/png,image/gif,image/webp" multiple>
+  <input type="file" id="videoInput" accept="video/*" multiple>
   <input type="file" id="docInput" accept=".txt,.md,.markdown,.json,.csv,.log,.html,.htm,.xml,.yaml,.yml,.js,.ts,.py,.java,.c,.cpp,.go,.rs,.sh,.css,text/*,application/json" multiple>
 </div>
 
@@ -318,7 +338,15 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
   <div class="sheet-panel">
     <div class="sheet-handle"></div>
     <div class="sheet-head"><h2>对话设置 · 仅本对话</h2><button id="closeConvSheet">完成</button></div>
-    <p class="desc" style="margin-top:-8px;margin-bottom:16px">这里的修改只影响当前对话，其它对话不受影响。</p>
+    <p class="desc" style="margin-top:-8px;margin-bottom:16px">这里的修改只影响当前对话，其它对话不受影响（API Key 除外，它是全局共用）。</p>
+
+    <div class="field">
+      <label for="convApiKey">API Key 密钥（全局）</label>
+      <div class="input-wrap">
+        <input id="convApiKey" type="password" placeholder="sk-..." autocomplete="off">
+        <button class="eye" id="convToggleKey" type="button">显示</button>
+      </div>
+    </div>
 
     <div class="field">
       <label for="convSystemPrompt">系统提示词（本对话）</label>
@@ -367,7 +395,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
       </div>
       <div class="field">
         <label for="convMaxToolLoops">工具调用最大轮数</label>
-        <input type="number" id="convMaxToolLoops" min="0" step="1" value="30" inputmode="numeric">
+        <input type="number" id="convMaxToolLoops" min="0" step="1" value="0" inputmode="numeric">
         <p class="desc">填 0 表示不限制。</p>
       </div>
       <div class="field">
@@ -381,7 +409,13 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
     </div>
 
     <div class="field">
-      <label>文件工具权限</label>
+      <label for="convTermuxEnv">使用的 Termux 环境</label>
+      <select id="convTermuxEnv"></select>
+      <p class="desc">AI 的终端工具会在选中的环境里执行命令（环境在「总设置 → Termux 环境」里创建）。</p>
+    </div>
+
+    <div class="field">
+      <label>工具权限</label>
       <div class="tool-toggles">
         <div class="tool-toggle-row">
           <div class="tool-toggle-label">
@@ -389,6 +423,13 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
             <div class="tool-toggle-desc">关闭后 AI 将不能调用任何文件工具</div>
           </div>
           <label class="switch"><input type="checkbox" id="convFileToolToggle"><span class="slider"></span></label>
+        </div>
+        <div class="tool-toggle-row" style="border-top:1px solid var(--line);padding-top:10px">
+          <div class="tool-toggle-label">
+            <div class="tool-toggle-name">允许使用终端</div>
+            <div class="tool-toggle-desc">AI 可以在内置 Termux 里执行命令</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="convTermuxToggle"><span class="slider"></span></label>
         </div>
         <div class="tool-toggle-row" style="border-top:1px solid var(--line);padding-top:10px">
           <div class="tool-toggle-label">
@@ -412,14 +453,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
     <div class="sheet-head"><h2>总设置</h2><button id="closeSheet">完成</button></div>
 
     <div class="field">
-      <label for="apiKey">API Key 密钥（全局）</label>
-      <div class="input-wrap">
-        <input id="apiKey" type="password" placeholder="sk-..." autocomplete="off">
-        <button class="eye" id="toggleKey" type="button">显示</button>
-      </div>
-    </div>
-
-    <div class="field">
       <label>界面字体大小 <span class="val" id="fontVal">100%</span></label>
       <input type="range" id="fontScale" min="0.8" max="1.6" step="0.05" value="1">
       <p class="desc">调整后立即生效，影响整个 App 的文字大小。</p>
@@ -432,11 +465,44 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
     </div>
 
     <div class="advanced-group">
+      <div class="advanced-group-title">🧰 Termux 环境</div>
+      <div class="field">
+        <label>内置环境状态</label>
+        <div class="tool-toggles">
+          <div class="tool-toggle-row">
+            <div class="tool-toggle-label">
+              <div class="tool-toggle-name"><span class="status-dot" id="termuxDot"></span>Termux 内置环境</div>
+              <div class="tool-toggle-desc" id="termuxStatus">检测中…</div>
+            </div>
+            <button type="button" class="mini-btn" id="termuxInstallBtn">安装</button>
+          </div>
+        </div>
+        <p class="desc">这是 App 自带的一份独立 Termux，与手机上的 Termux App 无关；把官方 Termux 卸载了也照样能用，也不会和官方 Termux 冲突。</p>
+      </div>
+      <div class="field">
+        <label>环境列表</label>
+        <div class="list-box" id="termuxEnvList"></div>
+      </div>
+      <div class="field">
+        <label for="termuxNewName">新建环境（完全隔离）</label>
+        <input type="text" id="termuxNewName" placeholder="环境名字，例如：Python 工作区" maxlength="24">
+        <input type="text" id="termuxNewCwd" placeholder="工作目录（可留空，默认用环境自带目录）" style="margin-top:8px">
+        <button class="btn-soft" id="termuxAddBtn" type="button" style="margin-top:10px">+ 新建环境</button>
+        <p class="desc">每个环境都有自己独立的一套软件库，可各自用 pkg 安装不同版本的软件（例如两个环境装不同 Python）。新建时需解压一次基础环境，稍等片刻。不同对话可在「对话设置 → 使用的 Termux 环境」里分别选择。</p>
+      </div>
+    </div>
+
+    <div class="advanced-group">
       <div class="advanced-group-title">💾 备份</div>
       <div class="field">
         <label for="backupName">为这次备份取个名字</label>
         <input type="text" id="backupName" placeholder="例如：换手机前的备份">
-        <p class="desc">备份文件会存到 <b id="backupDirText">/sdcard/LingQiongBuddy/备份</b>，卸载 App 也不会删除。</p>
+        <p class="desc">备份文件会存到 <b id="backupDirText">/sdcard/LingQiongBuddy/备份</b>，卸载 App 也不会删除。备份包含配置、对话、技能与 Termux 环境配置。</p>
+      </div>
+      <div class="field">
+        <label for="backupFullEnvToggle">同时备份完整 Termux 环境</label>
+        <div style="text-align:right"><label class="switch"><input type="checkbox" id="backupFullEnvToggle"><span class="slider"></span></label></div>
+        <p class="desc">开启后会额外打包每个环境里 pkg 安装的全部软件（体积可达数百 MB、耗时较长），换机后可完整还原。关闭则只备份配置与各环境工作目录里的文本文件。</p>
       </div>
       <button class="btn-primary" id="backupBtn" type="button">立即备份</button>
     </div>
@@ -453,39 +519,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
       <button class="btn-soft" id="openRecycleBtn" type="button">打开回收站管理</button>
     </div>
 
-    <div class="advanced-group">
-      <div class="advanced-group-title">⚙️ 全局高级参数</div>
-      <div class="field">
-        <label for="maxTokensLimit">max_tokens 硬上限</label>
-        <input type="number" id="maxTokensLimit" min="0" step="1" value="131072" inputmode="numeric">
-        <p class="desc">填 0 表示不限制。</p>
-      </div>
-      <div class="field">
-        <label for="maxMediaItems">最多图片数量</label>
-        <input type="number" id="maxMediaItems" min="1" step="1" value="32" inputmode="numeric">
-      </div>
-      <div class="field">
-        <label for="maxInlineMB">单张图片大小上限 (MB)</label>
-        <input type="number" id="maxInlineMB" min="1" step="1" value="32" inputmode="numeric">
-      </div>
-      <div class="field">
-        <label for="maxDocTotal">最多文档数量</label>
-        <input type="number" id="maxDocTotal" min="1" step="1" value="5" inputmode="numeric">
-      </div>
-      <div class="field">
-        <label for="maxDocFileMB">单个文档大小上限 (MB)</label>
-        <input type="number" id="maxDocFileMB" min="1" step="1" value="2" inputmode="numeric">
-      </div>
-      <div class="field">
-        <label for="maxDocChars">单文档注入字符数上限</label>
-        <input type="number" id="maxDocChars" min="1000" step="1000" value="80000" inputmode="numeric">
-      </div>
-      <div class="field">
-        <label for="maxSkillFileKB">技能文件大小上限 (KB)</label>
-        <input type="number" id="maxSkillFileKB" min="1" step="1" value="512" inputmode="numeric">
-      </div>
-    </div>
-
     <div class="field">
       <label>文件系统权限</label>
       <div class="tool-toggles">
@@ -500,12 +533,12 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
             <div class="tool-toggle-name"><span class="status-dot" id="shizukuStatusDot"></span>Shizuku 高权限</div>
             <div class="tool-toggle-desc" id="shizukuStatusText">检测中…</div>
           </div>
-          <button type="button" id="reqShizukuBtn" style="padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:#fff;font-size:.75rem;color:var(--accent)">授权</button>
+          <button type="button" class="mini-btn" id="reqShizukuBtn">授权</button>
         </div>
       </div>
     </div>
 
-    <p class="desc" style="text-align:center;margin-top:6px">LingQiongBuddy v<span id="aboutVer">2.0.0</span></p>
+    <p class="desc" style="text-align:center;margin-top:6px">LingQiongBuddy v<span id="aboutVer">2.3.0</span></p>
   </div>
 </div>
 
@@ -517,6 +550,25 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
     <div class="sheet-head"><h2>回收站</h2><button id="closeRecycle">关闭</button></div>
     <div class="list-box" id="recycleList" style="max-height:52vh"></div>
     <button class="btn-ghost" id="emptyRecycleBtn" type="button" style="margin-top:14px">清空回收站（永久删除全部）</button>
+  </div>
+</div>
+
+<!-- 终端 -->
+<div class="sheet" id="termSheet">
+  <div class="sheet-backdrop"></div>
+  <div class="sheet-panel">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h2>Termux 终端</h2><button id="closeTermSheet">关闭</button></div>
+    <div class="field">
+      <label for="termEnvSelect">环境</label>
+      <select id="termEnvSelect"></select>
+    </div>
+    <div class="term-output" id="termOutput"></div>
+    <div class="term-input-row">
+      <input type="text" id="termInput" placeholder="输入命令，例如：ls -la" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <button class="term-run" id="termRunBtn" type="button">运行</button>
+    </div>
+    <button class="btn-soft" id="termClearBtn" type="button" style="margin-top:12px">清屏</button>
   </div>
 </div>
 
@@ -540,17 +592,24 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
 (function () {
   'use strict';
 
-  var APP_VERSION = '2.0.0';
+  var APP_VERSION = '2.3.0';
   var API_URL = 'https://api.deepseek.com/chat/completions';
-  var STORE_KEY = 'lingqiong-buddy-cfg-v2';
-  var OLD_STORE_KEY = 'deepseek-mobile-cfg-v10';
+  var STORE_KEY = 'lingqiong-buddy-cfg-v3';
+  var OLD_STORE_KEY = 'lingqiong-buddy-cfg-v2';
+
+  // 固定上限（原来在"总设置→高级参数"里，现已内置为常量）
+  var LIMITS = {
+    maxMediaItems: 32, maxInlineMB: 32,
+    maxDocTotal: 5, maxDocFileMB: 2, maxDocChars: 80000, maxSkillFileKB: 512
+  };
 
   // 对话级默认参数（新对话以此为初始值）
   var CONV_DEFAULT = {
     systemPrompt: '', model: 'deepseek-flash', stream: true,
     reasoning_effort: 'high', temperature: 1, top_p: 1, max_tokens: 4096,
     fileRootPath: '/sdcard/', fileToolEnabled: true, allowDelete: false,
-    maxToolLoops: 30, maxConsecutiveErrors: 5
+    maxToolLoops: 0, maxConsecutiveErrors: 5,
+    termuxEnabled: true, termuxEnvId: ''
   };
 
   // 全局设置
@@ -561,9 +620,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
     detail: 'auto', skills: [], activeSkillId: '',
     conversations: [], currentConvId: '', recycleRecords: [],
     convDefaults: null,
-    maxTokensLimit: 131072,
-    maxMediaItems: 32, maxInlineMB: 32,
-    maxDocTotal: 5, maxDocFileMB: 2, maxDocChars: 80000, maxSkillFileKB: 512
+    termuxEnvs: [], termuxDefaultEnvId: ''
   };
 
   function readStore(key) { try { return JSON.parse(localStorage.getItem(key) || '{}'); } catch (e) { return {}; } }
@@ -583,6 +640,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
   if (!Array.isArray(cfg.skills)) cfg.skills = [];
   if (!Array.isArray(cfg.conversations)) cfg.conversations = [];
   if (!Array.isArray(cfg.recycleRecords)) cfg.recycleRecords = [];
+  if (!Array.isArray(cfg.termuxEnvs)) cfg.termuxEnvs = [];
   if (!cfg.convDefaults) cfg.convDefaults = Object.assign({}, CONV_DEFAULT);
   else cfg.convDefaults = Object.assign({}, CONV_DEFAULT, cfg.convDefaults);
 
@@ -591,8 +649,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
 
   var chatEl = $('chat'), inputEl = $('input'), sendBtn = $('send');
   var sheetEl = $('sheet'), convSheetEl = $('convSheet'), skillSheetEl = $('skillSheet');
-  var recycleSheetEl = $('recycleSheet'), historyDrawer = $('historyDrawer');
-  var keyEl = $('apiKey');
+  var recycleSheetEl = $('recycleSheet'), historyDrawer = $('historyDrawer'), termSheetEl = $('termSheet');
   var modelTag = $('modelTag');
   var skillBtn = $('skillBtn'), skillBtnLabel = $('skillBtnLabel');
   var fileToolBtn = $('fileToolBtn'), fileToolLabel = $('fileToolLabel');
@@ -600,12 +657,13 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
   var skillEditorTitle = $('skillEditorTitle'), skillEditorHint = $('skillEditorHint');
   var skillNameInput = $('skillNameInput'), skillPromptInput = $('skillPromptInput');
   var skillFileInput = $('skillFileInput');
-  var fileInput = $('fileInput'), docInput = $('docInput');
-  var imageBtn = $('imageBtn'), docBtn = $('docBtn');
+  var fileInput = $('fileInput'), docInput = $('docInput'), videoInput = $('videoInput');
+  var imageBtn = $('imageBtn'), videoBtn = $('videoBtn'), docBtn = $('docBtn');
   var previewBar = $('previewBar'), usageBar = $('usageBar');
   var historyListEl = $('historyList'), historySearchEl = $('historySearch');
   var askOverlay = $('askOverlay'), askQuestionEl = $('askQuestion'), askOptionsEl = $('askOptions');
   var askCustomEl = $('askCustom'), askCancelBtn = $('askCancel'), askConfirmBtn = $('askConfirm');
+  var termOutputEl = $('termOutput'), termInputEl = $('termInput'), termRunBtn = $('termRunBtn');
 
   var ICON_SEND = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>';
   var ICON_STOP = '<svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg>';
@@ -614,8 +672,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
   var ICON_DEL = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>';
 
   var messages = [], generating = false, controller = null, stick = true;
-  var pending = [], pendingFiles = [], editingSkillId = null;
-  var askResolve = null;
+  var pending = [], pendingFiles = [], pendingVideos = [], editingSkillId = null;
+  var askResolve = null, pendingPick = '';
 
   function toast(msg) {
     var t = $('toast'); t.textContent = msg; t.classList.add('show');
@@ -656,6 +714,105 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
     return c;
   }
   function CS() { return ensureConv().settings; }
+
+  /* ============ Termux 环境 ============ */
+  var _termuxInfo = null;
+  function hasTermuxBridge() { return !!(window.AndroidTermux && typeof window.AndroidTermux.execStart === 'function'); }
+  function termuxInfo(force) {
+    if (!_termuxInfo || force) {
+      try { _termuxInfo = JSON.parse(window.AndroidTermux.getStatus()); }
+      catch (e) { _termuxInfo = { ready: false, installing: false, log: '终端桥接不可用', envsDir: '/sdcard' }; }
+    }
+    return _termuxInfo;
+  }
+  function termuxReady() { return hasTermuxBridge() && termuxInfo().ready; }
+  function ensureTermuxEnv() {
+    if (!cfg.termuxEnvs.length) {
+      cfg.termuxEnvs.push({ id: 'default', name: '默认环境', cwd: '' });
+      cfg.termuxDefaultEnvId = 'default';
+      save();
+      return;
+    }
+    var hasDefault = false;
+    for (var i = 0; i < cfg.termuxEnvs.length; i++) if (cfg.termuxEnvs[i].id === 'default') hasDefault = true;
+    if (!hasDefault) {
+      // 旧版数据迁移：旧环境共用同一份 usr、无法独立，统一收敛为 default 环境
+      var first = cfg.termuxEnvs[0];
+      first.id = 'default';
+      cfg.termuxEnvs = [first];
+      cfg.termuxDefaultEnvId = 'default';
+      save();
+    }
+  }
+  function currentEnv() {
+    var cs = CS();
+    var e = null;
+    if (cs.termuxEnvId) e = cfg.termuxEnvs.filter(function (x) { return x.id === cs.termuxEnvId; })[0];
+    if (!e) e = cfg.termuxEnvs.filter(function (x) { return x.id === cfg.termuxDefaultEnvId; })[0];
+    if (!e) e = cfg.termuxEnvs[0] || null;
+    return e;
+  }
+  function envHome(env) {
+    var base = termuxInfo().envsDir || '/sdcard';
+    return base.replace(/\/+$/, '') + '/' + (env ? env.id : 'default') + '/home';
+  }
+  /* ── 异步执行：不再阻塞网页线程，彻底避免“发消息卡死” ── */
+  function termuxExecStart(cmd, cwd, envId) {
+    if (!hasTermuxBridge()) return { err: '终端桥接不可用' };
+    try {
+      var r = window.AndroidTermux.execStart(cmd, cwd || '', envId || 'default');
+      if (typeof r === 'string' && r.indexOf('ok:') === 0) return { id: r.slice(3) };
+      return { err: (typeof r === 'string' ? r.replace(/^err:/, '') : '启动失败') };
+    } catch (e) { return { err: '执行异常：' + (e.message || e) }; }
+  }
+  function termuxExecPoll(id) {
+    try { return JSON.parse(window.AndroidTermux.execPoll(id)); }
+    catch (e) { return { state: 'missing', out: '' }; }
+  }
+  function termuxExecKill(id) { try { return window.AndroidTermux.execKill(id); } catch (e) { return ''; } }
+  function shizukuExecStart(cmd) {
+    if (!hasShizuku() || typeof window.AndroidShizuku.execStart !== 'function') return { err: 'Shizuku 不可用' };
+    try {
+      var r = window.AndroidShizuku.execStart(cmd);
+      if (typeof r === 'string' && r.indexOf('ok:') === 0) return { id: r.slice(3) };
+      return { err: (typeof r === 'string' ? r.replace(/^err:/, '') : '启动失败') };
+    } catch (e) { return { err: '执行异常：' + (e.message || e) }; }
+  }
+  function shizukuExecPoll(id) {
+    try { return JSON.parse(window.AndroidShizuku.execPoll(id)); }
+    catch (e) { return { state: 'missing', out: '' }; }
+  }
+  function startEnvTask(method, arg) {
+    try {
+      var r = window.AndroidTermux[method](arg);
+      if (typeof r === 'string' && r.indexOf('ok:') === 0) return { id: r.slice(3) };
+      return { err: (typeof r === 'string' ? r.replace(/^err:/, '') : '启动失败') };
+    } catch (e) { return { err: (e.message || e) }; }
+  }
+  function waitTask(pollFn, id, onTick, maxMs) {
+    return new Promise(function (resolve) {
+      var t0 = Date.now(), limit = maxMs || 660000;
+      (function tick() {
+        var st = pollFn(id);
+        if (st.state === 'running') {
+          if (onTick) onTick(st);
+          if (Date.now() - t0 > limit) { resolve({ state: 'done', code: -1, timedOut: true, out: String(st.out || '') + '\n（等待超时）' }); return; }
+          setTimeout(tick, 250);
+          return;
+        }
+        resolve(st);
+      })();
+    });
+  }
+  async function runShizukuTool(cmd) {
+    if (!hasShizuku()) return '错误：Shizuku 不可用';
+    var started = shizukuExecStart(cmd);
+    if (started.err) return '错误：' + started.err;
+    var res = await waitTask(shizukuExecPoll, started.id);
+    var out = String(res.out || '');
+    if (out.length > 16000) out = out.slice(0, 16000) + '\n…（输出过长，已截断）';
+    return '退出码 ' + res.code + '\n' + (out || '（无输出）');
+  }
 
   /* ============ ask_user 弹窗 ============ */
   function askUser(question, options) {
@@ -825,10 +982,28 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
         tools.push({ type: 'function', function: { name: 'permanent_delete_file', description: '⚠️ 永久删除文件或目录（不可恢复）。仅在用户明确要求彻底删除时使用。', parameters: { type: 'object', properties: { path: { type: 'string' }, use_shizuku: { type: 'boolean' } }, required: ['path'] } } });
       }
       tools.push({ type: 'function', function: { name: 'mkdirs', description: '创建目录（含父目录）。', parameters: { type: 'object', properties: { path: { type: 'string' }, use_shizuku: { type: 'boolean' } }, required: ['path'] } } });
-      tools.push({ type: 'function', function: { name: 'shell_exec', description: '通过 Shizuku 执行任意 shell 命令。可用于解压、批量处理、查找文件。需要 Shizuku 已授权。', parameters: { type: 'object', properties: { cmd: { type: 'string', description: '要执行的 shell 命令' } }, required: ['cmd'] } } });
+    }
+    if (cs.termuxEnabled) {
+      var envNames = cfg.termuxEnvs.map(function (e) { return e.name; }).join('、');
+      tools.push({ type: 'function', function: {
+        name: 'termux_exec',
+        description: '在内置 Termux 终端里执行 shell 命令，返回输出与退出码。适合运行脚本、调用命令行工具（python/ffmpeg/curl 等，需先自行安装）、批量处理文件。可用环境：' + (envNames || '（无）') + '。',
+        parameters: { type: 'object', properties: {
+          cmd: { type: 'string', description: '要执行的命令，例如 ls -la /sdcard' },
+          env: { type: 'string', description: '环境名字（可省略，默认用当前对话选中的环境）' }
+        }, required: ['cmd'] } } });
+    }
+    if (cs.termuxEnabled && hasShizuku()) {
+      tools.push({ type: 'function', function: { name: 'shell_exec', description: '通过 Shizuku 以高权限执行任意 shell 命令（可访问系统受限目录）。', parameters: { type: 'object', properties: { cmd: { type: 'string', description: '要执行的 shell 命令' } }, required: ['cmd'] } } });
     }
     tools.push({ type: 'function', function: { name: 'ask_user', description: '当你需要用户从若干个选项中做出明确选择，或需要用户补充关键信息时调用。会弹出对话框让用户选择或自定义回答。不要用于闲聊提问，只在真的需要用户决策时使用。', parameters: { type: 'object', properties: { question: { type: 'string' }, options: { type: 'array', items: { type: 'string' } } }, required: ['question'] } } });
     return tools;
+  }
+
+  function findEnvByName(name) {
+    if (!name) return null;
+    for (var i = 0; i < cfg.termuxEnvs.length; i++) if (cfg.termuxEnvs[i].name === name) return cfg.termuxEnvs[i];
+    return null;
   }
 
   async function executeTool(name, args) {
@@ -843,24 +1018,30 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
     if (name === 'delete_file') { return moveToRecycleBin(args.path, useShizuku); }
     if (name === 'permanent_delete_file') { if (!CS().allowDelete) return '错误：未开启永久删除权限，已改为移入回收站。' + moveToRecycleBin(args.path, useShizuku); if (useShizuku && hasShizuku()) return shizukuDeleteFile(args.path); return nativeDeleteFile(args.path); }
     if (name === 'mkdirs') { if (useShizuku && hasShizuku()) return shizukuMkdirs(args.path); return nativeMkdirs(args.path); }
-    if (name === 'shell_exec') { return shizukuExec(args.cmd); }
+    if (name === 'shell_exec') { return await runShizukuTool(args.cmd); }
+    if (name === 'termux_exec') { return await runTermuxTool(args); }
     if (name === 'ask_user') { return await askUser(args.question || '请选择', args.options || []); }
     return '未知工具：' + name;
   }
 
+  async function runTermuxTool(args) {
+    if (!hasTermuxBridge()) return '错误：终端桥接不可用（请确认安装的是 2.3.0 及以后的版本）。';
+    if (!termuxInfo(true).ready) return '错误：内置 Termux 环境尚未安装。请提示用户到「总设置 → Termux 环境」点击「安装」，装好后重试。';
+    var env = findEnvByName(args.env) || currentEnv();
+    var started = termuxExecStart(args.cmd, env ? env.cwd : '', env ? env.id : 'default');
+    if (started.err) return '终端启动失败：' + started.err;
+    var res = await waitTask(termuxExecPoll, started.id);
+    var out = String(res.out || '');
+    if (out.length > 16000) out = out.slice(0, 16000) + '\n…（输出过长，已截断）';
+    var head = '[环境 ' + (env ? env.name : '默认') + '] 退出码 ' + res.code + (res.cost ? '，耗时 ' + res.cost + 'ms' : '') + (res.timedOut ? '（超时已终止）' : '');
+    return head + '\n' + (out || '（无输出）');
+  }
   /* ============ UI 初始化 ============ */
   function initUI() {
-    keyEl.value = cfg.apiKey || '';
+    ensureTermuxEnv();
     $('thinkChineseToggle').checked = cfg.thinkChinese !== false;
     $('fontScale').value = cfg.fontScale;
     applyFontScale();
-    $('maxTokensLimit').value = cfg.maxTokensLimit;
-    $('maxMediaItems').value = cfg.maxMediaItems;
-    $('maxInlineMB').value = cfg.maxInlineMB;
-    $('maxDocTotal').value = cfg.maxDocTotal;
-    $('maxDocFileMB').value = cfg.maxDocFileMB;
-    $('maxDocChars').value = cfg.maxDocChars;
-    $('maxSkillFileKB').value = cfg.maxSkillFileKB;
     $('backupDirText').textContent = cfg.backupDir;
     $('recycleDirText').textContent = cfg.recycleDir;
     $('aboutVer').textContent = APP_VERSION;
@@ -870,6 +1051,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
     modelTag.textContent = CS().model;
     syncSkillBtn(); syncFileToolBtn();
     renderSkillList(); renderHistoryList(''); updateFsStatus();
+    renderTermuxEnvs(); updateTermuxStatus();
     var conv = findConv(cfg.currentConvId);
     if (conv && conv.messages && conv.messages.length) { messages = conv.messages.slice(); renderLoadedConversation(); }
   }
@@ -884,32 +1066,123 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
     else { shDot.className = 'status-dot warn'; shText.textContent = '未授权'; }
   }
 
+  /* ============ Termux 环境 UI ============ */
+  function updateTermuxStatus() {
+    var dot = $('termuxDot'), txt = $('termuxStatus'), btn = $('termuxInstallBtn');
+    if (!hasTermuxBridge()) { dot.className = 'status-dot err'; txt.textContent = '终端桥接不可用（请安装 2.3.0+）'; btn.textContent = '安装'; btn.disabled = true; return; }
+    btn.disabled = false;
+    var st = termuxInfo(true);
+    if (st.ready) { dot.className = 'status-dot ok'; txt.textContent = '已就绪 · ' + st.arch + ' · ' + (st.prefix || ''); btn.textContent = '重装'; }
+    else if (st.installing) { dot.className = 'status-dot warn'; txt.textContent = st.log || '安装中…'; btn.textContent = '安装中'; btn.disabled = true; }
+    else { dot.className = 'status-dot warn'; txt.textContent = st.log || '尚未安装'; btn.textContent = '安装'; }
+  }
+  function renderTermuxEnvs() {
+    var box = $('termuxEnvList'); box.innerHTML = '';
+    if (!cfg.termuxEnvs.length) { box.innerHTML = '<div class="list-empty">还没有环境</div>'; return; }
+    cfg.termuxEnvs.forEach(function (env) {
+      var row = document.createElement('div'); row.className = 'list-row';
+      var body = document.createElement('div'); body.className = 'list-row-body';
+      var t = document.createElement('div'); t.className = 'list-row-title'; t.textContent = env.name;
+      var m = document.createElement('div'); m.className = 'list-row-meta';
+      m.textContent = '独立环境' + (env.id === cfg.termuxDefaultEnvId ? ' · 默认' : '') + (env.cwd ? ' · 工作目录 ' + env.cwd : '');
+      body.appendChild(t); body.appendChild(m);
+      var b1 = document.createElement('button'); b1.className = 'list-row-btn'; b1.textContent = '设为默认';
+      b1.addEventListener('click', function () { cfg.termuxDefaultEnvId = env.id; save(); renderTermuxEnvs(); });
+      var b2 = document.createElement('button'); b2.className = 'list-row-btn'; b2.textContent = '改名';
+      b2.addEventListener('click', function () { var n = prompt('新的环境名字：', env.name); if (n === null) return; n = n.trim(); if (!n) return; env.name = n.slice(0, 24); save(); renderTermuxEnvs(); refreshEnvSelects(); });
+      var b3 = document.createElement('button'); b3.className = 'list-row-btn danger'; b3.textContent = '删除';
+      b3.addEventListener('click', function () {
+        if (env.id === 'default') { toast('默认环境不可删除'); return; }
+        if (!confirm('删除环境「' + env.name + '」？将删除它独立安装的全部软件，不可恢复。')) return;
+        if (hasTermuxBridge() && typeof window.AndroidTermux.envDelete === 'function') { try { window.AndroidTermux.envDelete(env.id); } catch (e) {} }
+        cfg.termuxEnvs = cfg.termuxEnvs.filter(function (x) { return x.id !== env.id; });
+        if (cfg.termuxDefaultEnvId === env.id) cfg.termuxDefaultEnvId = cfg.termuxEnvs.length ? cfg.termuxEnvs[0].id : '';
+        ensureTermuxEnv(); save(); renderTermuxEnvs(); refreshEnvSelects();
+      });
+      row.appendChild(body); row.appendChild(b1); row.appendChild(b2); row.appendChild(b3); box.appendChild(row);
+    });
+  }
+  function refreshEnvSelects() {
+    var sel = $('convTermuxEnv'), tsel = $('termEnvSelect');
+    if (sel) {
+      sel.innerHTML = '';
+      cfg.termuxEnvs.forEach(function (env) {
+        var o = document.createElement('option'); o.value = env.id; o.textContent = env.name; sel.appendChild(o);
+      });
+      var cs = CS(); sel.value = cs.termuxEnvId || (currentEnv() ? currentEnv().id : '');
+    }
+    if (tsel) {
+      tsel.innerHTML = '';
+      cfg.termuxEnvs.forEach(function (env) {
+        var o = document.createElement('option'); o.value = env.id; o.textContent = env.name; tsel.appendChild(o);
+      });
+      var cur = currentEnv(); if (cur) tsel.value = cur.id;
+    }
+  }
+  function startTermuxInstall(force) {
+    if (!hasTermuxBridge()) { toast('终端桥接不可用'); return; }
+    var r = force ? window.AndroidTermux.reinstall() : window.AndroidTermux.install();
+    toast(String(r));
+    $('loadingText').textContent = '正在准备内置 Termux 环境…';
+    $('loadingMask').classList.add('show');
+    var timer = setInterval(function () {
+      var st = termuxInfo(true);
+      $('loadingText').textContent = '内置 Termux：' + (st.log || '') + (st.percent ? '（' + st.percent + '%）' : '');
+      if (!st.installing) {
+        clearInterval(timer);
+        $('loadingMask').classList.remove('show');
+        updateTermuxStatus();
+        if (st.ready) toast('Termux 环境安装完成');
+        else toast('安装未完成：' + (st.log || '未知错误'));
+      }
+    }, 700);
+  }
+
   initUI();
+  refreshEnvSelects();
 
   /* ============ 总设置事件 ============ */
-  function openSheet() { sheetEl.classList.add('open'); }
+  function openSheet() { sheetEl.classList.add('open'); renderTermuxEnvs(); updateTermuxStatus(); }
   function closeSheet() { sheetEl.classList.remove('open'); }
   $('settingsBtn').addEventListener('click', openSheet);
   $('closeSheet').addEventListener('click', closeSheet);
   sheetEl.querySelector('.sheet-backdrop').addEventListener('click', closeSheet);
 
-  keyEl.addEventListener('input', function () { cfg.apiKey = keyEl.value.trim(); save(); });
-  $('toggleKey').addEventListener('click', function () { var show = keyEl.type === 'password'; keyEl.type = show ? 'text' : 'password'; this.textContent = show ? '隐藏' : '显示'; });
   $('fontScale').addEventListener('input', function () { cfg.fontScale = parseFloat(this.value); applyFontScale(); });
   $('fontScale').addEventListener('change', save);
   $('thinkChineseToggle').addEventListener('change', function () { cfg.thinkChinese = this.checked; save(); });
-
-  function numberField(id, key, min, fallback) {
-    $(id).addEventListener('input', function () { var v = parseInt(this.value, 10); if (isNaN(v) || v < min) v = fallback; cfg[key] = v; save(); });
-    $(id).addEventListener('blur', function () { this.value = cfg[key]; });
-  }
-  numberField('maxTokensLimit', 'maxTokensLimit', 0, 131072);
-  numberField('maxMediaItems', 'maxMediaItems', 1, 32);
-  numberField('maxInlineMB', 'maxInlineMB', 1, 32);
-  numberField('maxDocTotal', 'maxDocTotal', 1, 5);
-  numberField('maxDocFileMB', 'maxDocFileMB', 1, 2);
-  numberField('maxDocChars', 'maxDocChars', 100, 80000);
-  numberField('maxSkillFileKB', 'maxSkillFileKB', 1, 512);
+  $('termuxInstallBtn').addEventListener('click', function () {
+    var st = termuxInfo(true);
+    startTermuxInstall(!!st.ready);
+  });
+  $('termuxAddBtn').addEventListener('click', function () {
+    var name = ($('termuxNewName').value || '').trim();
+    if (!name) { toast('请填写环境名字'); return; }
+    if (findEnvByName(name)) { toast('已有同名环境'); return; }
+    var cwd = ($('termuxNewCwd').value || '').trim();
+    var id = genId('env_');
+    cfg.termuxEnvs.push({ id: id, name: name.slice(0, 24), cwd: cwd });
+    if (!cfg.termuxDefaultEnvId) cfg.termuxDefaultEnvId = cfg.termuxEnvs[0].id;
+    $('termuxNewName').value = ''; $('termuxNewCwd').value = '';
+    save(); renderTermuxEnvs(); refreshEnvSelects();
+    if (hasTermuxBridge() && typeof window.AndroidTermux.envCreate === 'function') {
+      var r = window.AndroidTermux.envCreate(id);
+      toast(String(r));
+      $('loadingText').textContent = '正在创建独立环境「' + name + '」…'; $('loadingMask').classList.add('show');
+      var timer = setInterval(function () {
+        var st = termuxInfo(true);
+        $('loadingText').textContent = '创建环境：' + (st.log || '') + (st.percent ? '（' + st.percent + '%）' : '');
+        if (!st.installing) {
+          clearInterval(timer);
+          $('loadingMask').classList.remove('show');
+          updateTermuxStatus();
+          toast('环境「' + name + '」创建完成');
+        }
+      }, 800);
+    } else {
+      toast('已新建环境');
+    }
+  });
 
   $('reqShizukuBtn').addEventListener('click', function () {
     if (!window.AndroidShizuku) { toast('Shizuku 桥接不可用'); return; }
@@ -945,21 +1218,37 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
       var rawName = ($('backupName').value || '').trim();
       var safe = (rawName || ('backup_' + stamp())).replace(/[\/\\:*?"<>|]/g, '_');
       nativeMkdirs(cfg.backupDir);
+      var envs = cfg.termuxEnvs.map(function (env) { return { id: env.id, name: env.name, cwd: env.cwd }; });
+      var wantFull = $('backupFullEnvToggle') && $('backupFullEnvToggle').checked;
       var payload = {
         app: 'LingQiongBuddy', version: APP_VERSION, exportedAt: Date.now(), name: rawName || safe,
         config: {
           apiKey: cfg.apiKey, fontScale: cfg.fontScale, thinkChinese: cfg.thinkChinese,
           backupDir: cfg.backupDir, recycleDir: cfg.recycleDir, detail: cfg.detail,
           skills: cfg.skills, activeSkillId: cfg.activeSkillId, convDefaults: cfg.convDefaults,
-          maxTokensLimit: cfg.maxTokensLimit, maxMediaItems: cfg.maxMediaItems, maxInlineMB: cfg.maxInlineMB,
-          maxDocTotal: cfg.maxDocTotal, maxDocFileMB: cfg.maxDocFileMB, maxDocChars: cfg.maxDocChars, maxSkillFileKB: cfg.maxSkillFileKB
+          termuxEnvs: cfg.termuxEnvs, termuxDefaultEnvId: cfg.termuxDefaultEnvId
         },
+        termux: { envs: envs, installed: termuxReady(), arch: termuxInfo().arch || '', fullEnv: !!wantFull },
         conversations: cfg.conversations
       };
       var path = cfg.backupDir.replace(/\/+$/, '') + '/' + safe + '.json';
       var r = nativeWriteFile(path, JSON.stringify(payload, null, 2));
-      if (/OK/.test(String(r))) { toast('已备份：' + safe); renderBackupList(); }
-      else toast('备份失败：' + r);
+      if (!/OK/.test(String(r))) { toast('备份失败：' + r); return; }
+      if (wantFull && hasTermuxBridge() && typeof window.AndroidTermux.exportEnvTar === 'function') {
+        var tarPath = cfg.backupDir.replace(/\/+$/, '') + '/' + safe + '.env.tar.gz';
+        var started = startEnvTask('exportEnvTar', tarPath);
+        if (started.err) { toast('配置已备份，但环境打包启动失败：' + started.err); renderBackupList(); return; }
+        toast('正在打包完整 Termux 环境（可能较慢、体积较大）…');
+        $('loadingText').textContent = '正在打包 Termux 环境（含已装软件）…'; $('loadingMask').classList.add('show');
+        waitTask(termuxExecPoll, started.id).then(function (res) {
+          $('loadingMask').classList.remove('show');
+          if (res.code === 0) toast('已备份（含完整环境）：' + safe); else toast('环境打包失败：' + String(res.out || '').slice(0, 120));
+          renderBackupList();
+        });
+      } else {
+        toast('已备份：' + safe);
+        renderBackupList();
+      }
     } catch (e) { toast('备份失败：' + (e.message || e)); }
   }
   function doRestore(filename) {
@@ -971,12 +1260,32 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
       var data = JSON.parse(txt);
       if (data.config) {
         var c = data.config;
-        ['apiKey', 'fontScale', 'thinkChinese', 'backupDir', 'recycleDir', 'detail', 'skills', 'activeSkillId', 'convDefaults', 'maxTokensLimit', 'maxMediaItems', 'maxInlineMB', 'maxDocTotal', 'maxDocFileMB', 'maxDocChars', 'maxSkillFileKB'].forEach(function (k) { if (c[k] !== undefined) cfg[k] = c[k]; });
+        ['apiKey', 'fontScale', 'thinkChinese', 'backupDir', 'recycleDir', 'detail', 'skills', 'activeSkillId', 'convDefaults', 'termuxEnvs', 'termuxDefaultEnvId'].forEach(function (k) { if (c[k] !== undefined) cfg[k] = c[k]; });
       }
+      if (!Array.isArray(cfg.termuxEnvs)) cfg.termuxEnvs = [];
       if (Array.isArray(data.conversations)) cfg.conversations = data.conversations;
       cfg.currentConvId = '';
+      var hasTermuxData = !!(data.termux || (data.config && data.config.termuxEnvs));
       save();
-      location.reload();
+      // 若备份里带有完整环境包（.env.tar.gz），异步还原
+      var tarName = filename.replace(/\.json$/i, '') + '.env.tar.gz';
+      var tarPath = cfg.backupDir.replace(/\/+$/, '') + '/' + tarName;
+      var hasTar = false;
+      try { JSON.parse(nativeListDirJson(cfg.backupDir)).forEach(function (o) { if (!o.isDir && o.name === tarName) hasTar = true; }); } catch (e) {}
+      if (hasTar && hasTermuxBridge() && typeof window.AndroidTermux.importEnvTar === 'function') {
+        var started = startEnvTask('importEnvTar', tarPath);
+        if (started.err) { toast('环境还原启动失败：' + started.err); setTimeout(function () { location.reload(); }, 900); return; }
+        toast('正在还原完整 Termux 环境…');
+        $('loadingText').textContent = '正在还原 Termux 环境…'; $('loadingMask').classList.add('show');
+        waitTask(termuxExecPoll, started.id).then(function (res) {
+          $('loadingMask').classList.remove('show');
+          if (res.code === 0) toast('完整环境已还原'); else toast('环境还原失败：' + String(res.out || '').slice(0, 120));
+          setTimeout(function () { location.reload(); }, 900);
+        });
+        return;
+      }
+      toast('还原完成' + (hasTermuxData ? '' : '（旧版备份，Termux 环境保持不变）'));
+      setTimeout(function () { location.reload(); }, 600);
     } catch (e) { toast('还原失败：' + (e.message || e)); }
   }
   $('backupBtn').addEventListener('click', doBackup);
@@ -1009,9 +1318,60 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
     cfg.recycleRecords = []; persistRecycle(); renderRecycleList(); toast('已清空回收站');
   });
 
+  /* ============ 终端 ============ */
+  function termPrint(text, cls) {
+    var d = document.createElement('div');
+    if (cls) d.className = cls;
+    d.textContent = text;
+    termOutputEl.appendChild(d);
+    termOutputEl.scrollTop = termOutputEl.scrollHeight;
+  }
+  function openTermSheet() {
+    if (!hasTermuxBridge()) { toast('终端桥接不可用'); return; }
+    refreshEnvSelects();
+    if (!termuxReady()) {
+      termOutputEl.innerHTML = '';
+      termPrint('内置 Termux 环境尚未安装。', 't-err');
+      termPrint('请到「总设置 → Termux 环境」点击「安装」，装好后回来即可使用。', 't-dim');
+    } else if (!termOutputEl.children.length) {
+      termPrint('LingQiongBuddy 内置终端 · 环境已就绪', 't-dim');
+      termPrint('试试：uname -a    或    ls /sdcard', 't-dim');
+    }
+    termSheetEl.classList.add('open');
+  }
+  function termRun() {
+    var cmd = (termInputEl.value || '').trim();
+    if (!cmd) return;
+    if (!termuxReady()) { termPrint('环境未安装，无法执行。', 't-err'); return; }
+    var id = $('termEnvSelect').value;
+    var env = cfg.termuxEnvs.filter(function (x) { return x.id === id; })[0] || currentEnv();
+    termPrint('$ ' + cmd, 't-cmd');
+    termInputEl.value = '';
+    termRunBtn.disabled = true;
+    var started = termuxExecStart(cmd, env ? env.cwd : '', env ? env.id : 'default');
+    if (started.err) { termPrint(started.err, 't-err'); termRunBtn.disabled = false; return; }
+    var ph = document.createElement('div'); ph.className = 't-dim'; ph.textContent = '…';
+    termOutputEl.appendChild(ph); termOutputEl.scrollTop = termOutputEl.scrollHeight;
+    var shown = '';
+    waitTask(termuxExecPoll, started.id, function (st) {
+      var o = String(st.out || '');
+      if (o.length > shown.length) { shown = o; ph.textContent = o; termOutputEl.scrollTop = termOutputEl.scrollHeight; }
+    }).then(function (res) {
+      try { ph.remove(); } catch (e) {}
+      var out = String(res.out || '');
+      if (out) termPrint(out);
+      termPrint('— 退出码 ' + res.code + (res.cost ? ' · ' + res.cost + 'ms' : '') + (res.timedOut ? '（超时已终止）' : ''), res.code === 0 ? 't-ok' : 't-err');
+      termRunBtn.disabled = false;
+    });
+  }
+  $('termClearBtn').addEventListener('click', function () { termOutputEl.innerHTML = ''; });
+  termRunBtn.addEventListener('click', termRun);
+  termInputEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); termRun(); } });
+
   /* ============ 对话设置 UI ============ */
   function openConvSheet() {
     var cs = CS();
+    $('convApiKey').value = cfg.apiKey || '';
     $('convSystemPrompt').value = cs.systemPrompt || '';
     $('convMaxTokens').value = cs.max_tokens;
     $('convTemp').value = cs.temperature; $('convTempVal').textContent = Number(cs.temperature).toFixed(1);
@@ -1021,7 +1381,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
     $('convFileRootPath').value = cs.fileRootPath || '/sdcard/';
     $('convStreamToggle').checked = !!cs.stream;
     $('convFileToolToggle').checked = !!cs.fileToolEnabled;
+    $('convTermuxToggle').checked = cs.termuxEnabled !== false;
     $('convAllowDeleteToggle').checked = !!cs.allowDelete;
+    refreshEnvSelects();
+    var sel = $('convTermuxEnv'); if (sel) sel.value = cs.termuxEnvId || (currentEnv() ? currentEnv().id : '');
     syncSeg('convModelSeg', cs.model); syncSeg('convEffortSeg', cs.reasoning_effort);
     convSheetEl.classList.add('open');
   }
@@ -1030,8 +1393,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
   $('closeConvSheet').addEventListener('click', closeConvSheet);
   convSheetEl.querySelector('.sheet-backdrop').addEventListener('click', closeConvSheet);
 
+  $('convApiKey').addEventListener('input', function () { cfg.apiKey = this.value.trim(); save(); });
+  $('convToggleKey').addEventListener('click', function () { var el = $('convApiKey'); var show = el.type === 'password'; el.type = show ? 'text' : 'password'; this.textContent = show ? '隐藏' : '显示'; });
   $('convSystemPrompt').addEventListener('input', function () { CS().systemPrompt = this.value; save(); });
-  $('convMaxTokens').addEventListener('input', function () { var v = parseInt(this.value, 10); if (isNaN(v) || v < 0) v = 0; var lim = cfg.maxTokensLimit; if (lim > 0 && v > lim) v = lim; CS().max_tokens = v; save(); });
+  $('convMaxTokens').addEventListener('input', function () { var v = parseInt(this.value, 10); if (isNaN(v) || v < 0) v = 0; CS().max_tokens = v; save(); });
   $('convTemp').addEventListener('input', function () { CS().temperature = parseFloat(this.value); $('convTempVal').textContent = CS().temperature.toFixed(1); });
   $('convTemp').addEventListener('change', save);
   $('convTopP').addEventListener('input', function () { CS().top_p = parseFloat(this.value); $('convTopPVal').textContent = CS().top_p.toFixed(2); });
@@ -1039,12 +1404,14 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
   $('convStreamToggle').addEventListener('change', function () { CS().stream = this.checked; save(); });
   $('convFileRootPath').addEventListener('input', function () { CS().fileRootPath = this.value.trim(); save(); });
   $('convFileToolToggle').addEventListener('change', function () { CS().fileToolEnabled = this.checked; save(); syncFileToolBtn(); });
+  $('convTermuxToggle').addEventListener('change', function () { CS().termuxEnabled = this.checked; save(); toast(this.checked ? '已允许 AI 使用终端' : '已禁止 AI 使用终端'); });
+  $('convTermuxEnv').addEventListener('change', function () { CS().termuxEnvId = this.value; save(); _termuxInfo = null; });
   $('convAllowDeleteToggle').addEventListener('change', function () { CS().allowDelete = this.checked; save(); toast(this.checked ? '已开启永久删除权限' : '已关闭，删除改为移入回收站'); });
   function convNumberField(id, key, min, fallback) {
     $(id).addEventListener('input', function () { var v = parseInt(this.value, 10); if (isNaN(v) || v < min) v = fallback; CS()[key] = v; save(); });
     $(id).addEventListener('blur', function () { this.value = CS()[key]; });
   }
-  convNumberField('convMaxToolLoops', 'maxToolLoops', 0, 30);
+  convNumberField('convMaxToolLoops', 'maxToolLoops', 0, 0);
   convNumberField('convMaxConsecutiveErrors', 'maxConsecutiveErrors', 0, 5);
   Array.prototype.forEach.call(document.querySelectorAll('#convModelSeg button'), function (btn) {
     btn.addEventListener('click', function () { CS().model = btn.dataset.value; syncSeg('convModelSeg', CS().model); modelTag.textContent = CS().model; save(); });
@@ -1054,7 +1421,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
   });
   $('convClearBtn').addEventListener('click', function () {
     if (messages.length && !confirm('确定清空当前对话？')) return;
-    messages = []; clearPending(); clearPendingFiles();
+    messages = []; clearPending(); clearPendingFiles(); clearPendingVideos();
     chatEl.innerHTML = '<div class="welcome"><div class="logo">LQ</div><p>有什么可以帮你的？</p></div>';
     usageBar.classList.remove('show'); closeConvSheet(); saveCurrentConversation(); toast('已清空');
   });
@@ -1069,7 +1436,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
     if (generating) { toast('正在生成中'); return; }
     saveCurrentConversation(); cfg.currentConvId = genId('conv_'); messages = [];
     ensureConv();
-    clearPending(); clearPendingFiles();
+    clearPending(); clearPendingFiles(); clearPendingVideos();
     chatEl.innerHTML = '<div class="welcome"><div class="logo">LQ</div><p>有什么可以帮你的？</p></div>';
     usageBar.classList.remove('show'); save(); modelTag.textContent = CS().model; syncFileToolBtn();
     historyDrawer.classList.remove('open'); toast('已开始新对话');
@@ -1158,7 +1525,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
     var file = skillFileInput.files && skillFileInput.files[0];
     skillFileInput.value = '';
     if (!file) return;
-    if (file.size > cfg.maxSkillFileKB * 1024) { toast('文件超过 ' + cfg.maxSkillFileKB + 'KB'); return; }
+    if (file.size > LIMITS.maxSkillFileKB * 1024) { toast('文件超过 ' + LIMITS.maxSkillFileKB + 'KB'); return; }
     var reader = new FileReader();
     reader.onload = function () {
       var parsed = parseSkillFile(String(reader.result || ''), file.name);
@@ -1235,37 +1602,54 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
     save(); closeSkillEditor(); renderSkillList(); syncSkillBtn();
   }
 
-  /* ============ 图片 / 文档 ============ */
-  imageBtn.addEventListener('click', function () { fileInput.click(); });
+  /* ============ 图片 / 视频 / 文档 ============ */
+  imageBtn.addEventListener('click', function () { pendingPick = 'image'; fileInput.click(); });
   fileInput.addEventListener('change', function () {
     var files = Array.prototype.slice.call(fileInput.files || []);
     fileInput.value = '';
     if (!files.length) return;
-    var room = cfg.maxMediaItems - pending.length;
-    if (room <= 0) { toast('最多 ' + cfg.maxMediaItems + ' 张图片'); return; }
+    var room = LIMITS.maxMediaItems - pending.length;
+    if (room <= 0) { toast('最多 ' + LIMITS.maxMediaItems + ' 张图片'); return; }
     files = files.slice(0, room);
     files.forEach(function (file) {
-      if (file.size > cfg.maxInlineMB * 1024 * 1024) { toast(file.name + ' 超过 ' + cfg.maxInlineMB + 'MB'); return; }
+      if (file.size > LIMITS.maxInlineMB * 1024 * 1024) { toast(file.name + ' 超过 ' + LIMITS.maxInlineMB + 'MB'); return; }
       var reader = new FileReader();
       reader.onload = function () { pending.push({ dataUrl: String(reader.result), name: file.name, size: file.size }); renderPreview(); };
       reader.onerror = function () { toast('读取失败'); };
       reader.readAsDataURL(file);
     });
   });
-  docBtn.addEventListener('click', function () { docInput.click(); });
+
+  // 视频：不读进内存（多大都行），只取真实路径交给 AI 用终端处理
+  videoBtn.addEventListener('click', function () { pendingPick = 'video'; videoInput.click(); });
+  videoInput.addEventListener('change', function () { videoInput.value = ''; });
+  window.__onNativePicker = function (paths) {
+    if (pendingPick !== 'video') return;
+    pendingPick = '';
+    var added = 0;
+    (paths || []).forEach(function (p) {
+      if (!p) return;
+      pendingVideos.push({ path: p, name: basename(p) });
+      added++;
+    });
+    renderPreview();
+    if (!added) toast('没能拿到视频路径，请确认存储权限，或改用「文档」方式');
+  };
+
+  docBtn.addEventListener('click', function () { pendingPick = 'doc'; docInput.click(); });
   docInput.addEventListener('change', function () {
     var files = Array.prototype.slice.call(docInput.files || []);
     docInput.value = '';
     if (!files.length) return;
-    var room = cfg.maxDocTotal - pendingFiles.length;
-    if (room <= 0) { toast('最多 ' + cfg.maxDocTotal + ' 个文档'); return; }
+    var room = LIMITS.maxDocTotal - pendingFiles.length;
+    if (room <= 0) { toast('最多 ' + LIMITS.maxDocTotal + ' 个文档'); return; }
     files = files.slice(0, room);
     files.forEach(function (file) {
-      if (file.size > cfg.maxDocFileMB * 1024 * 1024) { toast(file.name + ' 超过 ' + cfg.maxDocFileMB + 'MB'); return; }
+      if (file.size > LIMITS.maxDocFileMB * 1024 * 1024) { toast(file.name + ' 超过 ' + LIMITS.maxDocFileMB + 'MB'); return; }
       var reader = new FileReader();
       reader.onload = function () {
         var content = String(reader.result || '');
-        if (content.length > cfg.maxDocChars) content = content.slice(0, cfg.maxDocChars) + '\n\n...（已截断）';
+        if (content.length > LIMITS.maxDocChars) content = content.slice(0, LIMITS.maxDocChars) + '\n\n...（已截断）';
         pendingFiles.push({ name: file.name, size: file.size, content: content });
         renderPreview();
       };
@@ -1275,12 +1659,24 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
   });
   function renderPreview() {
     previewBar.innerHTML = '';
-    previewBar.classList.toggle('has-items', pending.length > 0 || pendingFiles.length > 0);
+    previewBar.classList.toggle('has-items', pending.length > 0 || pendingFiles.length > 0 || pendingVideos.length > 0);
     pending.forEach(function (item, idx) {
       var box = document.createElement('div'); box.className = 'preview-item';
       var img = document.createElement('img'); img.src = item.dataUrl; box.appendChild(img);
       var rm = document.createElement('button'); rm.className = 'rm'; rm.innerHTML = ICON_RM;
       rm.addEventListener('click', function () { pending.splice(idx, 1); renderPreview(); });
+      box.appendChild(rm); previewBar.appendChild(box);
+    });
+    pendingVideos.forEach(function (item, idx) {
+      var box = document.createElement('div'); box.className = 'preview-item file-preview';
+      var icon = document.createElement('div'); icon.className = 'file-icon vid'; icon.textContent = 'VID';
+      var meta = document.createElement('div'); meta.className = 'file-meta';
+      var nm = document.createElement('div'); nm.className = 'file-name'; nm.textContent = item.name;
+      var sz = document.createElement('div'); sz.className = 'file-size'; sz.textContent = '视频 · 仅传路径';
+      meta.appendChild(nm); meta.appendChild(sz);
+      box.appendChild(icon); box.appendChild(meta);
+      var rm = document.createElement('button'); rm.className = 'rm'; rm.innerHTML = ICON_RM;
+      rm.addEventListener('click', function () { pendingVideos.splice(idx, 1); renderPreview(); });
       box.appendChild(rm); previewBar.appendChild(box);
     });
     pendingFiles.forEach(function (item, idx) {
@@ -1305,10 +1701,11 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
   }
   function clearPending() { pending = []; renderPreview(); }
   function clearPendingFiles() { pendingFiles = []; renderPreview(); }
-  function updateSendState() { if (generating) return; sendBtn.disabled = !inputEl.value.trim() && pending.length === 0 && pendingFiles.length === 0; }
+  function clearPendingVideos() { pendingVideos = []; renderPreview(); }
+  function updateSendState() { if (generating) return; sendBtn.disabled = !inputEl.value.trim() && pending.length === 0 && pendingFiles.length === 0 && pendingVideos.length === 0; }
 
   /* ============ 消息渲染 ============ */
-  function addMessage(role, text, images, files) {
+  function addMessage(role, text, images, files, videos) {
     var wrap = document.createElement('div'); wrap.className = 'msg ' + role;
     var bubble = document.createElement('div'); bubble.className = 'bubble';
     var reason = null, reasonText = null, toolLog = null, toolLogBody = null, toolCount = 0;
@@ -1331,6 +1728,11 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
       images.slice(0, 12).forEach(function (it) { var im = document.createElement('img'); im.src = it.dataUrl; imgBox.appendChild(im); });
       if (images.length > 12) { var more = document.createElement('div'); more.style.cssText = 'width:110px;height:110px;border-radius:9px;background:rgba(255,255,255,.18);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.8125rem;font-weight:600;'; more.textContent = '+' + (images.length - 12); imgBox.appendChild(more); }
       bubble.appendChild(imgBox);
+    }
+    if (role === 'user' && videos && videos.length) {
+      var vBox = document.createElement('div'); vBox.className = 'msg-files';
+      videos.forEach(function (v) { var tag = document.createElement('span'); tag.className = 'msg-file-tag'; tag.textContent = '🎬 ' + v.name; vBox.appendChild(tag); });
+      bubble.appendChild(vBox);
     }
     if (role === 'user' && files && files.length) {
       var fileBox = document.createElement('div'); fileBox.className = 'msg-files';
@@ -1358,8 +1760,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
   }
   function setGenerating(g) {
     generating = g;
-    if (g) { sendBtn.classList.add('stop'); sendBtn.innerHTML = ICON_STOP; sendBtn.disabled = false; imageBtn.disabled = true; docBtn.disabled = true; }
-    else { sendBtn.classList.remove('stop'); sendBtn.innerHTML = ICON_SEND; imageBtn.disabled = false; docBtn.disabled = false; updateSendState(); }
+    if (g) { sendBtn.classList.add('stop'); sendBtn.innerHTML = ICON_STOP; sendBtn.disabled = false; imageBtn.disabled = true; videoBtn.disabled = true; docBtn.disabled = true; }
+    else { sendBtn.classList.remove('stop'); sendBtn.innerHTML = ICON_SEND; imageBtn.disabled = false; videoBtn.disabled = false; docBtn.disabled = false; updateSendState(); }
   }
   setGenerating(false);
   inputEl.addEventListener('input', function () { autoGrow(); updateSendState(); });
@@ -1432,22 +1834,31 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
 
   async function send() {
     var text = inputEl.value.trim();
-    if ((!text && !pending.length && !pendingFiles.length) || generating) return;
-    if (!cfg.apiKey) { openSheet(); toast('请先填写 API Key'); return; }
+    if ((!text && !pending.length && !pendingFiles.length && !pendingVideos.length) || generating) return;
+    if (!cfg.apiKey) { openConvSheet(); toast('请先填写 API Key'); return; }
     ensureConv();
-    var imagesToSend = pending.slice(), filesToSend = pendingFiles.slice();
+    var imagesToSend = pending.slice(), filesToSend = pendingFiles.slice(), videosToSend = pendingVideos.slice();
     var welcome = chatEl.querySelector('.welcome'); if (welcome) welcome.remove();
-    inputEl.value = ''; autoGrow(); clearPending(); clearPendingFiles(); sendBtn.disabled = true; stick = true;
-    addMessage('user', text, imagesToSend, filesToSend);
+    inputEl.value = ''; autoGrow(); clearPending(); clearPendingFiles(); clearPendingVideos(); sendBtn.disabled = true; stick = true;
+    addMessage('user', text, imagesToSend, filesToSend, videosToSend);
     var fullText = text;
+    if (videosToSend.length) {
+      var vparts = videosToSend.map(function (v) { return '- ' + v.path; }).join('\n');
+      fullText = (fullText ? fullText + '\n\n' : '') + '[视频文件路径（可用 termux_exec 或工具处理，例如 ffmpeg）]\n' + vparts;
+    }
     if (filesToSend.length) {
       var parts = [];
       filesToSend.forEach(function (f) { parts.push('<file name="' + f.name + '">\n' + f.content + '\n</file>'); });
-      fullText = (text ? text + '\n\n' : '') + parts.join('\n\n');
+      fullText = (fullText ? fullText + '\n\n' : '') + parts.join('\n\n');
     }
     var userContent = buildUserContent(fullText, imagesToSend);
-    var historyText = text || (imagesToSend.length ? '[图片]' : '') || (filesToSend.length ? '[文件]' : '');
-    if (filesToSend.length) historyText = (text ? text + ' ' : '') + '[文件: ' + filesToSend.map(function (f) { return f.name; }).join(', ') + ']';
+    var historyText = text || (imagesToSend.length ? '[图片]' : '') || (videosToSend.length ? '[视频]' : '') || (filesToSend.length ? '[文件]' : '');
+    if (videosToSend.length || filesToSend.length) {
+      var tags = [];
+      if (videosToSend.length) tags.push('视频: ' + videosToSend.map(function (f) { return f.name; }).join(', '));
+      if (filesToSend.length) tags.push('文件: ' + filesToSend.map(function (f) { return f.name; }).join(', '));
+      historyText = (text ? text + ' ' : '') + '[' + tags.join(' | ') + ']';
+    }
     messages.push({ role: 'user', content: historyText });
     var ai = addMessage('ai', '');
     ai.bubble.classList.add('streaming'); usageBar.classList.remove('show');
@@ -1471,6 +1882,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
     var activeSkill = getActiveSkill();
     if (activeSkill) sysParts.push(activeSkill.prompt);
     if (cfg.thinkChinese !== false) sysParts.push('请始终使用简体中文进行思考（reasoning）和回答，不要用英文思考。');
+    if (cs.termuxEnabled) {
+      var env = currentEnv();
+      if (env) sysParts.push('你可以使用 termux_exec 工具在内置终端环境「' + env.name + '」里执行命令。环境里默认有常用 Unix 命令，也可用 pkg install 安装新工具。');
+    }
     if (sysParts.length) apiMessages.push({ role: 'system', content: sysParts.join('\n\n') });
     for (var i = 0; i < messages.length - 1; i++) {
       var m = messages[i];
@@ -1493,7 +1908,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
           body: JSON.stringify(payload)
         });
       } catch (fetchErr) {
-        if (fetchErr && fetchErr.name === 'AbortError') throw fetchErr;   // ← 用户主动中断：直接结束，不再自救
+        if (fetchErr && fetchErr.name === 'AbortError') throw fetchErr;   // 用户主动中断：直接结束，不再自救
         consecutiveErrors++;
         if (errLimit > 0 && consecutiveErrors >= errLimit) throw new Error('连续 ' + consecutiveErrors + ' 次请求失败：' + (fetchErr.message || fetchErr));
         addToolEntry(aiEl, '网络', '请求失败，让 AI 尝试自救…', true);
@@ -1620,8 +2035,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
 
   window.addEventListener('load', function () {
     setTimeout(updateFsStatus, 200);
+    setTimeout(function () { updateTermuxStatus(); }, 300);
     renderBackupList();
-    if (!cfg.apiKey) setTimeout(function () { openSheet(); toast('请先填写 API Key'); }, 400);
+    if (!cfg.apiKey) setTimeout(function () { openConvSheet(); toast('请先填写 API Key'); }, 400);
   });
 
 })();

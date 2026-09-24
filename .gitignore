@@ -1,12 +1,14 @@
-# Built artifacts
 *.iml
 .gradle/
 /local.properties
 /.idea/
 .DS_Store
 /build
+/app/build
 /captures
 .externalNativeBuild
 .cxx
-local.properties
-app/build/
+/app/release
+
+# CI 打包时会自动下载 Termux bootstrap（体积较大，不入库）
+/app/src/main/assets/bootstrap-*.zip

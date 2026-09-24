@@ -9,8 +9,10 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.Reader;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.ConcurrentHashMap;
 
 import rikka.shizuku.Shizuku;
 import rikka.shizuku.ShizukuRemoteProcess;
@@ -18,10 +20,17 @@ import rikka.shizuku.ShizukuRemoteProcess;
 /**
  * 高权限文件桥接：通过 Shizuku 以 adb/root 身份执行 shell。
  * Shizuku.newProcess 是隐藏 API，这里用反射调用。
+ *
+ * 注意：exec（任意命令）同样采用"异步 + 轮询"模型，避免像内置终端那样
+ * 同步阻塞 WebView 的 JS 线程而导致整个界面卡死。
  */
 public class ShizukuBridge {
     private static final int REQUEST_CODE = 1001;
+    private static final int MAX_OUT = 400_000;
     private final Context context;
+
+    private static final ConcurrentHashMap<String, ShTask> TASKS = new ConcurrentHashMap<>();
+    private static long SEQ = 0;
 
     public ShizukuBridge(Context context) { this.context = context; }
 
@@ -117,13 +126,114 @@ public class ShizukuBridge {
 
     /* ==================== 任意 shell ==================== */
 
+    /** 同步版（保留兼容，短命令用）。 */
     @JavascriptInterface
     public String exec(String cmd) {
         if (cmd == null || cmd.trim().isEmpty()) return "命令为空";
         return execShell(cmd);
     }
 
+    /* ==================== 异步执行（避免卡死 UI） ==================== */
+
+    private static final class ShTask {
+        volatile boolean done = false;
+        volatile int code = -1;
+        volatile long cost = 0;
+        final long start = System.currentTimeMillis();
+        final StringBuilder out = new StringBuilder();
+        volatile ShizukuRemoteProcess proc;
+    }
+
+    /** 启动命令，立即返回 "ok:任务号"（或 "err:原因"）。 */
+    @JavascriptInterface
+    public String execStart(String cmd) {
+        if (cmd == null || cmd.trim().isEmpty()) return "err:命令为空";
+        if (!isAvailable()) return "err:Shizuku 未授权";
+        String id = "s" + (++SEQ);
+        ShTask t = new ShTask();
+        TASKS.put(id, t);
+        final String fcmd = cmd;
+        new Thread(new Runnable() {
+            @Override public void run() { runTask(t, fcmd); }
+        }, "lqb-shizuku-" + id).start();
+        return "ok:" + id;
+    }
+
+    private void runTask(ShTask t, String cmd) {
+        try {
+            Method m = Shizuku.class.getDeclaredMethod(
+                    "newProcess", String[].class, String[].class, String.class);
+            m.setAccessible(true);
+            ShizukuRemoteProcess process = (ShizukuRemoteProcess)
+                    m.invoke(null, new String[]{"sh", "-c", cmd}, null, null);
+            t.proc = process;
+
+            final InputStream ein = process.getErrorStream();
+            Thread errThread = new Thread(new Runnable() {
+                @Override public void run() {
+                    try {
+                        BufferedReader er = new BufferedReader(
+                                new InputStreamReader(ein, StandardCharsets.UTF_8));
+                        String line;
+                        boolean first = true;
+                        while ((line = er.readLine()) != null) {
+                            synchronized (t.out) {
+                                if (t.out.length() < MAX_OUT) {
+                                    t.out.append(first ? "[stderr] " : "         ").append(line).append('\n');
+                                }
+                            }
+                            first = false;
+                        }
+                    } catch (Throwable ignore) {}
+                }
+            });
+            errThread.start();
+
+            InputStream in = process.getInputStream();
+            Reader rd = new InputStreamReader(in, StandardCharsets.UTF_8);
+            char[] cb = new char[4096];
+            int n;
+            while ((n = rd.read(cb)) != -1) {
+                synchronized (t.out) { if (t.out.length() < MAX_OUT) t.out.append(cb, 0, n); }
+            }
+            t.code = process.waitFor();
+            try { errThread.join(1500); } catch (Throwable ignore) {}
+        } catch (Throwable e) {
+            synchronized (t.out) {
+                if (t.out.length() == 0) t.out.append("Shizuku 执行失败：").append(String.valueOf(e));
+            }
+            t.code = -1;
+        } finally {
+            t.cost = System.currentTimeMillis() - t.start;
+            t.done = true;
+        }
+    }
+
+    @JavascriptInterface
+    public String execPoll(String taskId) {
+        ShTask t = TASKS.get(taskId);
+        if (t == null) return "{\"state\":\"missing\"}";
+        String out;
+        synchronized (t.out) { out = t.out.toString(); }
+        if (!t.done) return "{\"state\":\"running\",\"out\":\"" + esc(out) + "\"}";
+        TASKS.remove(taskId);
+        return "{\"state\":\"done\",\"code\":" + t.code + ",\"cost\":" + t.cost + ",\"out\":\"" + esc(out) + "\"}";
+    }
+
+    @JavascriptInterface
+    public String execKill(String taskId) {
+        ShTask t = TASKS.get(taskId);
+        if (t == null) return "无此任务";
+        try { if (t.proc != null) t.proc.destroy(); } catch (Throwable ignore) {}
+        return "已中止";
+    }
+
     /* ==================== 内部工具 ==================== */
+
+    private static String esc(String s) {
+        if (s == null) return "";
+        return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "");
+    }
 
     /** 单引号安全转义，用于包住路径/参数，防止命令注入 */
     private static String q(String s) {
