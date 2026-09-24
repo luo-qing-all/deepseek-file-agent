@@ -4,7 +4,7 @@
 > 原理：模型只输出结构化文本（工具调用请求），真正的执行由 App 的 Java 桥接层完成。
 
 - **应用名**：LingQiongBuddy
-- **版本**：2.3.0（versionCode 5）
+- **版本**：2.3.1（versionCode 6）
 - **applicationId**：`com.lq.app`（10 字节，与官方 `com.termux` 等长，见下方说明）
 - **代码包名(namespace)**：`com.lingqiong.buddy`
 - **minSdk**：26 ／ **targetSdk**：28 ⚠️（见下方说明）
@@ -57,7 +57,27 @@ files/usr                   指向"当前激活环境"usr 的软链
 
 ---
 
-## 一、2.3.0 更新内容
+## 一、2.3.1 更新内容
+
+1. **修复「终端」按钮点了没反应** ⭐
+   聊天页顶部的「终端」按钮此前**根本没有绑定点击事件**（`openTermSheet()` 定义了却无人调用），
+   所以点了毫无反应。现已补上绑定，并让遮罩、关闭按钮都能正常关闭终端面板。
+
+2. **视频真正“看得见”了** ⭐
+   以前发视频只把**文件路径**交给 AI，AI 其实看不到画面。现在发送视频时会自动用 ffmpeg
+   把画面**按时间顺序均匀抽成 N 张关键帧图片**（默认 16 张，可在
+   **对话设置 → 视频抽帧数** 里调 10–30），作为图片随消息一起送给 AI，AI 便能直接观察画面。
+   若环境里没有 ffmpeg，会在消息里提示先 `pkg install ffmpeg`。
+
+3. **修复 `pkg install` 完全不可用** ⭐
+   官方源里每个 `.deb` 内部仍写死了 `com.termux`（含 ELF 的 RUNPATH），
+   导致安装任何新软件都失败（`unable to stat './data/data/com.termux' ... Permission denied`）。
+   现在每个环境里都内置了 `patch-debs` 钩子 + `apt.conf.d/99-lq-prefix.conf`：
+   apt 安装前把 deb 内的 `com.termux` 等长替换为本 App 包名，`pkg install` 恢复正常。
+
+4. 版本号升级为 **2.3.1**（versionCode 6）。
+
+### 2.3.0 更新内容
 
 1. **修复"发消息时界面卡死"** ⭐
    以前终端/Shizuku 命令是**同步**执行（在 WebView 的 JS 线程上 `waitFor`），
@@ -82,7 +102,7 @@ files/usr                   指向"当前激活环境"usr 的软链
 - **多环境管理**：总设置里创建环境、对话设置里选择环境。
 - **终端页面**：聊天页顶部「终端」按钮打开，可切换环境、执行命令、查看回显。
 - **API Key 在「对话设置」**（全局共用）。
-- **视频上传**：视频不读进内存，只把真实路径交给 AI（可用 `termux_exec` + ffmpeg 处理）。
+- **视频上传**：视频不读进内存（多大都行），只把真实路径交给 AI；同时自动抽帧成图片让 AI 直接观察画面。
 - 设置分层：总设置（全局）／对话设置（仅当前对话）。
 - 字体大小调节、备份与还原（存 `/sdcard/LingQiongBuddy/备份/`，卸载不丢）。
 - 工具调用收进可滑动的盒子；思考默认中文。
@@ -103,7 +123,8 @@ files/usr                   指向"当前激活环境"usr 的软链
   └─ TermuxBridge.install()
        ├─ 解压 zip 到 files/envs/default/usr（每个环境一份）
        ├─ 重建 SYMLINKS.txt 里的符号链接
-       └─ chmod 0755（Termux 的脚本/二进制都需要可执行位）
+       ├─ chmod 0755（Termux 的脚本/二进制都需要可执行位）
+       └─ 写入 patch-debs 钩子 + apt.conf.d/99-lq-prefix.conf（让 pkg install 可用）
 
 执行命令（异步）
   └─ JS: termuxExecStart() → Java execStart() 立即返回任务号
@@ -119,7 +140,7 @@ files/usr                   指向"当前激活环境"usr 的软链
 ## 三、目录结构
 
 ```
-LingQiongBuddy-2.3.0/
+LingQiongBuddy-2.3.1/
 ├── .github/workflows/build.yml          # 自动下载 bootstrap、等长替换包名、打包 APK
 ├── settings.gradle / build.gradle / gradle.properties
 ├── gradle/wrapper/gradle-wrapper.properties
@@ -142,7 +163,7 @@ LingQiongBuddy-2.3.0/
 ## 四、构建
 
 ### 方式 A：GitHub Actions（推荐，不需要本地环境）
-推送后自动构建，产物在本次运行的 **Artifacts** 里（`LingQiongBuddy-2.3.0-debug`）。
+推送后自动构建，产物在本次运行的 **Artifacts** 里（`LingQiongBuddy-2.3.1-debug`）。
 工作流会自动下载 Termux bootstrap、等长替换包名后打进 APK。
 
 ### 方式 B：Android Studio

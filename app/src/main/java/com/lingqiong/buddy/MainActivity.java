@@ -196,7 +196,7 @@ public class MainActivity extends Activity {
         public String getVersionName() {
             try {
                 return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
-            } catch (PackageManager.NameNotFoundException e) { return "2.3.0"; }
+            } catch (PackageManager.NameNotFoundException e) { return "2.3.1"; }
         }
 
         /** 宿主包名（com.lq.app，与官方 com.termux 等长，故可共存）。 */

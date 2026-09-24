@@ -409,6 +409,12 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
     </div>
 
     <div class="field">
+      <label>视频抽帧数 <span class="val" id="convVideoFramesVal">16</span></label>
+      <input type="range" id="convVideoFrames" min="10" max="30" step="1" value="16">
+      <p class="desc">发送视频时，自动把画面按时间均匀抽成这么多帧交给 AI 观察（需环境里已安装 ffmpeg）。范围 10–30，默认 16。</p>
+    </div>
+
+    <div class="field">
       <label for="convTermuxEnv">使用的 Termux 环境</label>
       <select id="convTermuxEnv"></select>
       <p class="desc">AI 的终端工具会在选中的环境里执行命令（环境在「总设置 → Termux 环境」里创建）。</p>
@@ -592,7 +598,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
 (function () {
   'use strict';
 
-  var APP_VERSION = '2.3.0';
+  var APP_VERSION = '2.3.1';
   var API_URL = 'https://api.deepseek.com/chat/completions';
   var STORE_KEY = 'lingqiong-buddy-cfg-v3';
   var OLD_STORE_KEY = 'lingqiong-buddy-cfg-v2';
@@ -609,7 +615,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
     reasoning_effort: 'high', temperature: 1, top_p: 1, max_tokens: 4096,
     fileRootPath: '/sdcard/', fileToolEnabled: true, allowDelete: false,
     maxToolLoops: 0, maxConsecutiveErrors: 5,
-    termuxEnabled: true, termuxEnvId: ''
+    termuxEnabled: true, termuxEnvId: '', videoFrames: 16
   };
 
   // 全局设置
@@ -1025,7 +1031,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
   }
 
   async function runTermuxTool(args) {
-    if (!hasTermuxBridge()) return '错误：终端桥接不可用（请确认安装的是 2.3.0 及以后的版本）。';
+    if (!hasTermuxBridge()) return '错误：终端桥接不可用（请确认安装的是 2.3.1 及以后的版本）。';
     if (!termuxInfo(true).ready) return '错误：内置 Termux 环境尚未安装。请提示用户到「总设置 → Termux 环境」点击「安装」，装好后重试。';
     var env = findEnvByName(args.env) || currentEnv();
     var started = termuxExecStart(args.cmd, env ? env.cwd : '', env ? env.id : 'default');
@@ -1036,6 +1042,52 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
     var head = '[环境 ' + (env ? env.name : '默认') + '] 退出码 ' + res.code + (res.cost ? '，耗时 ' + res.cost + 'ms' : '') + (res.timedOut ? '（超时已终止）' : '');
     return head + '\n' + (out || '（无输出）');
   }
+  /* ============ 视频抽帧（让 AI 真正“看到”画面） ============ */
+  function lqShq(s) { return "'" + String(s == null ? '' : s).replace(/'/g, "'\\''") + "'"; }
+  async function lqTermuxRun(cmd, env, timeoutMs) {
+    var started = termuxExecStart(cmd, env ? env.cwd : '', env ? env.id : 'default');
+    if (started.err) return { code: -1, out: started.err, timedOut: false };
+    return await waitTask(termuxExecPoll, started.id, null, timeoutMs || 300000);
+  }
+  async function extractVideoFrames(videos, count) {
+    var env = currentEnv();
+    var base = String(termuxInfo().filesDir || '') + '/tmp';
+    if (!termuxInfo().filesDir) base = '/sdcard/LingQiongBuddy/.tmp';
+    var stamp = Date.now();
+    var frames = [], notes = [];
+    for (var i = 0; i < videos.length; i++) {
+      var v = videos[i];
+      var chk = await lqTermuxRun('command -v ffmpeg >/dev/null 2>&1 && command -v ffprobe >/dev/null 2>&1 && echo __OK__ || echo __NOFF__', env, 60000);
+      if (String(chk.out).indexOf('__OK__') < 0) {
+        notes.push(v.name + '：环境里没有 ffmpeg，无法抽帧（可在终端执行 pkg install ffmpeg 后重试）');
+        continue;
+      }
+      var probe = await lqTermuxRun('ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 ' + lqShq(v.path), env, 120000);
+      var dur = parseFloat(String(probe.out || '').trim());
+      if (!isFinite(dur) || dur <= 0) { notes.push(v.name + '：读不到时长，已跳过抽帧'); continue; }
+      var fps = count / dur;
+      if (fps > 30) fps = 30;
+      var dir = base + '/vframes_' + stamp + '_' + i;
+      var cmd = 'mkdir -p ' + lqShq(dir) + ' && rm -f ' + lqShq(dir) + '/f_*.jpg 2>/dev/null; '
+        + 'ffmpeg -y -loglevel error -i ' + lqShq(v.path)
+        + ' -vf "fps=' + fps.toFixed(6) + ',scale=640:-2" -frames:v ' + count
+        + ' -q:v 4 ' + lqShq(dir) + '/f_%03d.jpg >/dev/null 2>&1 && echo __DONE__';
+      var r = await lqTermuxRun(cmd, env, 600000);
+      if (String(r.out).indexOf('__DONE__') < 0) { notes.push(v.name + '：抽帧失败'); continue; }
+      var ls = await lqTermuxRun('ls ' + lqShq(dir) + '/f_*.jpg 2>/dev/null', env, 30000);
+      var list = String(ls.out || '').split('\n').map(function (x) { return x.trim(); }).filter(function (x) { return x; });
+      var got = 0;
+      list.forEach(function (p) {
+        var b64 = '';
+        try { b64 = nativeReadFileBase64(p); } catch (e) { b64 = ''; }
+        if (b64) { frames.push({ dataUrl: 'data:image/jpeg;base64,' + b64, name: basename(p), size: 0 }); got++; }
+      });
+      notes.push(v.name + '：已抽取 ' + got + ' 帧画面');
+      try { await lqTermuxRun('rm -rf ' + lqShq(dir), env, 30000); } catch (e) {}
+    }
+    return { frames: frames, notes: notes };
+  }
+
   /* ============ UI 初始化 ============ */
   function initUI() {
     ensureTermuxEnv();
@@ -1069,7 +1121,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
   /* ============ Termux 环境 UI ============ */
   function updateTermuxStatus() {
     var dot = $('termuxDot'), txt = $('termuxStatus'), btn = $('termuxInstallBtn');
-    if (!hasTermuxBridge()) { dot.className = 'status-dot err'; txt.textContent = '终端桥接不可用（请安装 2.3.0+）'; btn.textContent = '安装'; btn.disabled = true; return; }
+    if (!hasTermuxBridge()) { dot.className = 'status-dot err'; txt.textContent = '终端桥接不可用（请安装 2.3.1+）'; btn.textContent = '安装'; btn.disabled = true; return; }
     btn.disabled = false;
     var st = termuxInfo(true);
     if (st.ready) { dot.className = 'status-dot ok'; txt.textContent = '已就绪 · ' + st.arch + ' · ' + (st.prefix || ''); btn.textContent = '重装'; }
@@ -1364,6 +1416,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
       termRunBtn.disabled = false;
     });
   }
+  $('terminalBtn').addEventListener('click', openTermSheet);
+  $('closeTermSheet').addEventListener('click', function () { termSheetEl.classList.remove('open'); });
+  termSheetEl.querySelector('.sheet-backdrop').addEventListener('click', function () { termSheetEl.classList.remove('open'); });
   $('termClearBtn').addEventListener('click', function () { termOutputEl.innerHTML = ''; });
   termRunBtn.addEventListener('click', termRun);
   termInputEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); termRun(); } });
@@ -1384,6 +1439,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
     $('convTermuxToggle').checked = cs.termuxEnabled !== false;
     $('convAllowDeleteToggle').checked = !!cs.allowDelete;
     refreshEnvSelects();
+    $('convVideoFrames').value = cs.videoFrames || 16;
+    $('convVideoFramesVal').textContent = cs.videoFrames || 16;
     var sel = $('convTermuxEnv'); if (sel) sel.value = cs.termuxEnvId || (currentEnv() ? currentEnv().id : '');
     syncSeg('convModelSeg', cs.model); syncSeg('convEffortSeg', cs.reasoning_effort);
     convSheetEl.classList.add('open');
@@ -1406,6 +1463,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
   $('convFileToolToggle').addEventListener('change', function () { CS().fileToolEnabled = this.checked; save(); syncFileToolBtn(); });
   $('convTermuxToggle').addEventListener('change', function () { CS().termuxEnabled = this.checked; save(); toast(this.checked ? '已允许 AI 使用终端' : '已禁止 AI 使用终端'); });
   $('convTermuxEnv').addEventListener('change', function () { CS().termuxEnvId = this.value; save(); _termuxInfo = null; });
+  $('convVideoFrames').addEventListener('input', function () { var v = parseInt(this.value, 10); if (isNaN(v)) v = 16; CS().videoFrames = v; $('convVideoFramesVal').textContent = v; });
+  $('convVideoFrames').addEventListener('change', save);
   $('convAllowDeleteToggle').addEventListener('change', function () { CS().allowDelete = this.checked; save(); toast(this.checked ? '已开启永久删除权限' : '已关闭，删除改为移入回收站'); });
   function convNumberField(id, key, min, fallback) {
     $(id).addEventListener('input', function () { var v = parseInt(this.value, 10); if (isNaN(v) || v < min) v = fallback; CS()[key] = v; save(); });
@@ -1842,9 +1901,23 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
     inputEl.value = ''; autoGrow(); clearPending(); clearPendingFiles(); clearPendingVideos(); sendBtn.disabled = true; stick = true;
     addMessage('user', text, imagesToSend, filesToSend, videosToSend);
     var fullText = text;
+    var _userImgCount = imagesToSend.length;
+    var _frameNotes = [];
+    if (videosToSend.length && (CS().videoFrames || 0) > 0 && termuxReady()) {
+      toast('正在把视频抽成画面，请稍候…');
+      try {
+        var _ex = await extractVideoFrames(videosToSend, CS().videoFrames);
+        if (_ex && _ex.frames && _ex.frames.length) imagesToSend = imagesToSend.concat(_ex.frames);
+        _frameNotes = (_ex && _ex.notes) ? _ex.notes : [];
+      } catch (e) { _frameNotes = ['抽帧出错：' + (e && e.message ? e.message : e)]; }
+    }
     if (videosToSend.length) {
       var vparts = videosToSend.map(function (v) { return '- ' + v.path; }).join('\n');
       fullText = (fullText ? fullText + '\n\n' : '') + '[视频文件路径（可用 termux_exec 或工具处理，例如 ffmpeg）]\n' + vparts;
+      if (imagesToSend.length > _userImgCount) {
+        fullText += '\n\n[本消息随附的图片里，最后 ' + (imagesToSend.length - _userImgCount) + ' 张是按时间顺序从视频中均匀抽取的画面，请直接观察这些画面来回答。]';
+      }
+      if (_frameNotes.length) fullText += '\n[抽帧说明] ' + _frameNotes.join('；');
     }
     if (filesToSend.length) {
       var parts = [];

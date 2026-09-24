@@ -143,6 +143,6 @@ jobs:
       - name: 上传 APK（在本次运行的 Artifacts 里下载）
         uses: actions/upload-artifact@v4
         with:
-          name: LingQiongBuddy-2.3.0-debug
+          name: LingQiongBuddy-2.3.1-debug
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error

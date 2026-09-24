@@ -140,7 +140,7 @@ public class TermuxBridge {
         }
 
         String cur = readLink(link);
-        if (cur != null && cur.equals(target.getAbsolutePath())) return; // 已指向目标
+        if (cur != null && cur.equals(target.getAbsolutePath())) { deployAptPatch(target); return; } // 已指向目标
 
         if (isSymlink(link) || link.exists()) {
             try { link.delete(); } catch (Throwable ignore) {}
@@ -149,6 +149,7 @@ public class TermuxBridge {
         if (parent != null && !parent.exists()) parent.mkdirs();
         if (!target.exists()) target.mkdirs();
         Os.symlink(target.getAbsolutePath(), link.getAbsolutePath());
+        deployAptPatch(target);
     }
 
     /* ==================== 状态查询（JS 轮询） ==================== */
@@ -172,6 +173,7 @@ public class TermuxBridge {
         sb.append(",\"arch\":\"").append(archName()).append("\"");
         sb.append(",\"prefix\":\"").append(esc(prefix())).append("\"");
         sb.append(",\"envsDir\":\"").append(esc(envsDir().getAbsolutePath())).append("\"");
+        sb.append(",\"filesDir\":\"").append(esc(filesDir().getAbsolutePath())).append("\"");
         sb.append(",\"home\":\"").append(esc(new File(envsDir(), "default/home").getAbsolutePath())).append("\"");
         sb.append(",\"active\":\"").append(esc(activeId)).append("\"");
         sb.append(",\"pkg\":\"").append(esc(context.getPackageName())).append("\"");
@@ -281,6 +283,7 @@ public class TermuxBridge {
         new File(usr, "tmp").mkdirs();
         new File(usr, "var").mkdirs();
         try { Os.chmod(new File(usr, "tmp").getAbsolutePath(), 0777); } catch (Throwable ignore) {}
+        deployAptPatch(usr);
     }
 
     private void unzipBootstrap(File usr) throws Exception {
@@ -566,6 +569,85 @@ public class TermuxBridge {
             t.cost = System.currentTimeMillis() - t.start;
             t.done = true;
         }
+    }
+
+
+    /* ==================== apt 补丁固化（让 pkg install 真正可用） ==================== */
+
+    /**
+     * 官方源里的每个 .deb 内部仍写死了 com.termux（含 ELF 里的 RUNPATH），
+     * 直接用 apt/dpkg 安装会因找不到 /data/data/com.termux 而失败
+     * （报错形如：unable to stat './data/data/com.termux' ... Permission denied）。
+     * 这里在每个环境里预置一个 patch-debs 钩子：apt 每次安装前，把待装 deb 内的
+     * com.termux 等长替换成本 App 包名（两者同为 10 字节，ELF 字符串偏移不变，
+     * 二进制不会损坏），从而让 pkg install 正常工作。
+     */
+    private static final String PATCH_DEBS_TEMPLATE = """
+#!/data/data/__PKG__/files/usr/bin/bash
+# Rewrite Termux deb packages on the fly: com.termux -> __PKG__
+# Both names are exactly 10 bytes, so byte-for-byte replacement is safe
+# even inside ELF binaries that hard-code /data/data/<pkg>/files/usr.
+umask 022
+OLD="com.termux"
+NEW="__PKG__"
+TMP="/data/data/__PKG__/files/usr/tmp"
+[ -d "$TMP" ] || mkdir -p "$TMP"
+
+while IFS= read -r deb; do
+  [ -n "$deb" ] || continue
+  case "$deb" in *.deb) ;; *) continue ;; esac
+  [ -f "$deb" ] || continue
+  d="$(mktemp -d "$TMP/pdb.XXXXXX")" || continue
+  if dpkg-deb -R "$deb" "$d" 2>/dev/null; then
+    # dpkg-deb -R 会丢掉维护者脚本的可执行位，必须补回来，否则重新打包会失败
+    if [ -d "$d/DEBIAN" ]; then
+      for s in preinst postinst prerm postrm config; do
+        [ -f "$d/DEBIAN/$s" ] && chmod 0755 "$d/DEBIAN/$s"
+      done
+    fi
+    if [ -d "$d/data/data/$OLD" ]; then
+      mkdir -p "$d/data/data"
+      rm -rf "$d/data/data/$NEW"
+      mv "$d/data/data/$OLD" "$d/data/data/$NEW"
+    fi
+    find "$d" -type f -print0 2>/dev/null | while IFS= read -r -d '' f; do
+      if LC_ALL=C grep -qa "$OLD" "$f" 2>/dev/null; then
+        LC_ALL=C sed -i "s/$OLD/$NEW/g" "$f" 2>/dev/null || true
+      fi
+    done
+    # 这些 deb 马上就会被 dpkg 消费，用最快的方式重压缩
+    if dpkg-deb -b -Zgzip -z1 "$d" "$deb.new" >/dev/null 2>&1; then
+      mv -f "$deb.new" "$deb"
+    else
+      rm -f "$deb.new"
+    fi
+  fi
+  rm -rf "$d"
+done
+exit 0
+""";
+
+    /** 把 patch-debs 脚本与 apt 钩子配置写入指定环境的 usr（幂等，可重复调用）。 */
+    private void deployAptPatch(File usr) {
+        try {
+            String pkg = context.getPackageName();
+            File binDir = new File(usr, "bin");
+            if (!binDir.exists()) binDir.mkdirs();
+            File script = new File(binDir, "patch-debs");
+            FileOutputStream fos = new FileOutputStream(script);
+            fos.write(PATCH_DEBS_TEMPLATE.replace("__PKG__", pkg).getBytes(StandardCharsets.UTF_8));
+            fos.close();
+            try { Os.chmod(script.getAbsolutePath(), 0755); } catch (Throwable ignore) {}
+
+            File aptDir = new File(usr, "etc/apt/apt.conf.d");
+            if (!aptDir.exists()) aptDir.mkdirs();
+            File conf = new File(aptDir, "99-lq-prefix.conf");
+            String confBody = "// Rewrite com.termux -> " + pkg + " inside every downloaded .deb before install.\n"
+                    + "DPkg::Pre-Install-Pkgs { \"" + script.getAbsolutePath() + "\"; };\n";
+            FileOutputStream fos2 = new FileOutputStream(conf);
+            fos2.write(confBody.getBytes(StandardCharsets.UTF_8));
+            fos2.close();
+        } catch (Throwable ignore) {}
     }
 
     /* ==================== 工具 ==================== */

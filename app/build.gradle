@@ -28,8 +28,8 @@ android {
         //   28 可豁免。Termux 官方也是这么做的。
         targetSdk 28
 
-        versionCode 5
-        versionName "2.3.0"
+        versionCode 6
+        versionName "2.3.1"
         multiDexEnabled true
     }
 
