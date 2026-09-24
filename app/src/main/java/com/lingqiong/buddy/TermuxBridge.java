@@ -73,6 +73,8 @@ public class TermuxBridge {
 
     /** 单条命令默认超时（毫秒）。超时后强制结束，避免无限挂起。 */
     private static final long DEFAULT_TIMEOUT_MS = 600_000L;
+    /** 打包/还原整个 Termux 环境可能很慢（体积大），单独放宽到 1 小时。 */
+    private static final long ENV_TAR_TIMEOUT_MS = 3_600_000L;
     /** 单次执行保留的最大输出字符数，防止超大输出撑爆内存。 */
     private static final int MAX_OUT = 400_000;
 
@@ -354,6 +356,8 @@ public class TermuxBridge {
         final long start = System.currentTimeMillis();
         final StringBuilder out = new StringBuilder();
         volatile Process proc;
+        volatile OutputStream stdin;
+        volatile long timeoutMs = DEFAULT_TIMEOUT_MS;
         Task() {}
     }
 
@@ -383,8 +387,10 @@ public class TermuxBridge {
                 ProcessBuilder pb = buildProcess(cmd, cwd, envId);
                 proc = pb.start();
                 t.proc = proc;
+                try { t.stdin = proc.getOutputStream(); } catch (Throwable ignore) {}
             }
-            try { proc.getOutputStream().close(); } catch (Throwable ignore) {}
+            // 不关闭 stdin：内置终端可向运行中的程序写入输入（交互 / input / 确认提示）。
+            // 绝大多数命令不读取 stdin，保持打开不影响它们正常结束。
 
             final InputStream in = proc.getInputStream();
             Thread reader = new Thread(new Runnable() {
@@ -405,7 +411,7 @@ public class TermuxBridge {
 
             boolean finished;
             try {
-                finished = proc.waitFor(DEFAULT_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+                finished = proc.waitFor(t.timeoutMs, TimeUnit.MILLISECONDS);
             } catch (Throwable ex) {
                 finished = false;
             }
@@ -448,6 +454,29 @@ public class TermuxBridge {
         return "已中止";
     }
 
+    /** 向正在运行的任务的标准输入写入数据（内置终端交互用，应对 input / 确认提示）。 */
+    @JavascriptInterface
+    public String execInput(String taskId, String data) {
+        Task t = TASKS.get(taskId);
+        if (t == null) return "err:任务不存在或已结束";
+        OutputStream os = t.stdin;
+        if (os == null) return "err:该任务不支持输入";
+        try {
+            os.write((data == null ? "" : data).getBytes(StandardCharsets.UTF_8));
+            os.flush();
+            return "ok";
+        } catch (Throwable e) {
+            return "err:" + e;
+        }
+    }
+
+    /** 任务是否仍在运行（终端据此决定是否显示输入框）。 */
+    @JavascriptInterface
+    public boolean execAlive(String taskId) {
+        Task t = TASKS.get(taskId);
+        return t != null && !t.done;
+    }
+
     private ProcessBuilder buildProcess(String cmd, String cwd, String envId) throws Exception {
         String p = prefix();
         File home = envHomeDir(safeId(envId));
@@ -465,7 +494,11 @@ public class TermuxBridge {
         env.put("TMPDIR", p + "/tmp");
         env.put("LANG", "zh_CN.UTF-8");
         env.put("LC_ALL", "zh_CN.UTF-8");
-        env.put("LD_LIBRARY_PATH", p + "/lib");
+        // 注意：这里刻意【不】设置 LD_LIBRARY_PATH。
+        // Termux 二进制的 RUNPATH 已在 CI 打包时硬编码为 $PREFIX/lib，
+        // 若再设置 LD_LIBRARY_PATH，Android linker 在解析系统库依赖时
+        // （如 /system/lib64/libui.so -> libbinder_ndk.so）会失败，
+        // 导致 ffmpeg / ffprobe 等报 "CANNOT LINK EXECUTABLE"，抽帧随之失效。
         env.put("ANDROID_DATA", "/data");
         env.put("ANDROID_ROOT", "/system");
         env.put("EXTERNAL_STORAGE", Environment.getExternalStorageDirectory().getAbsolutePath());
@@ -477,9 +510,24 @@ public class TermuxBridge {
 
     /** 同步执行（仅供内部/备份等短任务使用，带超时）。返回纯文本输出。 */
     private String execSync(String cmd, String cwd, String envId) {
+        return execSync(cmd, cwd, envId, DEFAULT_TIMEOUT_MS);
+    }
+
+    private String execSync(String cmd, String cwd, String envId, long timeoutMs) {
         Task t = new Task();
+        t.timeoutMs = timeoutMs;
         runTask(t, cmd, cwd, envId);
         synchronized (t.out) { return t.out.toString(); }
+    }
+
+    /** 选择可用的 tar 命令，并给出“忽略属主”参数（非 root 解压时避免因 chown 失败而报错）。 */
+    private String tarPickScript() {
+        String appTar = activeLink().getAbsolutePath() + "/bin/tar";
+        return "TAR=''; OWN=''; "
+            + "if [ -x " + q(appTar) + " ]; then TAR=" + q(appTar) + "; OWN='--no-same-owner'; "
+            + "elif command -v tar >/dev/null 2>&1; then TAR='tar'; OWN='--no-same-owner'; "
+            + "elif [ -x /system/bin/toybox ]; then TAR='/system/bin/toybox tar'; OWN='-o'; "
+            + "else echo '__NO_TAR__'; exit 127; fi; ";
     }
 
     /* ==================== 备份 / 还原整个环境（含已安装软件包） ==================== */
@@ -507,19 +555,17 @@ public class TermuxBridge {
             File parent = new File(outPath).getParentFile();
             if (parent != null && !parent.exists()) parent.mkdirs();
             String base = filesDir().getAbsolutePath();
-            String pick =
-                "if command -v tar >/dev/null 2>&1; then TAR='tar'; " +
-                "elif [ -x /system/bin/toybox ]; then TAR='/system/bin/toybox tar'; " +
-                "else echo \"__NO_TAR__\"; exit 127; fi; ";
+            String pick = tarPickScript();
             String cmd = pick
-                + "if [ -d " + q(base + "/envs") + " ]; then "
-                + "  $TAR -czf " + q(outPath) + " -C " + q(base) + " envs 2>&1; "
-                + "else "
-                + "  $TAR -czf " + q(outPath) + " -C " + q(base) + " usr home 2>&1; "
-                + "fi";
-            String out = isReady() ? execSync(cmd, null, null) : execSystem(cmd);
+                + "rm -f " + q(outPath) + "; "
+                + "SRC='envs'; [ -d " + q(base + "/envs") + " ] || SRC='usr home'; "
+                + "$TAR -czf " + q(outPath) + " -C " + q(base) + " $SRC 2>&1; rc=$?; "
+                + "echo \"__TAR_RC__$rc\"; "
+                + "ls -l " + q(outPath) + " 2>&1";
+            String out = isReady() ? execSync(cmd, null, null, ENV_TAR_TIMEOUT_MS) : execSystem(cmd, ENV_TAR_TIMEOUT_MS);
             synchronized (t.out) { t.out.append(out == null ? "" : out); }
             File f = new File(outPath);
+            // 导出宽容判定：文件存在且非空即视为成功（tar 的 socket / file changed 警告不影响可解压性）。
             t.code = (f.exists() && f.length() > 0) ? 0 : -1;
         } catch (Throwable e) {
             synchronized (t.out) { t.out.append(String.valueOf(e)); }
@@ -546,14 +592,22 @@ public class TermuxBridge {
 
     private void doImport(Task t, String inPath) {
         try {
+            if (inPath == null || !new File(inPath).exists()) {
+                synchronized (t.out) { t.out.append("找不到备份文件：" + inPath); }
+                t.code = -1;
+                t.cost = System.currentTimeMillis() - t.start;
+                t.done = true;
+                return;
+            }
             String base = filesDir().getAbsolutePath();
-            String pick =
-                "if command -v tar >/dev/null 2>&1; then TAR='tar'; " +
-                "elif [ -x /system/bin/toybox ]; then TAR='/system/bin/toybox tar'; " +
-                "else echo \"__NO_TAR__\"; exit 127; fi; ";
+            String pick = tarPickScript();
+            // 关键修复：不再用 && 串联。tar 解压出现 warning（无法设置属主、覆盖中文件等）时退出码会变成 1，
+            // 原写法会跳过 __ENV_OK__ 从而误判为“还原失败”。现改为记录真实退出码，只要环境目录解压出来即算成功。
             String cmd = pick
-                + "$TAR -xzf " + q(inPath) + " -C " + q(base) + " 2>&1 && echo __ENV_OK__";
-            String out = isReady() ? execSync(cmd, null, null) : execSystem(cmd);
+                + "$TAR $OWN -xzf " + q(inPath) + " -C " + q(base) + " 2>&1; rc=$?; "
+                + "echo \"__TAR_RC__$rc\"; "
+                + "if [ -d " + q(base + "/envs") + " ] || [ -d " + q(base + "/usr") + " ]; then echo __ENV_OK__; fi";
+            String out = isReady() ? execSync(cmd, null, null, ENV_TAR_TIMEOUT_MS) : execSystem(cmd, ENV_TAR_TIMEOUT_MS);
             synchronized (t.out) { t.out.append(out == null ? "" : out); }
             if (out != null && out.contains("__ENV_OK__")) {
                 try { chmodTree(envsDir()); } catch (Throwable ignore) {}
@@ -653,15 +707,30 @@ exit 0
     /* ==================== 工具 ==================== */
 
     /** 用系统 shell 执行（不依赖内置 Termux），用于解压等基础操作。 */
-    private String execSystem(String cmd) {
+    private String execSystem(String cmd) { return execSystem(cmd, 120_000L); }
+
+    private String execSystem(String cmd, long timeoutMs) {
         try {
             ProcessBuilder pb = new ProcessBuilder("/system/bin/sh", "-c", cmd);
             pb.redirectErrorStream(true);
             Process p = pb.start();
             try { p.getOutputStream().close(); } catch (Throwable ignore) {}
-            String out = readAll(p.getInputStream());
-            try { p.waitFor(120, TimeUnit.SECONDS); } catch (Throwable ignore) {}
-            return out;
+            final StringBuilder sb = new StringBuilder();
+            final InputStream in = p.getInputStream();
+            Thread rd = new Thread(new Runnable() {
+                @Override public void run() {
+                    try {
+                        byte[] buf = new byte[8192]; int n;
+                        while ((n = in.read(buf)) != -1) sb.append(new String(buf, 0, n, StandardCharsets.UTF_8));
+                    } catch (Throwable ignore) {}
+                }
+            }, "lqb-sysexec-read");
+            rd.start();
+            boolean fin;
+            try { fin = p.waitFor(timeoutMs, TimeUnit.MILLISECONDS); } catch (Throwable ex) { fin = false; }
+            if (!fin) { try { p.destroyForcibly(); } catch (Throwable ignore) {} }
+            try { rd.join(2000); } catch (Throwable ignore) {}
+            return sb.toString();
         } catch (Throwable t) { return String.valueOf(t); }
     }
 
