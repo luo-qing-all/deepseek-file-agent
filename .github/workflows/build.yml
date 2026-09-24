@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -25,6 +25,12 @@ jobs:
 
       - name: 准备 Android SDK
         uses: android-actions/setup-android@v3
+
+      - name: 接受许可并安装 SDK 组件（关键步骤，避免缺 platform 报错）
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+          echo "ANDROID_HOME=$ANDROID_HOME"
 
       - name: 准备 Gradle（本仓库无 gradlew，故直接安装 Gradle）
         uses: gradle/actions/setup-gradle@v4
