@@ -4,62 +4,73 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#ffffff">
-<title>DeepSeek</title>
+<title>LingQiongBuddy</title>
 <style>
 :root{--bg:#fff;--fg:#16181d;--muted:#8a8f99;--line:#eceef2;--accent:#4d6bfe;--bubble-ai:#f4f5f7;--radius:18px;--code-bg:#1e1f24;--code-fg:#e6e6e6}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{font-size:16px}
 html,body{height:100%}
-body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;background:var(--bg);color:var(--fg);display:flex;flex-direction:column;height:100vh;height:100dvh;overflow:hidden;font-size:16px;-webkit-font-smoothing:antialiased}
-header{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;padding:calc(10px + env(safe-area-inset-top)) 16px 10px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.92);backdrop-filter:saturate(180%) blur(12px);-webkit-backdrop-filter:saturate(180%) blur(12px)}
-header .title{font-size:17px;font-weight:600}
-header .title small{font-size:11px;font-weight:400;color:var(--muted);margin-left:6px}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;background:var(--bg);color:var(--fg);display:flex;flex-direction:column;height:100vh;height:100dvh;overflow:hidden;font-size:1rem;-webkit-font-smoothing:antialiased}
+header{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;padding:calc(10px + env(safe-area-inset-top)) 12px 10px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.92);backdrop-filter:saturate(180%) blur(12px);-webkit-backdrop-filter:saturate(180%) blur(12px)}
+header .title{font-size:1.0625rem;font-weight:600}
+header .title small{font-size:.6875rem;font-weight:400;color:var(--muted);margin-left:6px}
 .icon-btn{border:none;background:transparent;color:var(--fg);width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;padding:0}
 .icon-btn:active{background:#f0f1f4}
-.header-left{display:flex;align-items:center;gap:2px}
-.header-left .icon-btn{margin-left:-8px;margin-right:4px}
+.header-left{display:flex;align-items:center;gap:2px;min-width:0}
+.header-right{display:flex;align-items:center;gap:0;flex:0 0 auto}
+.header-left .icon-btn{margin-left:-6px;margin-right:2px}
 #chat{flex:1 1 auto;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:16px 14px 8px}
 .welcome{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:44vh;color:var(--muted);user-select:none}
-.welcome .logo{width:56px;height:56px;border-radius:18px;background:linear-gradient(135deg,#4d6bfe,#7d93ff);color:#fff;font-weight:700;font-size:20px;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px rgba(77,107,254,.28);margin-bottom:14px}
-.welcome p{margin:0;font-size:14px}
+.welcome .logo{width:56px;height:56px;border-radius:18px;background:linear-gradient(135deg,#4d6bfe,#7d93ff);color:#fff;font-weight:700;font-size:1.25rem;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px rgba(77,107,254,.28);margin-bottom:14px}
+.welcome p{margin:0;font-size:.875rem}
 .msg{display:flex;margin-bottom:14px;animation:pop .22s ease}
 @keyframes pop{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .msg.user{justify-content:flex-end}
-.msg .bubble{max-width:88%;padding:10px 14px;border-radius:var(--radius);font-size:15px;line-height:1.6;word-break:break-word}
+.msg .bubble{max-width:88%;padding:10px 14px;border-radius:var(--radius);font-size:.9375rem;line-height:1.6;word-break:break-word}
 .msg.user .bubble{background:var(--accent);color:#fff;border-bottom-right-radius:6px;white-space:pre-wrap}
 .msg.ai .bubble{background:var(--bubble-ai);border-bottom-left-radius:6px}
 .msg.ai .bubble.error{background:#fff2f2;color:#c0392b}
-.tool-call-tip{display:inline-flex;align-items:center;gap:5px;margin:0 0 8px;padding:5px 10px;background:rgba(52,199,89,.1);border-radius:10px;font-size:12px;color:#34c759;font-weight:500}
-.tool-call-tip::before{content:'🔧';font-size:13px}
-.sys-tip{display:block;margin:6px 0;padding:6px 10px;background:rgba(255,149,0,.1);border-radius:10px;font-size:12px;color:#ff9500;line-height:1.5}
 .msg.user .msg-images{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
 .msg.user .msg-images img{max-width:110px;max-height:110px;border-radius:9px;display:block;object-fit:cover;border:1px solid rgba(255,255,255,.35)}
 .msg.user .msg-files{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
-.msg.user .msg-file-tag{display:inline-flex;align-items:center;gap:4px;padding:4px 9px;border-radius:8px;background:rgba(255,255,255,.2);font-size:12px}
+.msg.user .msg-file-tag{display:inline-flex;align-items:center;gap:4px;padding:4px 9px;border-radius:8px;background:rgba(255,255,255,.2);font-size:.75rem}
 .msg .content{display:block;white-space:pre-wrap;word-break:break-word}
 .msg .content p{margin:0 0 8px}
-.code-block{background:var(--code-bg);border-radius:10px;margin:8px 0;overflow:hidden;font-size:13px}
-.code-head{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:rgba(255,255,255,.06);color:#b0b0b0;font-size:11.5px;font-family:ui-monospace,Menlo,monospace}
-.code-head button{border:1px solid rgba(255,255,255,.2);background:transparent;color:#e6e6e6;font-size:11px;padding:3px 10px;border-radius:6px;cursor:pointer;font-family:inherit}
+.code-block{background:var(--code-bg);border-radius:10px;margin:8px 0;overflow:hidden;font-size:.8125rem}
+.code-head{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:rgba(255,255,255,.06);color:#b0b0b0;font-size:.71875rem;font-family:ui-monospace,Menlo,monospace}
+.code-head button{border:1px solid rgba(255,255,255,.2);background:transparent;color:#e6e6e6;font-size:.6875rem;padding:3px 10px;border-radius:6px;cursor:pointer;font-family:inherit}
 .code-head button:active{background:rgba(255,255,255,.15)}
 .code-head button.copied{color:#4ade80;border-color:#4ade80}
 .code-block pre{margin:0;padding:10px 12px;overflow-x:auto;white-space:pre;color:var(--code-fg);font-family:ui-monospace,Menlo,monospace;line-height:1.5}
 .code-block code{font-family:inherit}
 .msg.ai .bubble.streaming .content::after{content:'';display:inline-block;width:2px;height:1em;background:var(--accent);vertical-align:-.15em;margin-left:3px;border-radius:1px;animation:blink 1s step-end infinite}
 @keyframes blink{50%{opacity:0}}
-.reason{margin:0 0 8px;padding:8px 10px;background:rgba(0,0,0,.035);border-radius:12px;font-size:12.5px;color:#6b7280;line-height:1.55}
+.reason{margin:0 0 8px;padding:8px 10px;background:rgba(0,0,0,.035);border-radius:12px;font-size:.78125rem;color:#6b7280;line-height:1.55}
 .reason summary{cursor:pointer;list-style:none;font-weight:600;color:#8a8f99}
 .reason summary::-webkit-details-marker{display:none}
 .reason summary::before{content:'▸ ';display:inline-block;transition:transform .2s}
 .reason[open] summary::before{transform:rotate(90deg)}
 .reason-text{white-space:pre-wrap;margin-top:6px;max-height:220px;overflow-y:auto}
-.usage-bar{display:none;padding:6px 10px;font-size:11px;color:var(--muted);text-align:right;border-top:1px dashed var(--line);margin-top:4px}
+.tool-log{margin:0 0 8px;border:1px solid var(--line);border-radius:12px;background:#fafbfc;overflow:hidden}
+.tool-log summary{cursor:pointer;list-style:none;padding:7px 10px;font-size:.75rem;font-weight:600;color:#5b6069;background:#f4f5f7;display:flex;align-items:center;gap:6px}
+.tool-log summary::-webkit-details-marker{display:none}
+.tool-log summary::before{content:'▸';display:inline-block;transition:transform .2s;color:#8a8f99}
+.tool-log[open] summary::before{transform:rotate(90deg)}
+.tool-log-body{max-height:180px;overflow-y:auto;padding:6px 10px;font-size:.71875rem;color:#6b7280;line-height:1.5;overscroll-behavior:contain}
+.tool-line{padding:4px 0;border-bottom:1px dashed var(--line);white-space:pre-wrap;word-break:break-word}
+.tool-line:last-child{border-bottom:none}
+.tool-line .tool-nm{color:var(--accent);font-weight:600}
+.tool-line.tool-err{color:#c0392b}
+.btn-continue{margin-top:10px;padding:7px 16px;border-radius:18px;border:1px solid var(--line);background:#fff;color:var(--accent);font-size:.8125rem;font-weight:600}
+.btn-continue:active{background:#f0f1f4}
+.usage-bar{display:none;padding:6px 10px;font-size:.6875rem;color:var(--muted);text-align:right;border-top:1px dashed var(--line);margin-top:4px}
 .usage-bar.show{display:block}
 .usage-bar span{margin-left:8px}
 .usage-bar .usage-accent{color:var(--accent);font-weight:600}
 .composer{flex:0 0 auto;padding:10px 12px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:#fff}
 .composer-inner{display:flex;align-items:flex-end;gap:6px}
 .quick-bar{display:flex;align-items:center;gap:8px;padding:0 4px 8px;overflow-x:auto;-webkit-overflow-scrolling:touch}
-.quick-btn{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:16px;border:1px solid var(--line);background:#fff;color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;flex:0 0 auto;max-width:180px}
+.quick-btn{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:16px;border:1px solid var(--line);background:#fff;color:var(--muted);font-size:.75rem;font-weight:500;cursor:pointer;flex:0 0 auto;max-width:180px}
 .quick-btn.active{background:rgba(77,107,254,.08);border-color:var(--accent);color:var(--accent)}
 .quick-btn.disabled{opacity:.4;cursor:not-allowed}
 .quick-btn svg{flex:0 0 auto}
@@ -69,13 +80,13 @@ header .title small{font-size:11px;font-weight:400;color:var(--muted);margin-lef
 .preview-item{position:relative;flex:0 0 auto;width:64px;height:64px}
 .preview-item img{width:100%;height:100%;object-fit:cover;border-radius:10px;display:block;border:1px solid var(--line)}
 .preview-item.file-preview{width:auto;min-width:100px;max-width:160px;height:64px;background:#f4f5f7;border-radius:10px;display:flex;align-items:center;gap:8px;padding:0 12px;border:1px solid var(--line)}
-.preview-item.file-preview .file-icon{width:30px;height:30px;flex:0 0 auto;background:var(--accent);color:#fff;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}
+.preview-item.file-preview .file-icon{width:30px;height:30px;flex:0 0 auto;background:var(--accent);color:#fff;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:.625rem;font-weight:700}
 .preview-item.file-preview .file-meta{flex:1;min-width:0}
-.preview-item.file-preview .file-name{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.preview-item.file-preview .file-size{font-size:10.5px;color:var(--muted);margin-top:2px}
+.preview-item.file-preview .file-name{font-size:.75rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.preview-item.file-preview .file-size{font-size:.65625rem;color:var(--muted);margin-top:2px}
 .preview-item .rm{position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;background:rgba(22,24,29,.82);color:#fff;border:2px solid #fff;display:flex;align-items:center;justify-content:center;padding:0}
 .preview-item .rm svg{display:block}
-#input{flex:1;resize:none;border:none;outline:none;background:#f4f5f7;border-radius:20px;padding:11px 15px;font-size:16px;line-height:1.4;font-family:inherit;max-height:120px;min-height:42px;min-width:0}
+#input{flex:1;resize:none;border:none;outline:none;background:#f4f5f7;border-radius:20px;padding:11px 15px;font-size:1rem;line-height:1.4;font-family:inherit;max-height:120px;min-height:42px;min-width:0}
 #input:focus{background:#eef0f4}
 .btn-round{flex:0 0 auto;width:38px;height:38px;border-radius:50%;border:none;background:#f4f5f7;color:#5b6069;display:flex;align-items:center;justify-content:center;padding:0}
 .btn-round:active{transform:scale(.92);background:#e8eaef}
@@ -87,7 +98,7 @@ header .title small{font-size:11px;font-weight:400;color:var(--muted);margin-lef
 .loading-mask.show{display:flex}
 .spinner{width:38px;height:38px;border-radius:50%;border:3px solid #dfe1e6;border-top-color:var(--accent);animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-.loading-mask p{margin:0;font-size:13.5px;color:#5b6069}
+.loading-mask p{margin:0;font-size:.84375rem;color:#5b6069}
 .drawer{position:fixed;inset:0;z-index:70;pointer-events:none}
 .drawer.open{pointer-events:auto}
 .drawer-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.35);opacity:0;transition:opacity .28s}
@@ -95,42 +106,42 @@ header .title small{font-size:11px;font-weight:400;color:var(--muted);margin-lef
 .drawer-panel{position:absolute;left:0;top:0;bottom:0;width:86%;max-width:340px;background:#fff;transform:translateX(-101%);transition:transform .3s cubic-bezier(.32,.72,0,1);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
 .drawer.open .drawer-panel{transform:translateX(0)}
 .drawer-head{padding:16px 18px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}
-.drawer-head h2{margin:0;font-size:17px;font-weight:600}
+.drawer-head h2{margin:0;font-size:1.0625rem;font-weight:600}
 .drawer-head-actions{display:flex;gap:2px}
 .drawer-search{padding:10px 14px 6px}
-.drawer-search input{width:100%;padding:9px 13px;border:1px solid var(--line);border-radius:10px;font-size:14px;font-family:inherit;background:#f7f8fa;outline:none;-webkit-appearance:none}
+.drawer-search input{width:100%;padding:9px 13px;border:1px solid var(--line);border-radius:10px;font-size:.875rem;font-family:inherit;background:#f7f8fa;outline:none;-webkit-appearance:none}
 .drawer-search input:focus{border-color:var(--accent);background:#fff}
 .drawer-list{flex:1;overflow-y:auto;padding:6px 8px}
 .history-item{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:12px;cursor:pointer}
 .history-item:active{background:#f4f5f7}
 .history-item.active{background:rgba(77,107,254,.08)}
 .history-item-body{flex:1;min-width:0}
-.history-item-title{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
-.history-item-meta{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.history-item-title{font-size:.875rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
+.history-item-meta{font-size:.6875rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .history-item-actions{display:flex;gap:0;flex:0 0 auto}
 .history-icon-btn{width:30px;height:30px;border:none;background:transparent;color:var(--muted);border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0}
 .history-icon-btn:active{background:#eef0f4}
-.history-empty{text-align:center;padding:40px 20px;color:var(--muted);font-size:13px}
+.history-empty{text-align:center;padding:40px 20px;color:var(--muted);font-size:.8125rem}
 .sheet{position:fixed;inset:0;z-index:60;pointer-events:none}
 .sheet.open{pointer-events:auto}
 .sheet-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.35);opacity:0;transition:opacity .28s}
 .sheet.open .sheet-backdrop{opacity:1}
-.sheet-panel{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:22px 22px 0 0;padding:8px 20px calc(22px + env(safe-area-inset-bottom));transform:translateY(101%);transition:transform .3s cubic-bezier(.32,.72,0,1);max-height:88vh;overflow-y:auto}
+.sheet-panel{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:22px 22px 0 0;padding:8px 20px calc(22px + env(safe-area-inset-bottom));transform:translateY(101%);transition:transform .3s cubic-bezier(.32,.72,0,1);max-height:88vh;overflow-y:auto;overscroll-behavior:contain}
 .sheet.open .sheet-panel{transform:translateY(0)}
 .sheet-handle{width:38px;height:4px;border-radius:2px;background:#dcdfe5;margin:6px auto 12px}
 .sheet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
-.sheet-head h2{margin:0;font-size:17px;font-weight:600}
-.sheet-head button{border:none;background:transparent;color:var(--accent);font-size:15px;padding:4px 0}
+.sheet-head h2{margin:0;font-size:1.0625rem;font-weight:600}
+.sheet-head button{border:none;background:transparent;color:var(--accent);font-size:.9375rem;padding:4px 0}
 .field{margin-bottom:20px}
-.field > label{display:flex;align-items:center;justify-content:space-between;font-size:13.5px;font-weight:600;color:#3f434b;margin-bottom:8px}
-.field .val{color:var(--accent);font-size:12.5px}
-input[type=text],input[type=password],input[type=number],textarea{width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:12px;font-size:16px;font-family:inherit;color:inherit;background:#fafbfc;outline:none;-webkit-appearance:none;resize:vertical}
+.field > label{display:flex;align-items:center;justify-content:space-between;font-size:.84375rem;font-weight:600;color:#3f434b;margin-bottom:8px}
+.field .val{color:var(--accent);font-size:.78125rem}
+input[type=text],input[type=password],input[type=number],textarea{width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:12px;font-size:1rem;font-family:inherit;color:inherit;background:#fafbfc;outline:none;-webkit-appearance:none;resize:vertical}
 input:focus,textarea:focus{border-color:var(--accent);background:#fff}
 .input-wrap{position:relative}
 .input-wrap input{padding-right:66px}
-.eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);border:none;background:transparent;color:var(--accent);font-size:14px;padding:8px 12px}
+.eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);border:none;background:transparent;color:var(--accent);font-size:.875rem;padding:8px 12px}
 .segment{display:flex;background:#f4f5f7;border-radius:12px;padding:3px;gap:3px}
-.segment button{flex:1;border:none;background:transparent;padding:9px 2px;border-radius:9px;font-size:11.5px;font-weight:500;color:var(--muted)}
+.segment button{flex:1;border:none;background:transparent;padding:9px 2px;border-radius:9px;font-size:.71875rem;font-weight:500;color:var(--muted)}
 .segment button.active{background:#fff;color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.08)}
 input[type=range]{-webkit-appearance:none;width:100%;height:4px;border-radius:2px;background:#e6e8ec;outline:none;margin:10px 0 2px}
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;border:2px solid var(--accent)}
@@ -140,61 +151,73 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
 .slider::before{content:'';position:absolute;width:24px;height:24px;left:2px;top:2px;background:#fff;border-radius:50%;transition:transform .2s}
 .switch input:checked + .slider{background:var(--accent)}
 .switch input:checked + .slider::before{transform:translateX(20px)}
-.btn-ghost{width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:#fff;color:#e5484d;font-size:15px;font-weight:500}
-.desc{font-size:11.5px;color:var(--muted);line-height:1.65;margin:7px 0 0}
+.btn-primary{width:100%;padding:12px;border-radius:12px;border:none;background:var(--accent);color:#fff;font-size:.9375rem;font-weight:600}
+.btn-primary:active{opacity:.85}
+.btn-ghost{width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:#fff;color:#e5484d;font-size:.9375rem;font-weight:500}
+.btn-soft{width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:#fff;color:var(--accent);font-size:.9375rem;font-weight:500}
+.desc{font-size:.71875rem;color:var(--muted);line-height:1.65;margin:7px 0 0}
 .desc b{color:#7a8090}
 .advanced-group{background:#fafbfc;border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
 .advanced-group .field:last-child{margin-bottom:0}
-.advanced-group-title{font-size:12px;font-weight:600;color:#5b6069;margin-bottom:12px;letter-spacing:.3px}
+.advanced-group-title{font-size:.75rem;font-weight:600;color:#5b6069;margin-bottom:12px;letter-spacing:.3px}
+.list-box{border:1px solid var(--line);border-radius:12px;background:#fafbfc;max-height:220px;overflow-y:auto;margin-top:8px}
+.list-row{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)}
+.list-row:last-child{border-bottom:none}
+.list-row-body{flex:1;min-width:0}
+.list-row-title{font-size:.8125rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.list-row-meta{font-size:.6875rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.list-row-btn{border:1px solid var(--line);background:#fff;color:var(--accent);font-size:.71875rem;padding:6px 10px;border-radius:8px;flex:0 0 auto}
+.list-row-btn.danger{color:#e5484d}
+.list-empty{text-align:center;padding:22px 10px;color:var(--muted);font-size:.78125rem}
 .skill-list{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
 .skill-item{display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:#fafbfc;cursor:pointer}
 .skill-item.active{border-color:var(--accent);background:rgba(77,107,254,.06)}
 .skill-item-body{flex:1;min-width:0}
-.skill-item-name{font-size:14px;font-weight:600;margin-bottom:2px;display:flex;align-items:center;gap:6px}
-.skill-badge{display:inline-block;padding:1px 6px;border-radius:6px;font-size:9.5px;font-weight:600;background:rgba(77,107,254,.12);color:var(--accent)}
-.skill-item-preview{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.skill-item-name{font-size:.875rem;font-weight:600;margin-bottom:2px;display:flex;align-items:center;gap:6px}
+.skill-badge{display:inline-block;padding:1px 6px;border-radius:6px;font-size:.59375rem;font-weight:600;background:rgba(77,107,254,.12);color:var(--accent)}
+.skill-item-preview{font-size:.71875rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .skill-item-actions{display:flex;gap:2px;flex:0 0 auto}
 .skill-icon-btn{width:32px;height:32px;border:none;background:transparent;color:var(--muted);border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0}
 .skill-icon-btn:active{background:#eef0f4}
-.skill-empty{text-align:center;padding:24px 0;color:var(--muted);font-size:13px}
+.skill-empty{text-align:center;padding:24px 0;color:var(--muted);font-size:.8125rem}
 .skill-editor{padding:14px;border:1px solid var(--accent);border-radius:14px;background:#fff;margin-bottom:16px;display:none}
 .skill-editor.show{display:block}
-.skill-editor-title{font-size:13px;font-weight:600;color:#5b6069;margin-bottom:10px;display:flex;justify-content:space-between}
-.skill-editor-hint{font-size:11px;color:var(--muted);font-weight:400}
+.skill-editor-title{font-size:.8125rem;font-weight:600;color:#5b6069;margin-bottom:10px;display:flex;justify-content:space-between}
+.skill-editor-hint{font-size:.6875rem;color:var(--muted);font-weight:400}
 .skill-editor-actions{display:flex;gap:8px}
-.skill-editor-actions button{flex:1;padding:10px;border-radius:10px;border:none;font-size:14px;font-weight:500}
+.skill-editor-actions button{flex:1;padding:10px;border-radius:10px;border:none;font-size:.875rem;font-weight:500}
 .skill-editor-actions .btn-cancel{background:#f4f5f7;color:var(--fg)}
 .skill-editor-actions .btn-save{background:var(--accent);color:#fff}
 .skill-upload-row{display:flex;gap:8px;margin-bottom:8px}
-.btn-add-skill,.btn-upload-skill{flex:1;padding:12px;border:1.5px dashed var(--line);background:#fff;font-size:13.5px;font-weight:500;border-radius:12px;display:flex;align-items:center;justify-content:center;gap:5px}
+.btn-add-skill,.btn-upload-skill{flex:1;padding:12px;border:1.5px dashed var(--line);background:#fff;font-size:.84375rem;font-weight:500;border-radius:12px;display:flex;align-items:center;justify-content:center;gap:5px}
 .btn-add-skill{color:var(--accent)}
 .btn-upload-skill{color:#34c759}
 .tool-toggles{display:flex;flex-direction:column;gap:10px;padding:12px 14px;background:#fafbfc;border-radius:14px;border:1px solid var(--line);margin-bottom:12px}
 .tool-toggle-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .tool-toggle-label{flex:1}
-.tool-toggle-name{font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:6px}
-.tool-toggle-desc{font-size:11px;color:var(--muted);margin-top:3px}
+.tool-toggle-name{font-size:.84375rem;font-weight:600;display:flex;align-items:center;gap:6px}
+.tool-toggle-desc{font-size:.6875rem;color:var(--muted);margin-top:3px}
 .status-dot{width:7px;height:7px;border-radius:50%;background:#ccc}
 .status-dot.ok{background:#34c759}
 .status-dot.warn{background:#ff9500}
 .status-dot.err{background:#ff3b30}
-#toast{position:fixed;left:50%;bottom:96px;transform:translate(-50%,10px);background:rgba(22,24,29,.92);color:#fff;padding:9px 16px;border-radius:20px;font-size:13.5px;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;z-index:99;max-width:78vw;text-align:center}
+#toast{position:fixed;left:50%;bottom:96px;transform:translate(-50%,10px);background:rgba(22,24,29,.92);color:#fff;padding:9px 16px;border-radius:20px;font-size:.84375rem;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;z-index:99;max-width:78vw;text-align:center}
 #toast.show{opacity:1;transform:translate(-50%,0)}
 #askOverlay{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.5);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;padding:20px}
 #askOverlay.show{display:flex}
 .ask-card{background:#fff;border-radius:18px;width:100%;max-width:420px;max-height:85vh;overflow-y:auto;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.3);animation:askPop .22s ease}
 @keyframes askPop{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}
-.ask-title{font-size:13px;font-weight:600;color:var(--accent);margin-bottom:8px;letter-spacing:.3px}
-.ask-question{font-size:16px;font-weight:600;color:var(--fg);line-height:1.55;margin-bottom:16px;word-break:break-word;white-space:pre-wrap}
+.ask-title{font-size:.8125rem;font-weight:600;color:var(--accent);margin-bottom:8px;letter-spacing:.3px}
+.ask-question{font-size:1rem;font-weight:600;color:var(--fg);line-height:1.55;margin-bottom:16px;word-break:break-word;white-space:pre-wrap}
 .ask-options{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
-.ask-option{width:100%;padding:12px 14px;border-radius:12px;border:1.5px solid var(--line);background:#fafbfc;color:var(--fg);font-size:14.5px;font-family:inherit;text-align:left;cursor:pointer;transition:all .15s;line-height:1.5;word-break:break-word;white-space:pre-wrap}
+.ask-option{width:100%;padding:12px 14px;border-radius:12px;border:1.5px solid var(--line);background:#fafbfc;color:var(--fg);font-size:.90625rem;font-family:inherit;text-align:left;cursor:pointer;transition:all .15s;line-height:1.5;word-break:break-word;white-space:pre-wrap}
 .ask-option:active{background:#eef0f4}
 .ask-option.selected{border-color:var(--accent);background:rgba(77,107,254,.08);color:var(--accent);font-weight:600}
-.ask-custom-label{font-size:12px;font-weight:600;color:#5b6069;margin-bottom:6px}
-.ask-custom{width:100%;padding:10px 13px;border:1px solid var(--line);border-radius:10px;font-size:14.5px;font-family:inherit;background:#fafbfc;outline:none;-webkit-appearance:none;margin-bottom:14px;resize:vertical}
+.ask-custom-label{font-size:.75rem;font-weight:600;color:#5b6069;margin-bottom:6px}
+.ask-custom{width:100%;padding:10px 13px;border:1px solid var(--line);border-radius:10px;font-size:.90625rem;font-family:inherit;background:#fafbfc;outline:none;-webkit-appearance:none;margin-bottom:14px;resize:vertical}
 .ask-custom:focus{border-color:var(--accent);background:#fff}
 .ask-actions{display:flex;gap:8px}
-.ask-actions button{flex:1;padding:12px;border-radius:12px;border:none;font-size:15px;font-family:inherit;font-weight:500;cursor:pointer}
+.ask-actions button{flex:1;padding:12px;border-radius:12px;border:none;font-size:.9375rem;font-family:inherit;font-weight:500;cursor:pointer}
 .ask-cancel{background:#f4f5f7;color:var(--fg)}
 .ask-confirm{background:var(--accent);color:#fff}
 .ask-confirm:disabled{background:#dfe1e6;color:#fff}
@@ -206,12 +229,15 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
 <header>
   <div class="header-left">
     <button class="icon-btn" id="menuBtn"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
-    <div class="title">DeepSeek<small id="modelTag">deepseek-flash</small></div>
+    <div class="title">LingQiongBuddy<small id="modelTag">deepseek-flash</small></div>
   </div>
-  <button class="icon-btn" id="settingsBtn"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.6v2.5M12 18.9v2.5M21.4 12h-2.5M5.1 12H2.6M18.65 5.35l-1.77 1.77M7.12 16.88l-1.77 1.77M18.65 18.65l-1.77-1.77M7.12 7.12L5.35 5.35"/></svg></button>
+  <div class="header-right">
+    <button class="icon-btn" id="convSettingsBtn" title="对话设置"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10M18 6h2M4 12h2M10 12h10M4 18h8M16 18h4"/><circle cx="16" cy="6" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="14" cy="18" r="2"/></svg></button>
+    <button class="icon-btn" id="settingsBtn" title="总设置"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.6v2.5M12 18.9v2.5M21.4 12h-2.5M5.1 12H2.6M18.65 5.35l-1.77 1.77M7.12 16.88l-1.77 1.77M18.65 18.65l-1.77-1.77M7.12 7.12L5.35 5.35"/></svg></button>
+  </div>
 </header>
 
-<div id="chat"><div class="welcome"><div class="logo">DS</div><p>有什么可以帮你的？</p></div></div>
+<div id="chat"><div class="welcome"><div class="logo">LQ</div><p>有什么可以帮你的？</p></div></div>
 <div class="usage-bar" id="usageBar"></div>
 
 <div class="composer">
@@ -245,6 +271,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
 
 <div class="loading-mask" id="loadingMask"><div class="spinner"></div><p id="loadingText">正在处理…</p></div>
 
+<!-- 历史对话抽屉 -->
 <div class="drawer" id="historyDrawer">
   <div class="drawer-backdrop"></div>
   <div class="drawer-panel">
@@ -260,6 +287,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
   </div>
 </div>
 
+<!-- 技能 -->
 <div class="sheet" id="skillSheet">
   <div class="sheet-backdrop"></div>
   <div class="sheet-panel">
@@ -284,28 +312,22 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
   </div>
 </div>
 
-<div class="sheet" id="sheet">
+<!-- 对话设置（仅作用于本对话） -->
+<div class="sheet" id="convSheet">
   <div class="sheet-backdrop"></div>
   <div class="sheet-panel">
     <div class="sheet-handle"></div>
-    <div class="sheet-head"><h2>设置</h2><button id="closeSheet">完成</button></div>
+    <div class="sheet-head"><h2>对话设置 · 仅本对话</h2><button id="closeConvSheet">完成</button></div>
+    <p class="desc" style="margin-top:-8px;margin-bottom:16px">这里的修改只影响当前对话，其它对话不受影响。</p>
 
     <div class="field">
-      <label for="apiKey">API Key 密钥</label>
-      <div class="input-wrap">
-        <input id="apiKey" type="password" placeholder="sk-..." autocomplete="off">
-        <button class="eye" id="toggleKey" type="button">显示</button>
-      </div>
-    </div>
-
-    <div class="field">
-      <label for="systemPrompt">系统提示词（永久记忆）</label>
-      <textarea id="systemPrompt" rows="3" placeholder="例如：你是一个科学严谨的助手。"></textarea>
+      <label for="convSystemPrompt">系统提示词（本对话）</label>
+      <textarea id="convSystemPrompt" rows="3" placeholder="例如：你是一个科学严谨的助手。"></textarea>
     </div>
 
     <div class="field">
       <label>模型 model</label>
-      <div class="segment" id="modelSeg">
+      <div class="segment" id="convModelSeg">
         <button type="button" data-value="deepseek-flash">V4.1 Flash</button>
         <button type="button" data-value="deepseek-v4-pro">V4 Pro</button>
       </div>
@@ -313,7 +335,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
 
     <div class="field">
       <label>思考强度 reasoning_effort</label>
-      <div class="segment" id="effortSeg">
+      <div class="segment" id="convEffortSeg">
         <button type="button" data-value="none">关闭</button>
         <button type="button" data-value="low">低</button>
         <button type="button" data-value="high">高</button>
@@ -322,74 +344,142 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
     </div>
 
     <div class="field">
-      <label for="streamToggle">流式输出</label>
-      <div style="text-align:right">
-        <label class="switch"><input type="checkbox" id="streamToggle" checked><span class="slider"></span></label>
-      </div>
+      <label for="convStreamToggle">流式输出</label>
+      <div style="text-align:right"><label class="switch"><input type="checkbox" id="convStreamToggle"><span class="slider"></span></label></div>
     </div>
 
     <div class="field">
-      <label>随机性 temperature <span class="val" id="tempVal">1.0</span></label>
-      <input type="range" id="temp" min="0" max="2" step="0.1" value="1">
+      <label>随机性 temperature <span class="val" id="convTempVal">1.0</span></label>
+      <input type="range" id="convTemp" min="0" max="2" step="0.1" value="1">
     </div>
 
     <div class="field">
-      <label>候选范围 top_p <span class="val" id="topPVal">1.00</span></label>
-      <input type="range" id="topP" min="0" max="1" step="0.05" value="1">
+      <label>候选范围 top_p <span class="val" id="convTopPVal">1.00</span></label>
+      <input type="range" id="convTopP" min="0" max="1" step="0.05" value="1">
     </div>
 
     <div class="advanced-group">
-      <div class="advanced-group-title">⚙️ 高级参数（全部由你决定）</div>
-
+      <div class="advanced-group-title">⚙️ 高级参数（本对话）</div>
       <div class="field">
-        <label for="maxTokens">最大回复长度 max_tokens</label>
-        <input type="number" id="maxTokens" min="0" step="1" value="4096" inputmode="numeric">
-        <p class="desc">单次回复最多生成多少 token。<b>填 0 表示不传该参数</b>（用 API 默认）。</p>
+        <label for="convMaxTokens">最大回复长度 max_tokens</label>
+        <input type="number" id="convMaxTokens" min="0" step="1" value="4096" inputmode="numeric">
+        <p class="desc">填 0 表示不传该参数。</p>
       </div>
+      <div class="field">
+        <label for="convMaxToolLoops">工具调用最大轮数</label>
+        <input type="number" id="convMaxToolLoops" min="0" step="1" value="30" inputmode="numeric">
+        <p class="desc">填 0 表示不限制。</p>
+      </div>
+      <div class="field">
+        <label for="convMaxConsecutiveErrors">连续错误阈值</label>
+        <input type="number" id="convMaxConsecutiveErrors" min="0" step="1" value="5" inputmode="numeric">
+      </div>
+      <div class="field">
+        <label for="convFileRootPath">文件根路径</label>
+        <input type="text" id="convFileRootPath" value="/sdcard/">
+      </div>
+    </div>
 
+    <div class="field">
+      <label>文件工具权限</label>
+      <div class="tool-toggles">
+        <div class="tool-toggle-row">
+          <div class="tool-toggle-label">
+            <div class="tool-toggle-name">允许读写文件</div>
+            <div class="tool-toggle-desc">关闭后 AI 将不能调用任何文件工具</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="convFileToolToggle"><span class="slider"></span></label>
+        </div>
+        <div class="tool-toggle-row" style="border-top:1px solid var(--line);padding-top:10px">
+          <div class="tool-toggle-label">
+            <div class="tool-toggle-name">允许永久删除 ⚠️</div>
+            <div class="tool-toggle-desc">默认删除只是移入回收站；开启后 AI 才能真删，用于必须删除的文件</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="convAllowDeleteToggle"><span class="slider"></span></label>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn-ghost" id="convClearBtn" type="button">清空当前对话</button>
+  </div>
+</div>
+
+<!-- 总设置 -->
+<div class="sheet" id="sheet">
+  <div class="sheet-backdrop"></div>
+  <div class="sheet-panel">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h2>总设置</h2><button id="closeSheet">完成</button></div>
+
+    <div class="field">
+      <label for="apiKey">API Key 密钥（全局）</label>
+      <div class="input-wrap">
+        <input id="apiKey" type="password" placeholder="sk-..." autocomplete="off">
+        <button class="eye" id="toggleKey" type="button">显示</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>界面字体大小 <span class="val" id="fontVal">100%</span></label>
+      <input type="range" id="fontScale" min="0.8" max="1.6" step="0.05" value="1">
+      <p class="desc">调整后立即生效，影响整个 App 的文字大小。</p>
+    </div>
+
+    <div class="field">
+      <label for="thinkChineseToggle">思考过程使用中文</label>
+      <div style="text-align:right"><label class="switch"><input type="checkbox" id="thinkChineseToggle"><span class="slider"></span></label></div>
+      <p class="desc">开启后会在系统提示里要求模型用中文思考，减少默认英文思考。</p>
+    </div>
+
+    <div class="advanced-group">
+      <div class="advanced-group-title">💾 备份</div>
+      <div class="field">
+        <label for="backupName">为这次备份取个名字</label>
+        <input type="text" id="backupName" placeholder="例如：换手机前的备份">
+        <p class="desc">备份文件会存到 <b id="backupDirText">/sdcard/LingQiongBuddy/备份</b>，卸载 App 也不会删除。</p>
+      </div>
+      <button class="btn-primary" id="backupBtn" type="button">立即备份</button>
+    </div>
+
+    <div class="advanced-group">
+      <div class="advanced-group-title">♻️ 还原</div>
+      <div class="list-box" id="backupList"></div>
+      <button class="btn-soft" id="backupRefreshBtn" type="button" style="margin-top:10px">刷新备份列表</button>
+    </div>
+
+    <div class="advanced-group">
+      <div class="advanced-group-title">🗑️ 回收站</div>
+      <p class="desc" style="margin-top:0">AI 删除的文件会先移到这里，可还原或永久删除。目录：<b id="recycleDirText">/sdcard/LingQiongBuddy/回收站</b></p>
+      <button class="btn-soft" id="openRecycleBtn" type="button">打开回收站管理</button>
+    </div>
+
+    <div class="advanced-group">
+      <div class="advanced-group-title">⚙️ 全局高级参数</div>
       <div class="field">
         <label for="maxTokensLimit">max_tokens 硬上限</label>
         <input type="number" id="maxTokensLimit" min="0" step="1" value="131072" inputmode="numeric">
-        <p class="desc">防止手滑输入过大。<b>填 0 表示不限制</b>。</p>
+        <p class="desc">填 0 表示不限制。</p>
       </div>
-
-      <div class="field">
-        <label for="maxToolLoops">工具调用最大轮数</label>
-        <input type="number" id="maxToolLoops" min="0" step="1" value="30" inputmode="numeric">
-        <p class="desc">单次对话最多调多少次工具。<b>填 0 表示不限制</b>。</p>
-      </div>
-
-      <div class="field">
-        <label for="maxConsecutiveErrors">连续错误阈值</label>
-        <input type="number" id="maxConsecutiveErrors" min="0" step="1" value="5" inputmode="numeric">
-        <p class="desc">连续出错多少次后停止（错误信息会先喂给 AI 自救）。<b>填 0 表示不限制</b>。</p>
-      </div>
-
       <div class="field">
         <label for="maxMediaItems">最多图片数量</label>
         <input type="number" id="maxMediaItems" min="1" step="1" value="32" inputmode="numeric">
       </div>
-
       <div class="field">
         <label for="maxInlineMB">单张图片大小上限 (MB)</label>
         <input type="number" id="maxInlineMB" min="1" step="1" value="32" inputmode="numeric">
       </div>
-
       <div class="field">
         <label for="maxDocTotal">最多文档数量</label>
         <input type="number" id="maxDocTotal" min="1" step="1" value="5" inputmode="numeric">
       </div>
-
       <div class="field">
         <label for="maxDocFileMB">单个文档大小上限 (MB)</label>
         <input type="number" id="maxDocFileMB" min="1" step="1" value="2" inputmode="numeric">
       </div>
-
       <div class="field">
         <label for="maxDocChars">单文档注入字符数上限</label>
         <input type="number" id="maxDocChars" min="1000" step="1000" value="80000" inputmode="numeric">
       </div>
-
       <div class="field">
         <label for="maxSkillFileKB">技能文件大小上限 (KB)</label>
         <input type="number" id="maxSkillFileKB" min="1" step="1" value="512" inputmode="numeric">
@@ -410,17 +500,23 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
             <div class="tool-toggle-name"><span class="status-dot" id="shizukuStatusDot"></span>Shizuku 高权限</div>
             <div class="tool-toggle-desc" id="shizukuStatusText">检测中…</div>
           </div>
-          <button type="button" id="reqShizukuBtn" style="padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:#fff;font-size:12px;color:var(--accent)">授权</button>
+          <button type="button" id="reqShizukuBtn" style="padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:#fff;font-size:.75rem;color:var(--accent)">授权</button>
         </div>
       </div>
     </div>
 
-    <div class="field">
-      <label for="fileRootPath">文件根路径</label>
-      <input type="text" id="fileRootPath" value="/sdcard/">
-    </div>
+    <p class="desc" style="text-align:center;margin-top:6px">LingQiongBuddy v<span id="aboutVer">2.0.0</span></p>
+  </div>
+</div>
 
-    <button class="btn-ghost" id="clearBtn" type="button">清空当前对话</button>
+<!-- 回收站 -->
+<div class="sheet" id="recycleSheet">
+  <div class="sheet-backdrop"></div>
+  <div class="sheet-panel">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h2>回收站</h2><button id="closeRecycle">关闭</button></div>
+    <div class="list-box" id="recycleList" style="max-height:52vh"></div>
+    <button class="btn-ghost" id="emptyRecycleBtn" type="button" style="margin-top:14px">清空回收站（永久删除全部）</button>
   </div>
 </div>
 
@@ -444,40 +540,60 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
 (function () {
   'use strict';
 
+  var APP_VERSION = '2.0.0';
   var API_URL = 'https://api.deepseek.com/chat/completions';
-  var STORE_KEY = 'deepseek-mobile-cfg-v10';
-  var DEFAULTS = {
-    apiKey: '', systemPrompt: '', model: 'deepseek-flash', stream: true,
+  var STORE_KEY = 'lingqiong-buddy-cfg-v2';
+  var OLD_STORE_KEY = 'deepseek-mobile-cfg-v10';
+
+  // 对话级默认参数（新对话以此为初始值）
+  var CONV_DEFAULT = {
+    systemPrompt: '', model: 'deepseek-flash', stream: true,
     reasoning_effort: 'high', temperature: 1, top_p: 1, max_tokens: 4096,
-    detail: 'auto', skills: [], activeSkillId: '',
-    conversations: [], currentConvId: '',
-    fileToolEnabled: true, fileRootPath: '/sdcard/',
-    maxTokensLimit: 131072,
-    maxToolLoops: 30,
-    maxConsecutiveErrors: 5,
-    maxMediaItems: 32,
-    maxInlineMB: 32,
-    maxDocTotal: 5,
-    maxDocFileMB: 2,
-    maxDocChars: 80000,
-    maxSkillFileKB: 512
+    fileRootPath: '/sdcard/', fileToolEnabled: true, allowDelete: false,
+    maxToolLoops: 30, maxConsecutiveErrors: 5
   };
 
+  // 全局设置
+  var DEFAULTS = {
+    apiKey: '', fontScale: 1, thinkChinese: true,
+    backupDir: '/sdcard/LingQiongBuddy/备份',
+    recycleDir: '/sdcard/LingQiongBuddy/回收站',
+    detail: 'auto', skills: [], activeSkillId: '',
+    conversations: [], currentConvId: '', recycleRecords: [],
+    convDefaults: null,
+    maxTokensLimit: 131072,
+    maxMediaItems: 32, maxInlineMB: 32,
+    maxDocTotal: 5, maxDocFileMB: 2, maxDocChars: 80000, maxSkillFileKB: 512
+  };
+
+  function readStore(key) { try { return JSON.parse(localStorage.getItem(key) || '{}'); } catch (e) { return {}; } }
+
   var cfg;
-  try { cfg = Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem(STORE_KEY) || '{}')); }
+  try { cfg = Object.assign({}, DEFAULTS, readStore(STORE_KEY)); }
   catch (e) { cfg = Object.assign({}, DEFAULTS); }
+  // 从旧版本迁移
+  try {
+    var old = readStore(OLD_STORE_KEY);
+    if (old && (old.apiKey || old.conversations)) {
+      if (!cfg.apiKey && old.apiKey) cfg.apiKey = old.apiKey;
+      if ((!cfg.conversations || !cfg.conversations.length) && old.conversations) cfg.conversations = old.conversations;
+      if ((!cfg.skills || !cfg.skills.length) && old.skills) cfg.skills = old.skills;
+    }
+  } catch (e) {}
   if (!Array.isArray(cfg.skills)) cfg.skills = [];
   if (!Array.isArray(cfg.conversations)) cfg.conversations = [];
+  if (!Array.isArray(cfg.recycleRecords)) cfg.recycleRecords = [];
+  if (!cfg.convDefaults) cfg.convDefaults = Object.assign({}, CONV_DEFAULT);
+  else cfg.convDefaults = Object.assign({}, CONV_DEFAULT, cfg.convDefaults);
 
   function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(cfg)); } catch (e) {} }
   var $ = function (id) { return document.getElementById(id); };
 
   var chatEl = $('chat'), inputEl = $('input'), sendBtn = $('send');
-  var sheetEl = $('sheet'), skillSheetEl = $('skillSheet'), historyDrawer = $('historyDrawer');
-  var keyEl = $('apiKey'), sysEl = $('systemPrompt');
-  var tempEl = $('temp'), tempValEl = $('tempVal');
-  var topPEl = $('topP'), topPValEl = $('topPVal');
-  var maxTokEl = $('maxTokens'), modelTag = $('modelTag'), streamEl = $('streamToggle');
+  var sheetEl = $('sheet'), convSheetEl = $('convSheet'), skillSheetEl = $('skillSheet');
+  var recycleSheetEl = $('recycleSheet'), historyDrawer = $('historyDrawer');
+  var keyEl = $('apiKey');
+  var modelTag = $('modelTag');
   var skillBtn = $('skillBtn'), skillBtnLabel = $('skillBtnLabel');
   var fileToolBtn = $('fileToolBtn'), fileToolLabel = $('fileToolLabel');
   var skillListEl = $('skillList'), skillEditor = $('skillEditor');
@@ -520,6 +636,26 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
     for (var i = 0; i < cfg.skills.length; i++) if (cfg.skills[i].id === cfg.activeSkillId) return cfg.skills[i];
     return null;
   }
+  function applyFontScale() {
+    var s = Number(cfg.fontScale) || 1;
+    document.documentElement.style.fontSize = (16 * s) + 'px';
+    var fv = $('fontVal'); if (fv) fv.textContent = Math.round(s * 100) + '%';
+  }
+
+  /* ============ 对话级设置访问 ============ */
+  function findConv(id) { for (var i = 0; i < cfg.conversations.length; i++) if (cfg.conversations[i].id === id) return cfg.conversations[i]; return null; }
+  function ensureConv() {
+    if (!cfg.currentConvId) cfg.currentConvId = genId('conv_');
+    var c = findConv(cfg.currentConvId);
+    if (!c) {
+      c = { id: cfg.currentConvId, title: '', createdAt: Date.now(), updatedAt: Date.now(), messages: [], settings: Object.assign({}, CONV_DEFAULT, cfg.convDefaults) };
+      cfg.conversations.unshift(c);
+    }
+    if (!c.settings) c.settings = Object.assign({}, CONV_DEFAULT, cfg.convDefaults);
+    else c.settings = Object.assign({}, CONV_DEFAULT, cfg.convDefaults, c.settings);
+    return c;
+  }
+  function CS() { return ensureConv().settings; }
 
   /* ============ ask_user 弹窗 ============ */
   function askUser(question, options) {
@@ -528,48 +664,32 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
       askQuestionEl.textContent = question || '请选择';
       askOptionsEl.innerHTML = '';
       askCustomEl.value = '';
-      var selected = null;
-
       (options || []).forEach(function (opt) {
         var btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'ask-option';
-        btn.textContent = String(opt);
+        btn.type = 'button'; btn.className = 'ask-option'; btn.textContent = String(opt);
         btn.addEventListener('click', function () {
           Array.prototype.forEach.call(askOptionsEl.children, function (c) { c.classList.remove('selected'); });
-          btn.classList.add('selected');
-          selected = String(opt);
-          askCustomEl.value = '';
+          btn.classList.add('selected'); askCustomEl.value = '';
         });
         askOptionsEl.appendChild(btn);
       });
-
-      askCustomEl.oninput = function () {
-        Array.prototype.forEach.call(askOptionsEl.children, function (c) { c.classList.remove('selected'); });
-        selected = null;
-      };
-
+      askCustomEl.oninput = function () { Array.prototype.forEach.call(askOptionsEl.children, function (c) { c.classList.remove('selected'); }); };
       askOverlay.classList.add('show');
       setTimeout(function () { askCustomEl.focus(); }, 100);
     });
   }
   askCancelBtn.addEventListener('click', function () {
     if (!askResolve) return;
-    var r = askResolve; askResolve = null;
-    askOverlay.classList.remove('show');
+    var r = askResolve; askResolve = null; askOverlay.classList.remove('show');
     r('（用户取消了选择，请自行决定或换个问题）');
   });
   askConfirmBtn.addEventListener('click', function () {
     if (!askResolve) return;
-    var custom = askCustomEl.value.trim();
-    var selected = null;
-    Array.prototype.forEach.call(askOptionsEl.children, function (c) {
-      if (c.classList.contains('selected')) selected = c.textContent;
-    });
+    var custom = askCustomEl.value.trim(), selected = null;
+    Array.prototype.forEach.call(askOptionsEl.children, function (c) { if (c.classList.contains('selected')) selected = c.textContent; });
     var answer = custom || selected;
     if (!answer) { toast('请选择一个选项或填写自定义回答'); return; }
-    var r = askResolve; askResolve = null;
-    askOverlay.classList.remove('show');
+    var r = askResolve; askResolve = null; askOverlay.classList.remove('show');
     r('用户选择了：' + answer);
   });
 
@@ -580,67 +700,30 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
     var regex = /```([a-zA-Z0-9_+-]*)\s*\n?([\s\S]*?)```/g;
     var lastIdx = 0, m;
     while ((m = regex.exec(raw)) !== null) {
-      if (m.index > lastIdx) {
-        var t = document.createElement('div');
-        t.textContent = raw.slice(lastIdx, m.index);
-        el.appendChild(t);
-      }
+      if (m.index > lastIdx) { var t = document.createElement('div'); t.textContent = raw.slice(lastIdx, m.index); el.appendChild(t); }
       var lang = (m[1] || 'code').toLowerCase();
       var codeText = m[2];
       if (codeText.charAt(codeText.length - 1) === '\n') codeText = codeText.slice(0, -1);
-
-      var block = document.createElement('div');
-      block.className = 'code-block';
-      var head = document.createElement('div');
-      head.className = 'code-head';
-      var langEl = document.createElement('span');
-      langEl.textContent = lang;
-      var btn = document.createElement('button');
-      btn.type = 'button';
-      btn.textContent = '复制';
-      btn.addEventListener('click', function () {
-        var pre = block.querySelector('pre');
-        copyText(pre ? pre.textContent : '', btn);
-      });
-      head.appendChild(langEl);
-      head.appendChild(btn);
-      var pre = document.createElement('pre');
-      var code = document.createElement('code');
-      code.textContent = codeText;
-      pre.appendChild(code);
-      block.appendChild(head);
-      block.appendChild(pre);
-      el.appendChild(block);
+      var block = document.createElement('div'); block.className = 'code-block';
+      var head = document.createElement('div'); head.className = 'code-head';
+      var langEl = document.createElement('span'); langEl.textContent = lang;
+      var btn = document.createElement('button'); btn.type = 'button'; btn.textContent = '复制';
+      btn.addEventListener('click', function () { var pre = block.querySelector('pre'); copyText(pre ? pre.textContent : '', btn); });
+      head.appendChild(langEl); head.appendChild(btn);
+      var pre = document.createElement('pre'); var code = document.createElement('code'); code.textContent = codeText;
+      pre.appendChild(code); block.appendChild(head); block.appendChild(pre); el.appendChild(block);
       lastIdx = regex.lastIndex;
     }
-    if (lastIdx < raw.length) {
-      var rest = document.createElement('div');
-      rest.textContent = raw.slice(lastIdx);
-      el.appendChild(rest);
-    }
+    if (lastIdx < raw.length) { var rest = document.createElement('div'); rest.textContent = raw.slice(lastIdx); el.appendChild(rest); }
   }
-
   function copyText(text, btn) {
     var ok = false;
     try {
-      var ta = document.createElement('textarea');
-      ta.value = text;
-      ta.style.position = 'fixed'; ta.style.opacity = '0';
-      document.body.appendChild(ta);
-      ta.select();
-      ok = document.execCommand('copy');
-      document.body.removeChild(ta);
+      var ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select(); ok = document.execCommand('copy'); document.body.removeChild(ta);
     } catch (e) {}
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).catch(function () {});
-      ok = true;
-    }
-    if (btn) {
-      var old = btn.textContent;
-      btn.textContent = ok ? '已复制' : '复制失败';
-      btn.classList.add('copied');
-      setTimeout(function () { btn.textContent = old; btn.classList.remove('copied'); }, 1500);
-    }
+    if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(text).catch(function () {}); ok = true; }
+    if (btn) { var old = btn.textContent; btn.textContent = ok ? '已复制' : '复制失败'; btn.classList.add('copied'); setTimeout(function () { btn.textContent = old; btn.classList.remove('copied'); }, 1500); }
   }
 
   /* ============ 原生桥接 ============ */
@@ -652,147 +735,146 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
       return typeof window.AndroidShizuku.readFile === 'function';
     } catch (e) { return false; }
   }
+  function call(obj, method, args, fallback) {
+    try { if (obj && typeof obj[method] === 'function') return obj[method].apply(obj, args); } catch (e) { return fallback + '：' + (e.message || e); }
+    return fallback;
+  }
+  function nativeReadFile(p) { if (!hasFileBridge()) return '错误：文件系统不可用'; return call(window.AndroidFile, 'readFile', [p], '读取失败'); }
+  function nativeWriteFile(p, c) { if (!hasFileBridge()) return '错误：文件系统不可用'; return call(window.AndroidFile, 'writeFile', [p, c], '写入失败'); }
+  function nativeMkdirs(p) { if (!hasFileBridge()) return '错误：文件系统不可用'; return call(window.AndroidFile, 'mkdirs', [p], '创建失败'); }
+  function nativeMoveFile(s, d) { if (!hasFileBridge()) return '错误：文件系统不可用'; return call(window.AndroidFile, 'moveFile', [s, d], '移动失败'); }
+  function nativeCopyFile(s, d) { if (!hasFileBridge()) return '错误：文件系统不可用'; return call(window.AndroidFile, 'copyFile', [s, d], '复制失败'); }
+  function nativeDeleteFile(p) { if (!hasFileBridge()) return '错误：文件系统不可用'; return call(window.AndroidFile, 'deleteFile', [p], '删除失败'); }
+  function nativeListDirJson(p) { if (!hasFileBridge()) return '[]'; return call(window.AndroidFile, 'listDirJson', [p], '[]'); }
+  function nativeReadFileBase64(p) { return call(window.AndroidFile, 'readFileBase64', [p], '读取失败'); }
+  function nativeWriteFileBase64(p, b) { return call(window.AndroidFile, 'writeFileBase64', [p, b], '写入失败'); }
 
-  function nativeReadFile(path) { if (!hasFileBridge()) return '错误：文件系统不可用'; try { return window.AndroidFile.readFile(path); } catch (e) { return '读取失败：' + (e.message || e); } }
-  function nativeWriteFile(path, content) { if (!hasFileBridge()) return '错误：文件系统不可用'; try { return window.AndroidFile.writeFile(path, content); } catch (e) { return '写入失败：' + (e.message || e); } }
-  function nativeListDir(path) { if (!hasFileBridge()) return '错误：文件系统不可用'; try { return window.AndroidFile.listDir(path); } catch (e) { return '读取目录失败：' + (e.message || e); } }
-  function nativeReadFileBase64(p) { if (!hasFileBridge() || typeof window.AndroidFile.readFileBase64 !== 'function') return '错误：该功能需要更新 App'; try { return window.AndroidFile.readFileBase64(p); } catch (e) { return '读取失败：' + (e.message || e); } }
-  function nativeWriteFileBase64(p, b) { if (!hasFileBridge() || typeof window.AndroidFile.writeFileBase64 !== 'function') return '错误：该功能需要更新 App'; try { return window.AndroidFile.writeFileBase64(p, b); } catch (e) { return '写入失败：' + (e.message || e); } }
-  function nativeCopyFile(s, d) { if (!hasFileBridge() || typeof window.AndroidFile.copyFile !== 'function') return '错误：该功能需要更新 App'; try { return window.AndroidFile.copyFile(s, d); } catch (e) { return '复制失败：' + (e.message || e); } }
-  function nativeMoveFile(s, d) { if (!hasFileBridge() || typeof window.AndroidFile.moveFile !== 'function') return '错误：该功能需要更新 App'; try { return window.AndroidFile.moveFile(s, d); } catch (e) { return '移动失败：' + (e.message || e); } }
-  function nativeDeleteFile(p) { if (!hasFileBridge()) return '错误：文件系统不可用'; try { return window.AndroidFile.deleteFile(p); } catch (e) { return '删除失败：' + (e.message || e); } }
-  function nativeMkdirs(p) { if (!hasFileBridge() || typeof window.AndroidFile.mkdirs !== 'function') return '错误：该功能需要更新 App'; try { return window.AndroidFile.mkdirs(p); } catch (e) { return '创建失败：' + (e.message || e); } }
-  function nativeFileInfo(p) { if (!hasFileBridge() || typeof window.AndroidFile.fileInfo !== 'function') return '错误：该功能需要更新 App'; try { return window.AndroidFile.fileInfo(p); } catch (e) { return '获取失败：' + (e.message || e); } }
-  function nativeListDirDetailed(p) { if (!hasFileBridge() || typeof window.AndroidFile.listDirDetailed !== 'function') return '错误：该功能需要更新 App'; try { return window.AndroidFile.listDirDetailed(p); } catch (e) { return '读取失败：' + (e.message || e); } }
+  function shizukuReadFile(p) { if (!hasShizuku()) return '错误：Shizuku 不可用'; return call(window.AndroidShizuku, 'readFile', [p], 'Shizuku 读取失败'); }
+  function shizukuWriteFile(p, c) { if (!hasShizuku()) return '错误：Shizuku 不可用'; return call(window.AndroidShizuku, 'writeFile', [p, c], 'Shizuku 写入失败'); }
+  function shizukuListDir(p) { if (!hasShizuku()) return '错误：Shizuku 不可用'; return call(window.AndroidShizuku, 'listDir', [p], 'Shizuku 列目录失败'); }
+  function shizukuMoveFile(s, d) { if (!hasShizuku()) return '错误：Shizuku 不可用'; return call(window.AndroidShizuku, 'moveFile', [s, d], '移动失败'); }
+  function shizukuDeleteFile(p) { if (!hasShizuku()) return '错误：Shizuku 不可用'; return call(window.AndroidShizuku, 'deleteFile', [p], '删除失败'); }
+  function shizukuMkdirs(p) { if (!hasShizuku()) return '错误：Shizuku 不可用'; return call(window.AndroidShizuku, 'mkdirs', [p], '创建失败'); }
+  function shizukuExec(cmd) { if (!hasShizuku()) return '错误：shell_exec 需要 Shizuku 且 App 已更新'; return call(window.AndroidShizuku, 'exec', [cmd], '执行失败'); }
 
-  function shizukuReadFile(path) { if (!hasShizuku()) return '错误：Shizuku 不可用'; try { return window.AndroidShizuku.readFile(path); } catch (e) { return 'Shizuku 读取失败：' + (e.message || e); } }
-  function shizukuWriteFile(path, content) { if (!hasShizuku()) return '错误：Shizuku 不可用'; try { return window.AndroidShizuku.writeFile(path, content); } catch (e) { return 'Shizuku 写入失败：' + (e.message || e); } }
-  function shizukuListDir(path) { if (!hasShizuku()) return '错误：Shizuku 不可用'; if (typeof window.AndroidShizuku.listDir !== 'function') return 'Shizuku 桥接未实现 listDir'; try { return window.AndroidShizuku.listDir(path); } catch (e) { return 'Shizuku 列目录失败：' + (e.message || e); } }
-  function shizukuReadFileBase64(p) { if (!hasShizuku() || typeof window.AndroidShizuku.readFileBase64 !== 'function') return '错误：该功能需要更新 App'; try { return window.AndroidShizuku.readFileBase64(p); } catch (e) { return '读取失败：' + (e.message || e); } }
-  function shizukuWriteFileBase64(p, b) { if (!hasShizuku() || typeof window.AndroidShizuku.writeFileBase64 !== 'function') return '错误：该功能需要更新 App'; try { return window.AndroidShizuku.writeFileBase64(p, b); } catch (e) { return '写入失败：' + (e.message || e); } }
-  function shizukuCopyFile(s, d) { if (!hasShizuku() || typeof window.AndroidShizuku.copyFile !== 'function') return '错误：该功能需要更新 App'; try { return window.AndroidShizuku.copyFile(s, d); } catch (e) { return '复制失败：' + (e.message || e); } }
-  function shizukuMoveFile(s, d) { if (!hasShizuku() || typeof window.AndroidShizuku.moveFile !== 'function') return '错误：该功能需要更新 App'; try { return window.AndroidShizuku.moveFile(s, d); } catch (e) { return '移动失败：' + (e.message || e); } }
-  function shizukuDeleteFile(p) { if (!hasShizuku()) return '错误：Shizuku 不可用'; try { return window.AndroidShizuku.deleteFile(p); } catch (e) { return '删除失败：' + (e.message || e); } }
-  function shizukuMkdirs(p) { if (!hasShizuku() || typeof window.AndroidShizuku.mkdirs !== 'function') return '错误：该功能需要更新 App'; try { return window.AndroidShizuku.mkdirs(p); } catch (e) { return '创建失败：' + (e.message || e); } }
-  function shizukuFileInfo(p) { if (!hasShizuku() || typeof window.AndroidShizuku.fileInfo !== 'function') return '错误：该功能需要更新 App'; try { return window.AndroidShizuku.fileInfo(p); } catch (e) { return '获取失败：' + (e.message || e); } }
-  function shizukuListDirDetailed(p) { if (!hasShizuku() || typeof window.AndroidShizuku.listDirDetailed !== 'function') return '错误：该功能需要更新 App'; try { return window.AndroidShizuku.listDirDetailed(p); } catch (e) { return '读取失败：' + (e.message || e); } }
-  function shizukuExec(cmd) { if (!hasShizuku() || typeof window.AndroidShizuku.exec !== 'function') return '错误：shell_exec 需要 Shizuku 且 App 已更新'; try { return window.AndroidShizuku.exec(cmd); } catch (e) { return '执行失败：' + (e.message || e); } }
+  /* ============ 回收站 ============ */
+  function basename(p) { p = String(p || '').replace(/\/+$/, ''); var i = p.lastIndexOf('/'); return i >= 0 ? p.slice(i + 1) : p; }
+  function stamp() {
+    var d = new Date(), z = function (n) { return n < 10 ? '0' + n : '' + n; };
+    return d.getFullYear() + z(d.getMonth() + 1) + z(d.getDate()) + '_' + z(d.getHours()) + z(d.getMinutes()) + z(d.getSeconds());
+  }
+  function manifestPath() { return cfg.recycleDir.replace(/\/+$/, '') + '/_manifest.json'; }
+  function persistRecycle() {
+    save();
+    try { nativeMkdirs(cfg.recycleDir); nativeWriteFile(manifestPath(), JSON.stringify(cfg.recycleRecords, null, 2)); } catch (e) {}
+  }
+  function moveToRecycleBin(path, useShizuku) {
+    if (!path) return '错误：路径为空';
+    try {
+      if (useShizuku && hasShizuku()) shizukuMkdirs(cfg.recycleDir); else nativeMkdirs(cfg.recycleDir);
+      var name = basename(path);
+      var dest = cfg.recycleDir.replace(/\/+$/, '') + '/' + stamp() + '__' + name;
+      var r;
+      if (useShizuku && hasShizuku()) r = shizukuMoveFile(path, dest);
+      else {
+        r = nativeMoveFile(path, dest);
+        if (/failed|失败|not found/i.test(String(r)) && hasShizuku()) r = shizukuMoveFile(path, dest);
+      }
+      if (/OK|Move/i.test(String(r))) {
+        cfg.recycleRecords.unshift({ id: genId('rc_'), name: name, origPath: path, recyclePath: dest, time: Date.now() });
+        persistRecycle();
+        return '已移入回收站：' + dest;
+      }
+      return '移入回收站失败：' + r;
+    } catch (e) { return '移入回收站失败：' + (e.message || e); }
+  }
+  function restoreRecycle(rec) {
+    try {
+      var parent = rec.origPath.replace(/\/[^\/]*$/, '');
+      nativeMkdirs(parent);
+      var r = nativeMoveFile(rec.recyclePath, rec.origPath);
+      if (/OK|Move/i.test(String(r))) {
+        cfg.recycleRecords = cfg.recycleRecords.filter(function (x) { return x.id !== rec.id; });
+        persistRecycle(); return true;
+      }
+      return false;
+    } catch (e) { return false; }
+  }
+  function permanentDelete(rec) {
+    var r = nativeDeleteFile(rec.recyclePath);
+    if (!/Deleted/i.test(String(r)) && hasShizuku()) r = shizukuDeleteFile(rec.recyclePath);
+    cfg.recycleRecords = cfg.recycleRecords.filter(function (x) { return x.id !== rec.id; });
+    persistRecycle();
+    return /Deleted/.test(String(r)) || hasShizuku();
+  }
 
   /* ============ 工具定义 ============ */
   function buildTools() {
     var tools = [];
-    if (cfg.fileToolEnabled) {
+    var cs = CS();
+    if (cs.fileToolEnabled) {
       tools.push({ type: 'function', function: { name: 'read_file', description: '读取手机上的文本文件内容。路径如 /sdcard/Documents/note.txt。如果普通权限失败，可尝试 use_shizuku=true 使用高权限。', parameters: { type: 'object', properties: { path: { type: 'string' }, use_shizuku: { type: 'boolean' } }, required: ['path'] } } });
       tools.push({ type: 'function', function: { name: 'write_file', description: '向手机文件写入文本内容。父目录不存在会自动创建。', parameters: { type: 'object', properties: { path: { type: 'string' }, content: { type: 'string' }, use_shizuku: { type: 'boolean' } }, required: ['path', 'content'] } } });
       tools.push({ type: 'function', function: { name: 'list_dir', description: '列出手机某个目录下的文件和子目录。', parameters: { type: 'object', properties: { path: { type: 'string' }, use_shizuku: { type: 'boolean' } }, required: ['path'] } } });
-      tools.push({ type: 'function', function: { name: 'read_file_base64', description: '读取任意文件（图片、APK、二进制）的 base64 内容。适合读图片、复制二进制文件。', parameters: { type: 'object', properties: { path: { type: 'string' }, use_shizuku: { type: 'boolean' } }, required: ['path'] } } });
-      tools.push({ type: 'function', function: { name: 'write_file_base64', description: '把 base64 内容解码后写入文件。适合写入图片、二进制文件。', parameters: { type: 'object', properties: { path: { type: 'string' }, base64: { type: 'string' }, use_shizuku: { type: 'boolean' } }, required: ['path', 'base64'] } } });
-      tools.push({ type: 'function', function: { name: 'copy_file', description: '复制文件或目录。可以用于把一张图片从一个目录复制到另一个目录。', parameters: { type: 'object', properties: { src: { type: 'string' }, dest: { type: 'string' }, use_shizuku: { type: 'boolean' } }, required: ['src', 'dest'] } } });
+      tools.push({ type: 'function', function: { name: 'read_file_base64', description: '读取任意文件（图片、APK、二进制）的 base64 内容。', parameters: { type: 'object', properties: { path: { type: 'string' }, use_shizuku: { type: 'boolean' } }, required: ['path'] } } });
+      tools.push({ type: 'function', function: { name: 'write_file_base64', description: '把 base64 内容解码后写入文件。', parameters: { type: 'object', properties: { path: { type: 'string' }, base64: { type: 'string' }, use_shizuku: { type: 'boolean' } }, required: ['path', 'base64'] } } });
+      tools.push({ type: 'function', function: { name: 'copy_file', description: '复制文件或目录。', parameters: { type: 'object', properties: { src: { type: 'string' }, dest: { type: 'string' }, use_shizuku: { type: 'boolean' } }, required: ['src', 'dest'] } } });
       tools.push({ type: 'function', function: { name: 'move_file', description: '移动/重命名文件或目录。', parameters: { type: 'object', properties: { src: { type: 'string' }, dest: { type: 'string' }, use_shizuku: { type: 'boolean' } }, required: ['src', 'dest'] } } });
-      tools.push({ type: 'function', function: { name: 'delete_file', description: '删除文件或目录（目录会递归删除）。请谨慎使用。', parameters: { type: 'object', properties: { path: { type: 'string' }, use_shizuku: { type: 'boolean' } }, required: ['path'] } } });
+      tools.push({ type: 'function', function: { name: 'delete_file', description: '删除文件或目录。注意：文件不会真正消失，而是被移入回收站，用户可在总设置里还原或永久删除。请放心使用。', parameters: { type: 'object', properties: { path: { type: 'string' }, use_shizuku: { type: 'boolean' } }, required: ['path'] } } });
+      if (cs.allowDelete) {
+        tools.push({ type: 'function', function: { name: 'permanent_delete_file', description: '⚠️ 永久删除文件或目录（不可恢复）。仅在用户明确要求彻底删除时使用。', parameters: { type: 'object', properties: { path: { type: 'string' }, use_shizuku: { type: 'boolean' } }, required: ['path'] } } });
+      }
       tools.push({ type: 'function', function: { name: 'mkdirs', description: '创建目录（含父目录）。', parameters: { type: 'object', properties: { path: { type: 'string' }, use_shizuku: { type: 'boolean' } }, required: ['path'] } } });
-      tools.push({ type: 'function', function: { name: 'file_info', description: '获取文件/目录的详细信息：大小、修改时间、类型、可读可写。', parameters: { type: 'object', properties: { path: { type: 'string' }, use_shizuku: { type: 'boolean' } }, required: ['path'] } } });
-      tools.push({ type: 'function', function: { name: 'list_dir_detailed', description: '列出目录的详细信息（带文件大小和修改时间）。', parameters: { type: 'object', properties: { path: { type: 'string' }, use_shizuku: { type: 'boolean' } }, required: ['path'] } } });
-      tools.push({ type: 'function', function: { name: 'shell_exec', description: '通过 Shizuku 执行任意 shell 命令。可用于反编译 APK（apktool、unzip、strings 等）、解压、批量处理、查找文件。需要 Shizuku 已授权。', parameters: { type: 'object', properties: { cmd: { type: 'string', description: '要执行的 shell 命令' } }, required: ['cmd'] } } });
+      tools.push({ type: 'function', function: { name: 'shell_exec', description: '通过 Shizuku 执行任意 shell 命令。可用于解压、批量处理、查找文件。需要 Shizuku 已授权。', parameters: { type: 'object', properties: { cmd: { type: 'string', description: '要执行的 shell 命令' } }, required: ['cmd'] } } });
     }
-    tools.push({ type: 'function', function: { name: 'ask_user', description: '当你需要用户从若干个选项中做出明确选择，或需要用户补充关键信息时调用。会弹出对话框让用户选择或自定义回答。不要用于闲聊提问，只在真的需要用户决策时使用。', parameters: { type: 'object', properties: { question: { type: 'string', description: '要问用户的问题' }, options: { type: 'array', items: { type: 'string' }, description: '可选项列表（建议 2-5 个）。用户也可以自己输入其他答案。' } }, required: ['question'] } } });
+    tools.push({ type: 'function', function: { name: 'ask_user', description: '当你需要用户从若干个选项中做出明确选择，或需要用户补充关键信息时调用。会弹出对话框让用户选择或自定义回答。不要用于闲聊提问，只在真的需要用户决策时使用。', parameters: { type: 'object', properties: { question: { type: 'string' }, options: { type: 'array', items: { type: 'string' } } }, required: ['question'] } } });
     return tools;
   }
 
   async function executeTool(name, args) {
     var useShizuku = args.use_shizuku === true;
-
-    if (name === 'read_file') {
-      if (useShizuku && hasShizuku()) return shizukuReadFile(args.path);
-      var r = nativeReadFile(args.path);
-      if (r.indexOf('失败') >= 0 && hasShizuku()) r += '\n\n（提示：如果该路径受限，可重新调用并设置 use_shizuku=true）';
-      return r;
-    }
-    if (name === 'write_file') {
-      if (useShizuku && hasShizuku()) return shizukuWriteFile(args.path, args.content);
-      var w = nativeWriteFile(args.path, args.content);
-      if (w.indexOf('失败') >= 0 && hasShizuku()) w += '\n\n（提示：如果该路径受限，可重新调用并设置 use_shizuku=true）';
-      return w;
-    }
-    if (name === 'list_dir') {
-      if (useShizuku && hasShizuku()) return shizukuListDir(args.path);
-      return nativeListDir(args.path);
-    }
-    if (name === 'read_file_base64') {
-      if (useShizuku && hasShizuku()) return shizukuReadFileBase64(args.path);
-      return nativeReadFileBase64(args.path);
-    }
-    if (name === 'write_file_base64') {
-      if (useShizuku && hasShizuku()) return shizukuWriteFileBase64(args.path, args.base64);
-      return nativeWriteFileBase64(args.path, args.base64);
-    }
-    if (name === 'copy_file') {
-      if (useShizuku && hasShizuku()) return shizukuCopyFile(args.src, args.dest);
-      return nativeCopyFile(args.src, args.dest);
-    }
-    if (name === 'move_file') {
-      if (useShizuku && hasShizuku()) return shizukuMoveFile(args.src, args.dest);
-      return nativeMoveFile(args.src, args.dest);
-    }
-    if (name === 'delete_file') {
-      if (useShizuku && hasShizuku()) return shizukuDeleteFile(args.path);
-      return nativeDeleteFile(args.path);
-    }
-    if (name === 'mkdirs') {
-      if (useShizuku && hasShizuku()) return shizukuMkdirs(args.path);
-      return nativeMkdirs(args.path);
-    }
-    if (name === 'file_info') {
-      if (useShizuku && hasShizuku()) return shizukuFileInfo(args.path);
-      return nativeFileInfo(args.path);
-    }
-    if (name === 'list_dir_detailed') {
-      if (useShizuku && hasShizuku()) return shizukuListDirDetailed(args.path);
-      return nativeListDirDetailed(args.path);
-    }
-    if (name === 'shell_exec') {
-      return shizukuExec(args.cmd);
-    }
-    if (name === 'ask_user') {
-      var ans = await askUser(args.question || '请选择', args.options || []);
-      return ans;
-    }
+    if (name === 'read_file') { if (useShizuku && hasShizuku()) return shizukuReadFile(args.path); var r = nativeReadFile(args.path); if (/失败/.test(r) && hasShizuku()) r += '\n\n（提示：可改用 use_shizuku=true）'; return r; }
+    if (name === 'write_file') { if (useShizuku && hasShizuku()) return shizukuWriteFile(args.path, args.content); var w = nativeWriteFile(args.path, args.content); if (/失败/.test(w) && hasShizuku()) w += '\n\n（提示：可改用 use_shizuku=true）'; return w; }
+    if (name === 'list_dir') { if (useShizuku && hasShizuku()) return shizukuListDir(args.path); if (!hasFileBridge()) return '错误：文件系统不可用'; var j = nativeListDirJson(args.path); try { var arr = JSON.parse(j); if (!arr.length) return '(空目录或无法访问)'; return arr.map(function (o) { return (o.isDir ? '[DIR] ' : '[FILE] ') + o.name + (o.isDir ? '' : ' (' + o.size + ' B)'); }).join('\n'); } catch (e) { return j; } }
+    if (name === 'read_file_base64') { if (useShizuku && hasShizuku()) return call(window.AndroidShizuku, 'readFileBase64', [args.path], '读取失败'); return nativeReadFileBase64(args.path); }
+    if (name === 'write_file_base64') { if (useShizuku && hasShizuku()) return call(window.AndroidShizuku, 'writeFileBase64', [args.path, args.base64], '写入失败'); return nativeWriteFileBase64(args.path, args.base64); }
+    if (name === 'copy_file') { if (useShizuku && hasShizuku()) return call(window.AndroidShizuku, 'copyFile', [args.src, args.dest], '复制失败'); return nativeCopyFile(args.src, args.dest); }
+    if (name === 'move_file') { if (useShizuku && hasShizuku()) return shizukuMoveFile(args.src, args.dest); return nativeMoveFile(args.src, args.dest); }
+    if (name === 'delete_file') { return moveToRecycleBin(args.path, useShizuku); }
+    if (name === 'permanent_delete_file') { if (!CS().allowDelete) return '错误：未开启永久删除权限，已改为移入回收站。' + moveToRecycleBin(args.path, useShizuku); if (useShizuku && hasShizuku()) return shizukuDeleteFile(args.path); return nativeDeleteFile(args.path); }
+    if (name === 'mkdirs') { if (useShizuku && hasShizuku()) return shizukuMkdirs(args.path); return nativeMkdirs(args.path); }
+    if (name === 'shell_exec') { return shizukuExec(args.cmd); }
+    if (name === 'ask_user') { return await askUser(args.question || '请选择', args.options || []); }
     return '未知工具：' + name;
   }
 
   /* ============ UI 初始化 ============ */
   function initUI() {
     keyEl.value = cfg.apiKey || '';
-    sysEl.value = cfg.systemPrompt || '';
-    streamEl.checked = !!cfg.stream;
-    tempEl.value = cfg.temperature;
-    tempValEl.textContent = Number(cfg.temperature).toFixed(1);
-    topPEl.value = cfg.top_p;
-    topPValEl.textContent = Number(cfg.top_p).toFixed(2);
-    maxTokEl.value = cfg.max_tokens;
-    $('fileRootPath').value = cfg.fileRootPath || '/sdcard/';
+    $('thinkChineseToggle').checked = cfg.thinkChinese !== false;
+    $('fontScale').value = cfg.fontScale;
+    applyFontScale();
     $('maxTokensLimit').value = cfg.maxTokensLimit;
-    $('maxToolLoops').value = cfg.maxToolLoops;
-    $('maxConsecutiveErrors').value = cfg.maxConsecutiveErrors;
     $('maxMediaItems').value = cfg.maxMediaItems;
     $('maxInlineMB').value = cfg.maxInlineMB;
     $('maxDocTotal').value = cfg.maxDocTotal;
     $('maxDocFileMB').value = cfg.maxDocFileMB;
     $('maxDocChars').value = cfg.maxDocChars;
     $('maxSkillFileKB').value = cfg.maxSkillFileKB;
-    syncSeg('modelSeg', cfg.model);
-    syncSeg('effortSeg', cfg.reasoning_effort);
-    syncSeg('detailSeg', cfg.detail);
-    modelTag.textContent = cfg.model;
+    $('backupDirText').textContent = cfg.backupDir;
+    $('recycleDirText').textContent = cfg.recycleDir;
+    $('aboutVer').textContent = APP_VERSION;
+    if (window.AndroidSystem && typeof window.AndroidSystem.getVersionName === 'function') {
+      try { var vn = window.AndroidSystem.getVersionName(); if (vn) $('aboutVer').textContent = vn; } catch (e) {}
+    }
+    modelTag.textContent = CS().model;
     syncSkillBtn(); syncFileToolBtn();
     renderSkillList(); renderHistoryList(''); updateFsStatus();
-    if (cfg.currentConvId) {
-      var conv = findConv(cfg.currentConvId);
-      if (conv && conv.messages.length) { messages = conv.messages.slice(); renderLoadedConversation(); }
-    }
+    var conv = findConv(cfg.currentConvId);
+    if (conv && conv.messages && conv.messages.length) { messages = conv.messages.slice(); renderLoadedConversation(); }
   }
   function syncSkillBtn() { var s = getActiveSkill(); skillBtnLabel.textContent = s ? s.name : '技能'; skillBtn.classList.toggle('active', !!s); }
-  function syncFileToolBtn() { fileToolBtn.classList.toggle('active', !!cfg.fileToolEnabled); fileToolLabel.textContent = cfg.fileToolEnabled ? '文件读写' : '文件读写(关)'; }
+  function syncFileToolBtn() { var on = !!CS().fileToolEnabled; fileToolBtn.classList.toggle('active', on); fileToolLabel.textContent = on ? '文件读写' : '文件读写(关)'; }
   function updateFsStatus() {
     var fsDot = $('fsStatusDot'), fsText = $('fsStatusText');
     var shDot = $('shizukuStatusDot'), shText = $('shizukuStatusText');
@@ -804,58 +886,24 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
 
   initUI();
 
-  keyEl.addEventListener('input', function () { cfg.apiKey = keyEl.value.trim(); save(); });
-  sysEl.addEventListener('input', function () { cfg.systemPrompt = sysEl.value.trim(); save(); });
-  $('fileRootPath').addEventListener('input', function () { cfg.fileRootPath = $('fileRootPath').value.trim(); save(); });
-  $('toggleKey').addEventListener('click', function () {
-    var show = keyEl.type === 'password';
-    keyEl.type = show ? 'text' : 'password';
-    this.textContent = show ? '隐藏' : '显示';
-  });
-  Array.prototype.forEach.call(document.querySelectorAll('#modelSeg button'), function (btn) {
-    btn.addEventListener('click', function () { cfg.model = btn.dataset.value; syncSeg('modelSeg', cfg.model); modelTag.textContent = cfg.model; save(); });
-  });
-  Array.prototype.forEach.call(document.querySelectorAll('#effortSeg button'), function (btn) {
-    btn.addEventListener('click', function () { cfg.reasoning_effort = btn.dataset.value; syncSeg('effortSeg', cfg.reasoning_effort); save(); });
-  });
-  Array.prototype.forEach.call(document.querySelectorAll('#detailSeg button'), function (btn) {
-    btn.addEventListener('click', function () { cfg.detail = btn.dataset.value; syncSeg('detailSeg', cfg.detail); save(); });
-  });
-  streamEl.addEventListener('change', function () { cfg.stream = streamEl.checked; save(); });
-  fileToolBtn.addEventListener('click', function () {
-    cfg.fileToolEnabled = !cfg.fileToolEnabled; syncFileToolBtn(); save();
-    toast(cfg.fileToolEnabled ? '文件读写已启用' : '文件读写已关闭');
-  });
-  tempEl.addEventListener('input', function () {
-    cfg.temperature = parseFloat(tempEl.value);
-    tempValEl.textContent = cfg.temperature.toFixed(1);
-  });
-  tempEl.addEventListener('change', save);
-  topPEl.addEventListener('input', function () {
-    cfg.top_p = parseFloat(topPEl.value);
-    topPValEl.textContent = cfg.top_p.toFixed(2);
-  });
-  topPEl.addEventListener('change', save);
+  /* ============ 总设置事件 ============ */
+  function openSheet() { sheetEl.classList.add('open'); }
+  function closeSheet() { sheetEl.classList.remove('open'); }
+  $('settingsBtn').addEventListener('click', openSheet);
+  $('closeSheet').addEventListener('click', closeSheet);
+  sheetEl.querySelector('.sheet-backdrop').addEventListener('click', closeSheet);
 
-  maxTokEl.addEventListener('input', function () {
-    var v = parseInt(maxTokEl.value, 10);
-    if (isNaN(v) || v < 0) v = 0;
-    if (cfg.maxTokensLimit > 0 && v > cfg.maxTokensLimit) v = cfg.maxTokensLimit;
-    cfg.max_tokens = v;
-    save();
-  });
+  keyEl.addEventListener('input', function () { cfg.apiKey = keyEl.value.trim(); save(); });
+  $('toggleKey').addEventListener('click', function () { var show = keyEl.type === 'password'; keyEl.type = show ? 'text' : 'password'; this.textContent = show ? '隐藏' : '显示'; });
+  $('fontScale').addEventListener('input', function () { cfg.fontScale = parseFloat(this.value); applyFontScale(); });
+  $('fontScale').addEventListener('change', save);
+  $('thinkChineseToggle').addEventListener('change', function () { cfg.thinkChinese = this.checked; save(); });
+
   function numberField(id, key, min, fallback) {
-    $(id).addEventListener('input', function () {
-      var v = parseInt(this.value, 10);
-      if (isNaN(v) || v < min) v = fallback;
-      cfg[key] = v;
-      save();
-    });
+    $(id).addEventListener('input', function () { var v = parseInt(this.value, 10); if (isNaN(v) || v < min) v = fallback; cfg[key] = v; save(); });
     $(id).addEventListener('blur', function () { this.value = cfg[key]; });
   }
   numberField('maxTokensLimit', 'maxTokensLimit', 0, 131072);
-  numberField('maxToolLoops', 'maxToolLoops', 0, 30);
-  numberField('maxConsecutiveErrors', 'maxConsecutiveErrors', 0, 5);
   numberField('maxMediaItems', 'maxMediaItems', 1, 32);
   numberField('maxInlineMB', 'maxInlineMB', 1, 32);
   numberField('maxDocTotal', 'maxDocTotal', 1, 5);
@@ -865,45 +913,173 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
 
   $('reqShizukuBtn').addEventListener('click', function () {
     if (!window.AndroidShizuku) { toast('Shizuku 桥接不可用'); return; }
+    try { if (typeof window.AndroidShizuku.requestPermission === 'function') toast(String(window.AndroidShizuku.requestPermission() || '已发送授权请求')); setTimeout(updateFsStatus, 1000); }
+    catch (e) { toast('Shizuku 授权失败：' + (e.message || e)); }
+  });
+
+  /* ============ 备份 / 还原 ============ */
+  function listBackups() {
+    nativeMkdirs(cfg.backupDir);
+    var j = nativeListDirJson(cfg.backupDir);
+    var arr = [];
+    try { arr = JSON.parse(j); } catch (e) { arr = []; }
+    return (arr || []).filter(function (o) { return !o.isDir && /\.json$/i.test(o.name); }).sort(function (a, b) { return (b.mtime || 0) - (a.mtime || 0); });
+  }
+  function renderBackupList() {
+    var box = $('backupList'); box.innerHTML = '';
+    var list = listBackups();
+    if (!list.length) { box.innerHTML = '<div class="list-empty">还没有备份</div>'; return; }
+    list.forEach(function (f) {
+      var row = document.createElement('div'); row.className = 'list-row';
+      var body = document.createElement('div'); body.className = 'list-row-body';
+      var t = document.createElement('div'); t.className = 'list-row-title'; t.textContent = f.name.replace(/\.json$/i, '');
+      var m = document.createElement('div'); m.className = 'list-row-meta'; m.textContent = formatSize(f.size) + ' · ' + formatTime(f.mtime);
+      body.appendChild(t); body.appendChild(m);
+      var btn = document.createElement('button'); btn.className = 'list-row-btn'; btn.textContent = '还原';
+      btn.addEventListener('click', function () { doRestore(f.name); });
+      row.appendChild(body); row.appendChild(btn); box.appendChild(row);
+    });
+  }
+  function doBackup() {
     try {
-      if (typeof window.AndroidShizuku.requestPermission === 'function') {
-        var r = window.AndroidShizuku.requestPermission();
-        toast(String(r || '已发送授权请求'));
+      var rawName = ($('backupName').value || '').trim();
+      var safe = (rawName || ('backup_' + stamp())).replace(/[\/\\:*?"<>|]/g, '_');
+      nativeMkdirs(cfg.backupDir);
+      var payload = {
+        app: 'LingQiongBuddy', version: APP_VERSION, exportedAt: Date.now(), name: rawName || safe,
+        config: {
+          apiKey: cfg.apiKey, fontScale: cfg.fontScale, thinkChinese: cfg.thinkChinese,
+          backupDir: cfg.backupDir, recycleDir: cfg.recycleDir, detail: cfg.detail,
+          skills: cfg.skills, activeSkillId: cfg.activeSkillId, convDefaults: cfg.convDefaults,
+          maxTokensLimit: cfg.maxTokensLimit, maxMediaItems: cfg.maxMediaItems, maxInlineMB: cfg.maxInlineMB,
+          maxDocTotal: cfg.maxDocTotal, maxDocFileMB: cfg.maxDocFileMB, maxDocChars: cfg.maxDocChars, maxSkillFileKB: cfg.maxSkillFileKB
+        },
+        conversations: cfg.conversations
+      };
+      var path = cfg.backupDir.replace(/\/+$/, '') + '/' + safe + '.json';
+      var r = nativeWriteFile(path, JSON.stringify(payload, null, 2));
+      if (/OK/.test(String(r))) { toast('已备份：' + safe); renderBackupList(); }
+      else toast('备份失败：' + r);
+    } catch (e) { toast('备份失败：' + (e.message || e)); }
+  }
+  function doRestore(filename) {
+    try {
+      if (!confirm('还原「' + filename.replace(/\.json$/i, '') + '」？将覆盖当前全部配置与对话。')) return;
+      var path = cfg.backupDir.replace(/\/+$/, '') + '/' + filename;
+      var txt = nativeReadFile(path);
+      if (!txt || /not found|失败/i.test(txt)) { toast('读取备份失败'); return; }
+      var data = JSON.parse(txt);
+      if (data.config) {
+        var c = data.config;
+        ['apiKey', 'fontScale', 'thinkChinese', 'backupDir', 'recycleDir', 'detail', 'skills', 'activeSkillId', 'convDefaults', 'maxTokensLimit', 'maxMediaItems', 'maxInlineMB', 'maxDocTotal', 'maxDocFileMB', 'maxDocChars', 'maxSkillFileKB'].forEach(function (k) { if (c[k] !== undefined) cfg[k] = c[k]; });
       }
-      setTimeout(updateFsStatus, 1000);
-    } catch (e) { toast('Shizuku 授权失败：' + (e.message || e)); }
+      if (Array.isArray(data.conversations)) cfg.conversations = data.conversations;
+      cfg.currentConvId = '';
+      save();
+      location.reload();
+    } catch (e) { toast('还原失败：' + (e.message || e)); }
+  }
+  $('backupBtn').addEventListener('click', doBackup);
+  $('backupRefreshBtn').addEventListener('click', renderBackupList);
+
+  /* ============ 回收站 UI ============ */
+  function renderRecycleList() {
+    var box = $('recycleList'); box.innerHTML = '';
+    if (!cfg.recycleRecords.length) { box.innerHTML = '<div class="list-empty">回收站是空的</div>'; return; }
+    cfg.recycleRecords.forEach(function (rec) {
+      var row = document.createElement('div'); row.className = 'list-row';
+      var body = document.createElement('div'); body.className = 'list-row-body';
+      var t = document.createElement('div'); t.className = 'list-row-title'; t.textContent = rec.name;
+      var m = document.createElement('div'); m.className = 'list-row-meta'; m.textContent = '原位置：' + rec.origPath;
+      body.appendChild(t); body.appendChild(m);
+      var rb = document.createElement('button'); rb.className = 'list-row-btn'; rb.textContent = '还原';
+      rb.addEventListener('click', function () { if (restoreRecycle(rec)) { toast('已还原'); renderRecycleList(); } else toast('还原失败'); });
+      var db = document.createElement('button'); db.className = 'list-row-btn danger'; db.textContent = '永久删除';
+      db.addEventListener('click', function () { if (!confirm('永久删除「' + rec.name + '」？不可恢复。')) return; if (permanentDelete(rec)) { toast('已永久删除'); } else toast('删除失败'); renderRecycleList(); });
+      row.appendChild(body); row.appendChild(rb); row.appendChild(db); box.appendChild(row);
+    });
+  }
+  $('openRecycleBtn').addEventListener('click', function () { renderRecycleList(); recycleSheetEl.classList.add('open'); });
+  $('closeRecycle').addEventListener('click', function () { recycleSheetEl.classList.remove('open'); });
+  recycleSheetEl.querySelector('.sheet-backdrop').addEventListener('click', function () { recycleSheetEl.classList.remove('open'); });
+  $('emptyRecycleBtn').addEventListener('click', function () {
+    if (!cfg.recycleRecords.length) { toast('回收站已经是空的'); return; }
+    if (!confirm('永久删除回收站里的全部文件？不可恢复。')) return;
+    cfg.recycleRecords.slice().forEach(function (rec) { try { nativeDeleteFile(rec.recyclePath); } catch (e) {} });
+    cfg.recycleRecords = []; persistRecycle(); renderRecycleList(); toast('已清空回收站');
   });
 
-  function openSheet() { sheetEl.classList.add('open'); }
-  function closeSheet() { sheetEl.classList.remove('open'); }
-  $('settingsBtn').addEventListener('click', openSheet);
-  $('closeSheet').addEventListener('click', closeSheet);
-  sheetEl.querySelector('.sheet-backdrop').addEventListener('click', closeSheet);
+  /* ============ 对话设置 UI ============ */
+  function openConvSheet() {
+    var cs = CS();
+    $('convSystemPrompt').value = cs.systemPrompt || '';
+    $('convMaxTokens').value = cs.max_tokens;
+    $('convTemp').value = cs.temperature; $('convTempVal').textContent = Number(cs.temperature).toFixed(1);
+    $('convTopP').value = cs.top_p; $('convTopPVal').textContent = Number(cs.top_p).toFixed(2);
+    $('convMaxToolLoops').value = cs.maxToolLoops;
+    $('convMaxConsecutiveErrors').value = cs.maxConsecutiveErrors;
+    $('convFileRootPath').value = cs.fileRootPath || '/sdcard/';
+    $('convStreamToggle').checked = !!cs.stream;
+    $('convFileToolToggle').checked = !!cs.fileToolEnabled;
+    $('convAllowDeleteToggle').checked = !!cs.allowDelete;
+    syncSeg('convModelSeg', cs.model); syncSeg('convEffortSeg', cs.reasoning_effort);
+    convSheetEl.classList.add('open');
+  }
+  function closeConvSheet() { convSheetEl.classList.remove('open'); }
+  $('convSettingsBtn').addEventListener('click', openConvSheet);
+  $('closeConvSheet').addEventListener('click', closeConvSheet);
+  convSheetEl.querySelector('.sheet-backdrop').addEventListener('click', closeConvSheet);
 
-  $('clearBtn').addEventListener('click', function () {
-    if (messages.length && !confirm('确定清空？')) return;
+  $('convSystemPrompt').addEventListener('input', function () { CS().systemPrompt = this.value; save(); });
+  $('convMaxTokens').addEventListener('input', function () { var v = parseInt(this.value, 10); if (isNaN(v) || v < 0) v = 0; var lim = cfg.maxTokensLimit; if (lim > 0 && v > lim) v = lim; CS().max_tokens = v; save(); });
+  $('convTemp').addEventListener('input', function () { CS().temperature = parseFloat(this.value); $('convTempVal').textContent = CS().temperature.toFixed(1); });
+  $('convTemp').addEventListener('change', save);
+  $('convTopP').addEventListener('input', function () { CS().top_p = parseFloat(this.value); $('convTopPVal').textContent = CS().top_p.toFixed(2); });
+  $('convTopP').addEventListener('change', save);
+  $('convStreamToggle').addEventListener('change', function () { CS().stream = this.checked; save(); });
+  $('convFileRootPath').addEventListener('input', function () { CS().fileRootPath = this.value.trim(); save(); });
+  $('convFileToolToggle').addEventListener('change', function () { CS().fileToolEnabled = this.checked; save(); syncFileToolBtn(); });
+  $('convAllowDeleteToggle').addEventListener('change', function () { CS().allowDelete = this.checked; save(); toast(this.checked ? '已开启永久删除权限' : '已关闭，删除改为移入回收站'); });
+  function convNumberField(id, key, min, fallback) {
+    $(id).addEventListener('input', function () { var v = parseInt(this.value, 10); if (isNaN(v) || v < min) v = fallback; CS()[key] = v; save(); });
+    $(id).addEventListener('blur', function () { this.value = CS()[key]; });
+  }
+  convNumberField('convMaxToolLoops', 'maxToolLoops', 0, 30);
+  convNumberField('convMaxConsecutiveErrors', 'maxConsecutiveErrors', 0, 5);
+  Array.prototype.forEach.call(document.querySelectorAll('#convModelSeg button'), function (btn) {
+    btn.addEventListener('click', function () { CS().model = btn.dataset.value; syncSeg('convModelSeg', CS().model); modelTag.textContent = CS().model; save(); });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('#convEffortSeg button'), function (btn) {
+    btn.addEventListener('click', function () { CS().reasoning_effort = btn.dataset.value; syncSeg('convEffortSeg', CS().reasoning_effort); save(); });
+  });
+  $('convClearBtn').addEventListener('click', function () {
+    if (messages.length && !confirm('确定清空当前对话？')) return;
     messages = []; clearPending(); clearPendingFiles();
-    chatEl.innerHTML = '<div class="welcome"><div class="logo">DS</div><p>有什么可以帮你的？</p></div>';
-    usageBar.classList.remove('show'); closeSheet(); saveCurrentConversation(); toast('已清空');
+    chatEl.innerHTML = '<div class="welcome"><div class="logo">LQ</div><p>有什么可以帮你的？</p></div>';
+    usageBar.classList.remove('show'); closeConvSheet(); saveCurrentConversation(); toast('已清空');
   });
 
+  fileToolBtn.addEventListener('click', function () { CS().fileToolEnabled = !CS().fileToolEnabled; syncFileToolBtn(); save(); toast(CS().fileToolEnabled ? '文件读写已启用' : '文件读写已关闭'); });
+
+  /* ============ 历史对话抽屉 ============ */
   $('menuBtn').addEventListener('click', function () { renderHistoryList(historySearchEl.value); historyDrawer.classList.add('open'); });
   $('closeDrawer').addEventListener('click', function () { historyDrawer.classList.remove('open'); });
   historyDrawer.querySelector('.drawer-backdrop').addEventListener('click', function () { historyDrawer.classList.remove('open'); });
   $('newChatBtn').addEventListener('click', function () {
     if (generating) { toast('正在生成中'); return; }
     saveCurrentConversation(); cfg.currentConvId = genId('conv_'); messages = [];
+    ensureConv();
     clearPending(); clearPendingFiles();
-    chatEl.innerHTML = '<div class="welcome"><div class="logo">DS</div><p>有什么可以帮你的？</p></div>';
-    usageBar.classList.remove('show'); save(); historyDrawer.classList.remove('open'); toast('已开始新对话');
+    chatEl.innerHTML = '<div class="welcome"><div class="logo">LQ</div><p>有什么可以帮你的？</p></div>';
+    usageBar.classList.remove('show'); save(); modelTag.textContent = CS().model; syncFileToolBtn();
+    historyDrawer.classList.remove('open'); toast('已开始新对话');
   });
   historySearchEl.addEventListener('input', function () { renderHistoryList(historySearchEl.value); });
 
-  function findConv(id) { for (var i = 0; i < cfg.conversations.length; i++) if (cfg.conversations[i].id === id) return cfg.conversations[i]; return null; }
   function saveCurrentConversation() {
     if (!messages.length) return;
     var conv = findConv(cfg.currentConvId);
-    if (!conv) { conv = { id: cfg.currentConvId || genId('conv_'), title: '', createdAt: Date.now(), updatedAt: Date.now(), messages: [] }; cfg.currentConvId = conv.id; cfg.conversations.unshift(conv); }
+    if (!conv) { conv = ensureConv(); }
     conv.messages = messages.slice(); conv.updatedAt = Date.now();
     if (!conv.title) { for (var i = 0; i < messages.length; i++) if (messages[i].role === 'user') { conv.title = String(messages[i].content).slice(0, 24); break; } if (!conv.title) conv.title = '新对话'; }
     if (cfg.conversations.length > 100) cfg.conversations = cfg.conversations.slice(0, 100);
@@ -912,7 +1088,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
   function renderHistoryList(filter) {
     var q = String(filter || '').trim().toLowerCase();
     historyListEl.innerHTML = '';
-    var list = cfg.conversations.slice().sort(function (a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); });
+    var list = cfg.conversations.filter(function (c) { return c.messages && c.messages.length; }).sort(function (a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); });
     var matched = [];
     list.forEach(function (c) {
       if (!q) { matched.push({ conv: c, snippet: '' }); return; }
@@ -935,7 +1111,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
       var editBtn = document.createElement('button'); editBtn.className = 'history-icon-btn'; editBtn.innerHTML = ICON_EDIT;
       editBtn.addEventListener('click', function (e) { e.stopPropagation(); var nt = prompt('重命名：', c.title || ''); if (nt === null) return; nt = nt.trim(); if (!nt) return; c.title = nt.slice(0, 30); save(); renderHistoryList(historySearchEl.value); });
       var delBtn = document.createElement('button'); delBtn.className = 'history-icon-btn'; delBtn.innerHTML = ICON_DEL;
-      delBtn.addEventListener('click', function (e) { e.stopPropagation(); if (!confirm('删除「' + (c.title || '未命名') + '」？')) return; cfg.conversations = cfg.conversations.filter(function (x) { return x.id !== c.id; }); if (cfg.currentConvId === c.id) { cfg.currentConvId = ''; messages = []; chatEl.innerHTML = '<div class="welcome"><div class="logo">DS</div><p>有什么可以帮你的？</p></div>'; usageBar.classList.remove('show'); } save(); renderHistoryList(historySearchEl.value); });
+      delBtn.addEventListener('click', function (e) { e.stopPropagation(); if (!confirm('删除「' + (c.title || '未命名') + '」？')) return; cfg.conversations = cfg.conversations.filter(function (x) { return x.id !== c.id; }); if (cfg.currentConvId === c.id) { cfg.currentConvId = ''; messages = []; chatEl.innerHTML = '<div class="welcome"><div class="logo">LQ</div><p>有什么可以帮你的？</p></div>'; usageBar.classList.remove('show'); } save(); renderHistoryList(historySearchEl.value); });
       actions.appendChild(editBtn); actions.appendChild(delBtn);
       row.appendChild(body); row.appendChild(actions);
       row.addEventListener('click', function () { if (generating) { toast('正在生成中'); return; } loadConversation(c.id); historyDrawer.classList.remove('open'); });
@@ -946,11 +1122,12 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
     if (cfg.currentConvId === id) return;
     saveCurrentConversation();
     var c = findConv(id); if (!c) return;
-    cfg.currentConvId = id; messages = c.messages.slice(); save(); renderLoadedConversation();
+    cfg.currentConvId = id; ensureConv(); messages = c.messages.slice(); save(); renderLoadedConversation();
+    modelTag.textContent = CS().model; syncFileToolBtn();
   }
   function renderLoadedConversation() {
     chatEl.innerHTML = ''; usageBar.classList.remove('show');
-    if (!messages.length) { chatEl.innerHTML = '<div class="welcome"><div class="logo">DS</div><p>有什么可以帮你的？</p></div>'; return; }
+    if (!messages.length) { chatEl.innerHTML = '<div class="welcome"><div class="logo">LQ</div><p>有什么可以帮你的？</p></div>'; return; }
     messages.forEach(function (m) {
       if (m.role === 'user') addMessage('user', m.content);
       else if (m.role === 'assistant' && m.content) addMessage('ai', m.content);
@@ -967,6 +1144,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
     return (d.getMonth() + 1) + '月' + d.getDate() + '日';
   }
 
+  /* ============ 技能 ============ */
   function openSkillSheet() { closeSkillEditor(); renderSkillList(); skillSheetEl.classList.add('open'); }
   function closeSkillSheet() { skillSheetEl.classList.remove('open'); closeSkillEditor(); }
   skillBtn.addEventListener('click', openSkillSheet);
@@ -976,7 +1154,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
   $('uploadSkillBtn').addEventListener('click', function () { skillFileInput.click(); });
   $('cancelSkillBtn').addEventListener('click', closeSkillEditor);
   $('saveSkillBtn').addEventListener('click', saveSkill);
-
   skillFileInput.addEventListener('change', function () {
     var file = skillFileInput.files && skillFileInput.files[0];
     skillFileInput.value = '';
@@ -984,15 +1161,13 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
     if (file.size > cfg.maxSkillFileKB * 1024) { toast('文件超过 ' + cfg.maxSkillFileKB + 'KB'); return; }
     var reader = new FileReader();
     reader.onload = function () {
-      var text = String(reader.result || '');
-      var parsed = parseSkillFile(text, file.name);
+      var parsed = parseSkillFile(String(reader.result || ''), file.name);
       if (!parsed || !parsed.prompt) { toast('解析失败：内容为空'); return; }
       openSkillEditorWithData(parsed.name, parsed.prompt, parsed.formatLabel);
     };
     reader.onerror = function () { toast('读取文件失败'); };
     reader.readAsText(file, 'utf-8');
   });
-
   function parseSkillFile(raw, filename) {
     var text = raw.replace(/^\uFEFF/, ''), trimmed = text.trim();
     if (!trimmed) return null;
@@ -1019,11 +1194,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
     }
     return { name: filenameToName(filename), prompt: trimmed, formatLabel: '纯文本' };
   }
-  function filenameToName(filename) {
-    var base = String(filename || '未命名').replace(/\.[^.]+$/, '');
-    if (base.length > 30) base = base.slice(0, 30);
-    return base || '未命名';
-  }
+  function filenameToName(filename) { var base = String(filename || '未命名').replace(/\.[^.]+$/, ''); if (base.length > 30) base = base.slice(0, 30); return base || '未命名'; }
   function renderSkillList() {
     skillListEl.innerHTML = '';
     if (!cfg.skills.length) { skillListEl.innerHTML = '<div class="skill-empty">还没有技能</div>'; return; }
@@ -1048,28 +1219,23 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
   }
   function openSkillEditor(id) {
     editingSkillId = id || null; skillEditorHint.textContent = '';
-    if (id) { var sk = cfg.skills.find(function (s) { return s.id === id; }); if (sk) { skillNameInput.value = sk.name; skillPromptInput.value = sk.prompt; skillEditorTitle.textContent = '编辑技能'; } }
+    if (id) { var sk = cfg.skills.filter(function (s) { return s.id === id; })[0]; if (sk) { skillNameInput.value = sk.name; skillPromptInput.value = sk.prompt; skillEditorTitle.textContent = '编辑技能'; } }
     else { skillNameInput.value = ''; skillPromptInput.value = ''; skillEditorTitle.textContent = '新建技能'; }
     skillEditor.classList.add('show');
   }
-  function openSkillEditorWithData(name, prompt, formatLabel) {
-    editingSkillId = null;
-    skillNameInput.value = name; skillPromptInput.value = prompt;
-    skillEditorTitle.textContent = '确认上传';
-    skillEditorHint.textContent = '已解析：' + (formatLabel || '');
-    skillEditor.classList.add('show');
-  }
+  function openSkillEditorWithData(name, prompt, formatLabel) { editingSkillId = null; skillNameInput.value = name; skillPromptInput.value = prompt; skillEditorTitle.textContent = '确认上传'; skillEditorHint.textContent = '已解析：' + (formatLabel || ''); skillEditor.classList.add('show'); }
   function closeSkillEditor() { skillEditor.classList.remove('show'); editingSkillId = null; skillEditorHint.textContent = ''; }
   function saveSkill() {
     var name = skillNameInput.value.trim(), prompt = skillPromptInput.value.trim();
     if (!name) { toast('请填写名称'); return; }
     if (!prompt) { toast('请填写提示词'); return; }
     if (name.length > 30) name = name.slice(0, 30);
-    if (editingSkillId) { var sk = cfg.skills.find(function (s) { return s.id === editingSkillId; }); if (sk) { sk.name = name; sk.prompt = prompt; } toast('已更新'); }
+    if (editingSkillId) { var sk = cfg.skills.filter(function (s) { return s.id === editingSkillId; })[0]; if (sk) { sk.name = name; sk.prompt = prompt; } toast('已更新'); }
     else { var ns = { id: genId('sk_'), name: name, prompt: prompt, source: skillEditorHint.textContent ? 'file' : 'manual' }; cfg.skills.push(ns); cfg.activeSkillId = ns.id; toast('已添加'); }
     save(); closeSkillEditor(); renderSkillList(); syncSkillBtn();
   }
 
+  /* ============ 图片 / 文档 ============ */
   imageBtn.addEventListener('click', function () { fileInput.click(); });
   fileInput.addEventListener('change', function () {
     var files = Array.prototype.slice.call(fileInput.files || []);
@@ -1141,20 +1307,29 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
   function clearPendingFiles() { pendingFiles = []; renderPreview(); }
   function updateSendState() { if (generating) return; sendBtn.disabled = !inputEl.value.trim() && pending.length === 0 && pendingFiles.length === 0; }
 
+  /* ============ 消息渲染 ============ */
   function addMessage(role, text, images, files) {
     var wrap = document.createElement('div'); wrap.className = 'msg ' + role;
     var bubble = document.createElement('div'); bubble.className = 'bubble';
-    var reason = null, reasonText = null;
+    var reason = null, reasonText = null, toolLog = null, toolLogBody = null, toolCount = 0;
     if (role === 'ai') {
       reason = document.createElement('details'); reason.className = 'reason'; reason.style.display = 'none';
       var summary = document.createElement('summary'); summary.textContent = '思考过程';
       reasonText = document.createElement('div'); reasonText.className = 'reason-text';
       reason.appendChild(summary); reason.appendChild(reasonText); bubble.appendChild(reason);
+
+      toolLog = document.createElement('details'); toolLog.className = 'tool-log'; toolLog.style.display = 'none';
+      var tsum = document.createElement('summary');
+      var tsumText = document.createElement('span'); tsumText.textContent = '工具调用';
+      var tcount = document.createElement('span'); tcount.textContent = '0';
+      tsum.appendChild(tsumText); tsum.appendChild(tcount);
+      toolLogBody = document.createElement('div'); toolLogBody.className = 'tool-log-body';
+      toolLog.appendChild(tsum); toolLog.appendChild(toolLogBody); bubble.appendChild(toolLog);
     }
     if (role === 'user' && images && images.length) {
       var imgBox = document.createElement('div'); imgBox.className = 'msg-images';
       images.slice(0, 12).forEach(function (it) { var im = document.createElement('img'); im.src = it.dataUrl; imgBox.appendChild(im); });
-      if (images.length > 12) { var more = document.createElement('div'); more.style.cssText = 'width:110px;height:110px;border-radius:9px;background:rgba(255,255,255,.18);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;'; more.textContent = '+' + (images.length - 12); imgBox.appendChild(more); }
+      if (images.length > 12) { var more = document.createElement('div'); more.style.cssText = 'width:110px;height:110px;border-radius:9px;background:rgba(255,255,255,.18);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.8125rem;font-weight:600;'; more.textContent = '+' + (images.length - 12); imgBox.appendChild(more); }
       bubble.appendChild(imgBox);
     }
     if (role === 'user' && files && files.length) {
@@ -1166,15 +1341,20 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
     if (text) content.textContent = text;
     bubble.appendChild(content);
     wrap.appendChild(bubble); chatEl.appendChild(wrap); scrollToBottom(true);
-    return { wrap: wrap, bubble: bubble, content: content, reason: reason, reasonText: reasonText };
+    return { wrap: wrap, bubble: bubble, content: content, reason: reason, reasonText: reasonText, toolLog: toolLog, toolLogBody: toolLogBody, toolCountEl: (toolLog ? toolLog.querySelector('summary span:last-child') : null) };
   }
-  function addToolTip(aiEl, text) {
-    var tip = document.createElement('div'); tip.className = 'tool-call-tip'; tip.textContent = text;
-    aiEl.bubble.insertBefore(tip, aiEl.content);
-  }
-  function addSysTip(aiEl, text) {
-    var tip = document.createElement('div'); tip.className = 'sys-tip'; tip.textContent = text;
-    aiEl.bubble.insertBefore(tip, aiEl.content);
+  function addToolEntry(aiEl, name, detail, isErr) {
+    if (!aiEl.toolLog) return;
+    aiEl.toolLog.style.display = '';
+    var line = document.createElement('div');
+    line.className = 'tool-line' + (isErr ? ' tool-err' : '');
+    var nm = document.createElement('span'); nm.className = 'tool-nm'; nm.textContent = name;
+    line.appendChild(nm);
+    if (detail) { var d = document.createElement('span'); d.textContent = ' ' + detail; line.appendChild(d); }
+    aiEl.toolLogBody.appendChild(line);
+    aiEl.toolLogBody.scrollTop = aiEl.toolLogBody.scrollHeight;
+    aiEl.toolLog.open = true;
+    if (aiEl.toolCountEl) aiEl.toolCountEl.textContent = String(aiEl.toolLogBody.children.length);
   }
   function setGenerating(g) {
     generating = g;
@@ -1211,10 +1391,50 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
     usageBar.innerHTML = html; usageBar.classList.add('show');
   }
 
+  function finishGen(ai, stopped) {
+    ai.bubble.classList.remove('streaming'); controller = null; setGenerating(false);
+    if (!ai.content.textContent && !ai.bubble.classList.contains('error')) ai.content.textContent = '（无内容）';
+    if (ai.content.textContent && !ai.bubble.classList.contains('error')) renderContent(ai.content, ai.content.textContent);
+    saveCurrentConversation(); scrollToBottom();
+    if (stopped || ai.bubble.classList.contains('error')) maybeShowContinue(ai);
+  }
+  function maybeShowContinue(ai) {
+    var old = ai.bubble.querySelector('.btn-continue'); if (old) old.remove();
+    if (ai.content.textContent === '（无内容）') return;
+    var btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'btn-continue'; btn.textContent = '继续生成';
+    btn.addEventListener('click', function () { continueFrom(ai, ai.content.textContent); });
+    ai.bubble.appendChild(btn);
+  }
+  function continueFrom(ai, partial) {
+    if (generating) return;
+    var old = ai.bubble.querySelector('.btn-continue'); if (old) old.remove();
+    if (partial && partial !== '（无内容）' && partial !== '（已停止）') messages.push({ role: 'assistant', content: partial });
+    messages.push({ role: 'user', content: '（继续）' });
+    var newAi = addMessage('ai', '');
+    newAi.bubble.classList.add('streaming'); usageBar.classList.remove('show');
+    setGenerating(true); controller = new AbortController();
+    var stopped = false;
+    runToolLoop(newAi, '（请从中断处继续，衔接上文，不要重复已输出的内容。）')
+      .catch(function (err) { stopped = handleGenError(newAi, err); })
+      .finally(function () { finishGen(newAi, stopped); });
+  }
+  function handleGenError(ai, err) {
+    if (err && err.name === 'AbortError') {
+      if (!ai.content.textContent) ai.content.textContent = '（已停止）';
+      return true;
+    }
+    ai.bubble.classList.add('error');
+    var prefix = ai.content.textContent ? ai.content.textContent + '\n\n' : '';
+    ai.content.textContent = prefix + '⚠️ ' + (err && err.message ? err.message : '请求失败');
+    return false;
+  }
+
   async function send() {
     var text = inputEl.value.trim();
     if ((!text && !pending.length && !pendingFiles.length) || generating) return;
     if (!cfg.apiKey) { openSheet(); toast('请先填写 API Key'); return; }
+    ensureConv();
     var imagesToSend = pending.slice(), filesToSend = pendingFiles.slice();
     var welcome = chatEl.querySelector('.welcome'); if (welcome) welcome.remove();
     inputEl.value = ''; autoGrow(); clearPending(); clearPendingFiles(); sendBtn.disabled = true; stick = true;
@@ -1232,33 +1452,25 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
     var ai = addMessage('ai', '');
     ai.bubble.classList.add('streaming'); usageBar.classList.remove('show');
     setGenerating(true); controller = new AbortController();
+    var stopped = false;
     try { await runToolLoop(ai, userContent); }
-    catch (err) {
-      if (err && err.name === 'AbortError') { if (!ai.content.textContent) ai.content.textContent = '（已停止）'; }
-      else { ai.bubble.classList.add('error'); var prefix = ai.content.textContent ? ai.content.textContent + '\n\n' : ''; ai.content.textContent = prefix + '⚠️ ' + (err && err.message ? err.message : '请求失败'); }
-    } finally {
-      ai.bubble.classList.remove('streaming'); controller = null; setGenerating(false);
-      if (!ai.content.textContent && !ai.bubble.classList.contains('error')) ai.content.textContent = '（无内容）';
-      if (ai.content.textContent && !ai.bubble.classList.contains('error')) {
-        var raw = ai.content.textContent;
-        renderContent(ai.content, raw);
-      }
-      saveCurrentConversation(); scrollToBottom();
-    }
+    catch (err) { stopped = handleGenError(ai, err); }
+    finally { finishGen(ai, stopped); }
   }
 
   async function runToolLoop(aiEl, firstUserContent) {
-    var loopCount = 0;
-    var consecutiveErrors = 0;
+    var loopCount = 0, consecutiveErrors = 0;
+    var cs = CS();
     var tools = buildTools();
-    var toolLoopLimit = cfg.maxToolLoops > 0 ? cfg.maxToolLoops : 999999;
-    var errLimit = cfg.maxConsecutiveErrors;
+    var toolLoopLimit = cs.maxToolLoops > 0 ? cs.maxToolLoops : 999999;
+    var errLimit = cs.maxConsecutiveErrors;
 
     var apiMessages = [];
     var sysParts = [];
-    if (cfg.systemPrompt) sysParts.push(cfg.systemPrompt);
+    if (cs.systemPrompt) sysParts.push(cs.systemPrompt);
     var activeSkill = getActiveSkill();
     if (activeSkill) sysParts.push(activeSkill.prompt);
+    if (cfg.thinkChinese !== false) sysParts.push('请始终使用简体中文进行思考（reasoning）和回答，不要用英文思考。');
     if (sysParts.length) apiMessages.push({ role: 'system', content: sysParts.join('\n\n') });
     for (var i = 0; i < messages.length - 1; i++) {
       var m = messages[i];
@@ -1269,12 +1481,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
 
     while (loopCount < toolLoopLimit) {
       loopCount++;
-      var payload = {
-        model: cfg.model, messages: apiMessages,
-        temperature: cfg.temperature, top_p: cfg.top_p,
-        stream: !!cfg.stream
-      };
-      if (cfg.max_tokens > 0) payload.max_tokens = cfg.max_tokens;
+      var payload = { model: cs.model, messages: apiMessages, temperature: cs.temperature, top_p: cs.top_p, stream: !!cs.stream };
+      if (cs.max_tokens > 0) payload.max_tokens = cs.max_tokens;
       if (tools.length) { payload.tools = tools; payload.tool_choice = 'auto'; }
 
       var response;
@@ -1285,11 +1493,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
           body: JSON.stringify(payload)
         });
       } catch (fetchErr) {
+        if (fetchErr && fetchErr.name === 'AbortError') throw fetchErr;   // ← 用户主动中断：直接结束，不再自救
         consecutiveErrors++;
-        if (errLimit > 0 && consecutiveErrors >= errLimit) {
-          throw new Error('连续 ' + consecutiveErrors + ' 次请求失败：' + (fetchErr.message || fetchErr));
-        }
-        addSysTip(aiEl, '请求失败，让 AI 尝试自救…');
+        if (errLimit > 0 && consecutiveErrors >= errLimit) throw new Error('连续 ' + consecutiveErrors + ' 次请求失败：' + (fetchErr.message || fetchErr));
+        addToolEntry(aiEl, '网络', '请求失败，让 AI 尝试自救…', true);
         apiMessages.push({ role: 'user', content: '[系统] 上一次网络请求失败：' + (fetchErr.message || fetchErr) + '。请判断是否可以重试或调整方案后继续回答。' });
         continue;
       }
@@ -1297,10 +1504,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
       if (!response.ok) {
         var errMsg = await readError(response);
         consecutiveErrors++;
-        if (errLimit > 0 && consecutiveErrors >= errLimit) {
-          throw new Error('连续 ' + consecutiveErrors + ' 次 API 错误：' + errMsg);
-        }
-        addSysTip(aiEl, 'API 错误，让 AI 尝试自救…');
+        if (errLimit > 0 && consecutiveErrors >= errLimit) throw new Error('连续 ' + consecutiveErrors + ' 次 API 错误：' + errMsg);
+        addToolEntry(aiEl, 'API', '返回错误，让 AI 尝试自救…', true);
         apiMessages.push({ role: 'user', content: '[系统] API 返回错误：' + errMsg + '。请尝试调整参数或换一种思路继续。' });
         continue;
       }
@@ -1309,7 +1514,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
 
       var assistantMsg;
       try {
-        if (cfg.stream) { assistantMsg = await handleStream(response, aiEl); }
+        if (cs.stream) { assistantMsg = await handleStream(response, aiEl); }
         else {
           var data = await response.json();
           var choice = data.choices && data.choices[0];
@@ -1320,11 +1525,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
           if (assistantMsg.content) aiEl.content.textContent += assistantMsg.content;
         }
       } catch (parseErr) {
+        if (parseErr && parseErr.name === 'AbortError') throw parseErr;
         consecutiveErrors++;
-        if (errLimit > 0 && consecutiveErrors >= errLimit) {
-          throw new Error('连续 ' + consecutiveErrors + ' 次响应解析失败：' + (parseErr.message || parseErr));
-        }
-        addSysTip(aiEl, '解析失败，让 AI 尝试自救…');
+        if (errLimit > 0 && consecutiveErrors >= errLimit) throw new Error('连续 ' + consecutiveErrors + ' 次响应解析失败：' + (parseErr.message || parseErr));
+        addToolEntry(aiEl, '解析', '响应解析失败，让 AI 尝试自救…', true);
         apiMessages.push({ role: 'user', content: '[系统] 响应解析失败：' + (parseErr.message || parseErr) + '。请重试。' });
         continue;
       }
@@ -1339,29 +1543,20 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
         var tc = assistantMsg.tool_calls[j];
         var fnName = tc.function.name;
         var args = {};
-        try { args = JSON.parse(tc.function.arguments || '{}'); } catch (parseErr) {
-          apiMessages.push({
-            role: 'tool',
-            tool_call_id: tc.id,
-            content: '[系统] 工具参数 JSON 解析失败：' + (parseErr.message || parseErr) + '。请重新构造参数。'
-          });
-          continue;
-        }
+        try { args = JSON.parse(tc.function.arguments || '{}'); }
+        catch (parseErr) { apiMessages.push({ role: 'tool', tool_call_id: tc.id, content: '[系统] 工具参数 JSON 解析失败：' + (parseErr.message || parseErr) + '。请重新构造参数。' }); continue; }
         if (fnName !== 'ask_user') {
-          addToolTip(aiEl, '调用 ' + fnName + '：' + (args.path || args.src || args.cmd || JSON.stringify(args)).toString().slice(0, 80));
+          var detail = (args.path || args.src || args.cmd || (args.src ? args.src + ' → ' + args.dest : '') || '');
+          if (args.dest && args.src) detail = args.src + ' → ' + args.dest;
+          addToolEntry(aiEl, fnName, String(detail).slice(0, 100), false);
         }
-
         var result;
-        try {
-          result = await executeTool(fnName, args);
-        } catch (toolErr) {
-          result = '[工具执行异常] ' + (toolErr.message || toolErr) + '。请判断是否需要换参数、换工具或直接回答。';
-          addSysTip(aiEl, '工具异常，已反馈给 AI');
-        }
+        try { result = await executeTool(fnName, args); }
+        catch (toolErr) { result = '[工具执行异常] ' + (toolErr.message || toolErr) + '。请判断是否需要换参数、换工具或直接回答。'; addToolEntry(aiEl, fnName, '执行异常', true); }
         apiMessages.push({ role: 'tool', tool_call_id: tc.id, content: String(result) });
       }
     }
-    throw new Error('工具调用达到 ' + toolLoopLimit + ' 轮上限，已停止。可到设置中把「工具调用最大轮数」改为 0（不限制）或更大值。');
+    throw new Error('工具调用达到 ' + toolLoopLimit + ' 轮上限，已停止。可到「对话设置」里把「工具调用最大轮数」改为 0（不限制）或更大值。');
   }
 
   function handleStream(response, aiEl) {
@@ -1425,6 +1620,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
 
   window.addEventListener('load', function () {
     setTimeout(updateFsStatus, 200);
+    renderBackupList();
     if (!cfg.apiKey) setTimeout(function () { openSheet(); toast('请先填写 API Key'); }, 400);
   });
 

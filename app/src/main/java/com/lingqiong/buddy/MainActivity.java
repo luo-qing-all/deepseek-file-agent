@@ -1,7 +1,9 @@
-package com.example.deepseek;
+package com.lingqiong.buddy;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -15,10 +17,17 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
 
+/**
+ * 宿主 Activity：WebView 装载 index.html，并用 addJavascriptInterface 把
+ * FileBridge / ShizukuBridge / SystemBridge 暴露成 JS 里的 window 对象。
+ *
+ * 这就是"AI 能操作文件"的物理接口——JS 只是喊一声，真正的执行在这里。
+ */
 public class MainActivity extends Activity {
     private WebView webView;
     private ValueCallback<Uri[]> filePathCallback;
     private static final int FILE_CHOOSER_REQ = 1001;
+    private static final int PERM_REQ = 2001;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -35,6 +44,7 @@ public class MainActivity extends Activity {
         ws.setAllowUniversalAccessFromFileURLs(true);
         ws.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
 
+        // ===== 桥接：把 Java 对象挂到 window 上 =====
         webView.addJavascriptInterface(new FileBridge(this), "AndroidFile");
         webView.addJavascriptInterface(new ShizukuBridge(this), "AndroidShizuku");
         webView.addJavascriptInterface(new SystemBridge(), "AndroidSystem");
@@ -47,7 +57,7 @@ public class MainActivity extends Activity {
             }
         });
 
-        // ===== 关键：处理 <input type="file"> 弹窗 =====
+        // 处理 <input type="file"> 弹窗
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback,
@@ -71,6 +81,11 @@ public class MainActivity extends Activity {
 
         webView.loadUrl("file:///android_asset/index.html");
 
+        requestStoragePermission();
+    }
+
+    /** Android 11+ 用「所有文件访问权限」；更低版本用传统运行时权限。 */
+    private void requestStoragePermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             if (!Environment.isExternalStorageManager()) {
                 try {
@@ -84,10 +99,20 @@ public class MainActivity extends Activity {
                     } catch (Exception ex) {}
                 }
             }
+        } else {
+            boolean need = checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                    != PackageManager.PERMISSION_GRANTED
+                    || checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE)
+                    != PackageManager.PERMISSION_GRANTED;
+            if (need) {
+                requestPermissions(new String[]{
+                        Manifest.permission.READ_EXTERNAL_STORAGE,
+                        Manifest.permission.WRITE_EXTERNAL_STORAGE
+                }, PERM_REQ);
+            }
         }
     }
 
-    // ===== 关键：文件选择器返回结果 =====
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
@@ -115,13 +140,23 @@ public class MainActivity extends Activity {
         public String getSdkVersion() {
             return String.valueOf(Build.VERSION.SDK_INT);
         }
+
         @JavascriptInterface
         public boolean hasAllFilesAccess() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 return Environment.isExternalStorageManager();
             }
-            return true;
+            return checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                    == PackageManager.PERMISSION_GRANTED;
         }
+
+        @JavascriptInterface
+        public String getVersionName() {
+            try {
+                return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+            } catch (PackageManager.NameNotFoundException e) { return "2.0.0"; }
+        }
+
         @JavascriptInterface
         public void toast(final String msg) {
             runOnUiThread(new Runnable() {

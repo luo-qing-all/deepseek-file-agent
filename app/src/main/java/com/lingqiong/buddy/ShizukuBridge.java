@@ -1,4 +1,4 @@
-package com.example.deepseek;
+package com.lingqiong.buddy;
 
 import android.content.Context;
 import android.content.pm.PackageManager;
@@ -15,6 +15,10 @@ import java.nio.charset.StandardCharsets;
 import rikka.shizuku.Shizuku;
 import rikka.shizuku.ShizukuRemoteProcess;
 
+/**
+ * 高权限文件桥接：通过 Shizuku 以 adb/root 身份执行 shell。
+ * Shizuku.newProcess 是隐藏 API，这里用反射调用。
+ */
 public class ShizukuBridge {
     private static final int REQUEST_CODE = 1001;
     private final Context context;
@@ -60,7 +64,6 @@ public class ShizukuBridge {
     public String readFileBase64(String path) {
         Result r = run("base64 " + q(path));
         if (r.code != 0 && !r.err.isEmpty()) return "读取失败：" + r.err;
-        // 去掉 base64 输出里的换行/空白，返回纯净 base64
         return r.out.replaceAll("\\s", "");
     }
 
@@ -72,7 +75,6 @@ public class ShizukuBridge {
 
     @JavascriptInterface
     public String copyFile(String src, String dest) {
-        // 若 dest 是已存在目录，则复制进该目录（保持原名）
         String cmd = "if [ -d " + q(dest) + " ]; then cp -r " + q(src) + " " + q(dest) + "/; " +
                      "else mkdir -p " + q(parentOf(dest)) + " && cp -r " + q(src) + " " + q(dest) + "; fi";
         return execShell(cmd);
@@ -123,7 +125,7 @@ public class ShizukuBridge {
 
     /* ==================== 内部工具 ==================== */
 
-    /** 单引号安全转义，用于包住路径/参数 */
+    /** 单引号安全转义，用于包住路径/参数，防止命令注入 */
     private static String q(String s) {
         if (s == null) return "''";
         return "'" + s.replace("'", "'\\''") + "'";
@@ -158,7 +160,6 @@ public class ShizukuBridge {
             ShizukuRemoteProcess process = (ShizukuRemoteProcess)
                     m.invoke(null, new String[]{"sh", "-c", cmd}, null, null);
 
-            // stderr 单独线程读取，避免大输出时管道堵塞导致死锁
             final StringBuilder errSb = new StringBuilder();
             Thread errThread = new Thread(new Runnable() {
                 @Override public void run() {
