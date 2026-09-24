@@ -23,14 +23,34 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      # 不用 android-actions/setup-android@v3（它会联网现下 cmdline-tools，容易失败）
+      # 直接复用 runner 预装的 SDK；找不到时再兜底下载一次
       - name: 准备 Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: 接受许可并安装 SDK 组件（关键步骤，避免缺 platform 报错）
         run: |
-          yes | sdkmanager --licenses > /dev/null 2>&1 || true
-          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+          set -e
+          if [ -z "$ANDROID_HOME" ] || [ ! -d "$ANDROID_HOME" ]; then
+            for d in /usr/local/lib/android/sdk /opt/android-sdk "$HOME/Android/Sdk"; do
+              if [ -d "$d" ]; then export ANDROID_HOME="$d"; break; fi
+            done
+          fi
+          if [ -z "$ANDROID_HOME" ] || [ ! -d "$ANDROID_HOME" ]; then
+            echo "::error::找不到预装 Android SDK"
+            exit 1
+          fi
           echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
+
+          SDKMANAGER="$(find "$ANDROID_HOME" -type f -name sdkmanager 2>/dev/null | head -n 1)"
+          if [ -z "$SDKMANAGER" ]; then
+            echo "::error::在 $ANDROID_HOME 下没找到 sdkmanager"
+            exit 1
+          fi
+          echo "SDKMANAGER=$SDKMANAGER"
+          echo "$(dirname "$SDKMANAGER")" >> "$GITHUB_PATH"
+
+          yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+          "$SDKMANAGER" "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
       - name: 准备 Gradle（本仓库无 gradlew，故直接安装 Gradle）
         uses: gradle/actions/setup-gradle@v4
