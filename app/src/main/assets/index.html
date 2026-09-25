@@ -308,7 +308,7 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9l3 3-3 3M13 15h4"/></svg>
       <span>终端</span>
     </button>
-    <button class="quick-btn disabled" id="webSearchBtn" type="button" disabled title="暂未开放">
+    <button class="quick-btn active" id="webSearchBtn" type="button" title="联网搜索（web_search）">
       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
       <span>联网搜索</span>
     </button>
@@ -422,6 +422,12 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
     <div class="field">
       <label for="convStreamToggle">流式输出</label>
       <div style="text-align:right"><label class="switch"><input type="checkbox" id="convStreamToggle"><span class="slider"></span></label></div>
+    </div>
+
+    <div class="field">
+      <label>联网搜索 web_search</label>
+      <div style="text-align:right"><label class="switch"><input type="checkbox" id="convWebSearchToggle"><span class="slider"></span></label></div>
+      <p class="desc">开启后改用 Responses API（/responses）并声明 web_search 工具，尝试让服务端联网搜索并返回带引用的回答。关闭则回到原来的 Chat Completions（/chat/completions）。</p>
     </div>
 
     <div class="field">
@@ -592,7 +598,7 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
       </div>
     </div>
 
-    <p class="desc" style="text-align:center;margin-top:6px">LingQiongBuddy v<span id="aboutVer">2.3.4.1</span></p>
+    <p class="desc" style="text-align:center;margin-top:6px">LingQiongBuddy v<span id="aboutVer">2.4.0</span></p>
   </div>
 </div>
 
@@ -650,8 +656,10 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
 (function () {
   'use strict';
 
-  var APP_VERSION = '2.3.4.1';
-  var API_URL = 'https://api.deepseek.com/chat/completions';
+  var APP_VERSION = '2.4.0';
+  var API_URL_CHAT = 'https://api.deepseek.com/chat/completions';
+  var API_URL_RESPONSES = 'https://api.deepseek.com/responses';
+  var API_URL = API_URL_CHAT;
   var STORE_KEY = 'lingqiong-buddy-cfg-v3';
   var OLD_STORE_KEY = 'lingqiong-buddy-cfg-v2';
 
@@ -667,7 +675,8 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
     reasoning_effort: 'high', temperature: 1, top_p: 1, max_tokens: 4096,
     fileRootPath: '/sdcard/', fileToolEnabled: true, allowDelete: false,
     maxToolLoops: 0, maxConsecutiveErrors: 5,
-    termuxEnabled: true, termuxEnvId: '', videoFrames: 16
+    termuxEnabled: true, termuxEnvId: '', videoFrames: 16,
+    webSearch: true
   };
 
   // 全局设置
@@ -711,6 +720,7 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
   var modelTag = $('modelTag');
   var skillBtn = $('skillBtn'), skillBtnLabel = $('skillBtnLabel');
   var fileToolBtn = $('fileToolBtn'), fileToolLabel = $('fileToolLabel');
+  var webSearchBtn = $('webSearchBtn');
   var skillListEl = $('skillList'), skillEditor = $('skillEditor');
   var skillEditorTitle = $('skillEditorTitle'), skillEditorHint = $('skillEditorHint');
   var skillNameInput = $('skillNameInput'), skillPromptInput = $('skillPromptInput');
@@ -1057,6 +1067,7 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
       tools.push({ type: 'function', function: { name: 'shell_exec', description: '通过 Shizuku 以高权限执行任意 shell 命令（可访问系统受限目录）。', parameters: { type: 'object', properties: { cmd: { type: 'string', description: '要执行的 shell 命令' } }, required: ['cmd'] } } });
     }
     tools.push({ type: 'function', function: { name: 'ask_user', description: '当你需要用户从若干个选项中做出明确选择，或需要用户补充关键信息时调用。会弹出对话框让用户选择或自定义回答。不要用于闲聊提问，只在真的需要用户决策时使用。', parameters: { type: 'object', properties: { question: { type: 'string' }, options: { type: 'array', items: { type: 'string' } } }, required: ['question'] } } });
+    if (cs.webSearch) tools.push({ type: 'web_search' });
     return tools;
   }
 
@@ -1155,7 +1166,7 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
       try { var vn = window.AndroidSystem.getVersionName(); if (vn) $('aboutVer').textContent = vn; } catch (e) {}
     }
     modelTag.textContent = CS().model;
-    syncSkillBtn(); syncFileToolBtn();
+    syncSkillBtn(); syncFileToolBtn(); syncWebSearchBtn();
     renderSkillList(); renderHistoryList(''); updateFsStatus();
     renderTermuxEnvs(); updateTermuxStatus();
     var conv = findConv(cfg.currentConvId);
@@ -1163,6 +1174,7 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
   }
   function syncSkillBtn() { var s = getActiveSkill(); skillBtnLabel.textContent = s ? s.name : '技能'; skillBtn.classList.toggle('active', !!s); }
   function syncFileToolBtn() { var on = !!CS().fileToolEnabled; fileToolBtn.classList.toggle('active', on); fileToolLabel.textContent = on ? '文件读写' : '文件读写(关)'; }
+  function syncWebSearchBtn() { if (webSearchBtn) webSearchBtn.classList.toggle('active', CS().webSearch !== false); }
   function updateFsStatus() {
     var fsDot = $('fsStatusDot'), fsText = $('fsStatusText');
     var shDot = $('shizukuStatusDot'), shText = $('shizukuStatusText');
@@ -1523,6 +1535,7 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
     $('convMaxConsecutiveErrors').value = cs.maxConsecutiveErrors;
     $('convFileRootPath').value = cs.fileRootPath || '/sdcard/';
     $('convStreamToggle').checked = !!cs.stream;
+    $('convWebSearchToggle').checked = cs.webSearch !== false;
     $('convFileToolToggle').checked = !!cs.fileToolEnabled;
     $('convTermuxToggle').checked = cs.termuxEnabled !== false;
     $('convAllowDeleteToggle').checked = !!cs.allowDelete;
@@ -1531,6 +1544,7 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
     $('convVideoFramesVal').textContent = cs.videoFrames || 16;
     var sel = $('convTermuxEnv'); if (sel) sel.value = cs.termuxEnvId || (currentEnv() ? currentEnv().id : '');
     syncSeg('convModelSeg', cs.model); syncSeg('convEffortSeg', cs.reasoning_effort);
+    syncWebSearchBtn();
     convSheetEl.classList.add('open');
   }
   function closeConvSheet() { convSheetEl.classList.remove('open'); }
@@ -1547,6 +1561,7 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
   $('convTopP').addEventListener('input', function () { CS().top_p = parseFloat(this.value); $('convTopPVal').textContent = CS().top_p.toFixed(2); });
   $('convTopP').addEventListener('change', save);
   $('convStreamToggle').addEventListener('change', function () { CS().stream = this.checked; save(); });
+  $('convWebSearchToggle').addEventListener('change', function () { CS().webSearch = this.checked; syncWebSearchBtn(); save(); toast(this.checked ? '已开启联网搜索（Responses API）' : '已关闭联网搜索'); });
   $('convFileRootPath').addEventListener('input', function () { CS().fileRootPath = this.value.trim(); save(); });
   $('convFileToolToggle').addEventListener('change', function () { CS().fileToolEnabled = this.checked; save(); syncFileToolBtn(); });
   $('convTermuxToggle').addEventListener('change', function () { CS().termuxEnabled = this.checked; save(); toast(this.checked ? '已允许 AI 使用终端' : '已禁止 AI 使用终端'); });
@@ -1574,6 +1589,7 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
   });
 
   fileToolBtn.addEventListener('click', function () { CS().fileToolEnabled = !CS().fileToolEnabled; syncFileToolBtn(); save(); toast(CS().fileToolEnabled ? '文件读写已启用' : '文件读写已关闭'); });
+  webSearchBtn.addEventListener('click', function () { CS().webSearch = (CS().webSearch === false); syncWebSearchBtn(); save(); toast(CS().webSearch ? '已开启联网搜索（Responses API）' : '已关闭联网搜索'); });
 
   /* ============ 历史对话抽屉 ============ */
   $('menuBtn').addEventListener('click', function () { renderHistoryList(historySearchEl.value); historyDrawer.classList.add('open'); });
@@ -2061,13 +2077,14 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
 
     while (loopCount < toolLoopLimit) {
       loopCount++;
-      var payload = { model: cs.model, messages: apiMessages, temperature: cs.temperature, top_p: cs.top_p, stream: !!cs.stream };
-      if (cs.max_tokens > 0) payload.max_tokens = cs.max_tokens;
-      if (tools.length) { payload.tools = tools; payload.tool_choice = 'auto'; }
+      var useResponses = !!cs.webSearch;
+      var payload = useResponses
+        ? buildResponsesPayload(apiMessages, sysParts, tools, cs)
+        : buildChatPayload(apiMessages, tools, cs);
 
       var response;
       try {
-        response = await fetch(API_URL, {
+        response = await fetch(useResponses ? API_URL_RESPONSES : API_URL_CHAT, {
           method: 'POST', signal: controller.signal,
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.apiKey },
           body: JSON.stringify(payload)
@@ -2094,7 +2111,10 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
 
       var assistantMsg;
       try {
-        if (cs.stream) { assistantMsg = await handleStream(response, aiEl); }
+        if (useResponses) {
+          assistantMsg = cs.stream ? await handleResponsesStream(response, aiEl) : await handleResponsesJson(response, aiEl);
+          if (!assistantMsg) throw new Error('返回数据为空');
+        } else if (cs.stream) { assistantMsg = await handleStream(response, aiEl); }
         else {
           var data = await response.json();
           var choice = data.choices && data.choices[0];
@@ -2137,6 +2157,138 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
       }
     }
     throw new Error('工具调用达到 ' + toolLoopLimit + ' 轮上限，已停止。可到「对话设置」里把「工具调用最大轮数」改为 0（不限制）或更大值。');
+  }
+
+  /* ============ Responses API / 联网搜索支持 ============ */
+  function contentToResponses(content) {
+    if (typeof content === 'string') return content;
+    if (!content || !content.length) return '';
+    var out = [];
+    for (var i = 0; i < content.length; i++) {
+      var p = content[i]; if (!p) continue;
+      if (p.type === 'text') out.push({ type: 'input_text', text: p.text || '' });
+      else if (p.type === 'input_text') out.push(p);
+      else if (p.type === 'image_url') out.push({ type: 'input_image', image_url: (p.image_url && p.image_url.url) || p.image_url || '' });
+      else if (p.type === 'input_image') out.push(p);
+    }
+    return out.length ? out : '';
+  }
+  function buildResponsesInput(apiMessages) {
+    var input = [];
+    for (var i = 0; i < apiMessages.length; i++) {
+      var m = apiMessages[i]; if (!m || m.role === 'system') continue;
+      if (m.role === 'tool') { input.push({ type: 'function_call_output', call_id: m.tool_call_id, output: String(m.content) }); continue; }
+      if (m.tool_calls && m.tool_calls.length) {
+        if (m.content) input.push({ type: 'message', role: 'assistant', content: contentToResponses(m.content) });
+        for (var j = 0; j < m.tool_calls.length; j++) {
+          var tc = m.tool_calls[j];
+          input.push({ type: 'function_call', call_id: tc.id, name: tc.function.name, arguments: tc.function.arguments || '{}' });
+        }
+        continue;
+      }
+      input.push({ type: 'message', role: m.role, content: contentToResponses(m.content) });
+    }
+    return input;
+  }
+  function mapResponsesUsage(u) {
+    if (!u) return null;
+    return {
+      prompt_tokens: u.input_tokens || 0,
+      completion_tokens: u.output_tokens || 0,
+      total_tokens: u.total_tokens || 0,
+      prompt_tokens_details: { cached_tokens: (u.input_tokens_details && u.input_tokens_details.cached_tokens) || 0 }
+    };
+  }
+  function buildResponsesPayload(apiMessages, sysParts, tools, cs) {
+    var payload = { model: cs.model, input: buildResponsesInput(apiMessages), stream: !!cs.stream };
+    if (sysParts && sysParts.length) payload.instructions = sysParts.join(String.fromCharCode(10, 10));
+    if (cs.max_tokens > 0) payload.max_output_tokens = cs.max_tokens;
+    if (tools && tools.length) { payload.tools = tools; payload.tool_choice = 'auto'; }
+    var eff = cs.reasoning_effort;
+    if (eff && eff !== 'none') payload.reasoning = { effort: eff === 'max' ? 'high' : eff };
+    if (typeof cs.temperature === 'number') payload.temperature = cs.temperature;
+    return payload;
+  }
+  function buildChatPayload(apiMessages, tools, cs) {
+    var payload = { model: cs.model, messages: apiMessages, temperature: cs.temperature, top_p: cs.top_p, stream: !!cs.stream };
+    if (cs.max_tokens > 0) payload.max_tokens = cs.max_tokens;
+    if (tools && tools.length) { payload.tools = tools; payload.tool_choice = 'auto'; }
+    return payload;
+  }
+  function handleResponsesJson(response, aiEl) {
+    return response.json().then(function (data) {
+      if (data.usage) showUsage(mapResponsesUsage(data.usage));
+      var content = '', reasoning = '', toolCalls = [];
+      var out = data.output || [];
+      for (var i = 0; i < out.length; i++) {
+        var it = out[i]; if (!it) continue;
+        if (it.type === 'reasoning' && it.content) {
+          for (var a = 0; a < it.content.length; a++) if (it.content[a] && it.content[a].type === 'reasoning_text') reasoning += (it.content[a].text || '');
+        } else if (it.type === 'message' && it.content) {
+          for (var b = 0; b < it.content.length; b++) if (it.content[b] && (it.content[b].type === 'output_text' || it.content[b].type === 'text')) content += (it.content[b].text || '');
+        } else if (it.type === 'function_call') {
+          toolCalls.push({ id: it.call_id || it.id || ('call_' + toolCalls.length), type: 'function', function: { name: it.name, arguments: it.arguments || '{}' } });
+        }
+      }
+      if (reasoning && aiEl.reason) { aiEl.reason.style.display = ''; aiEl.reason.open = true; aiEl.reasonText.textContent = reasoning; }
+      if (content) aiEl.content.textContent += content;
+      return { content: content, reasoning_content: reasoning, tool_calls: toolCalls.length ? toolCalls : null };
+    });
+  }
+  function handleResponsesStream(response, aiEl) {
+    return new Promise(function (resolve, reject) {
+      if (!response.body) return reject(new Error('不支持流式'));
+      var reader = response.body.getReader(), decoder = new TextDecoder('utf-8'), buffer = '';
+      var content = '', reasoning = '', toolCalls = [], receivedUsage = null, failMsg = null, searchShown = false;
+      function onEvent(j) {
+        if (!j) return;
+        var type = j.type || '';
+        if (type === 'response.output_text.delta') { content += (j.delta || ''); if (aiEl.content) aiEl.content.textContent = content; }
+        else if (type === 'response.reasoning_text.delta' || type === 'response.reasoning_summary_text.delta') {
+          reasoning += (j.delta || '');
+          if (aiEl.reason) { aiEl.reason.style.display = ''; if (!aiEl.reason.open) aiEl.reason.open = true; aiEl.reasonText.textContent = reasoning; }
+        }
+        else if (type === 'response.web_search_call.in_progress' || type === 'response.web_search_call.searching') {
+          if (!searchShown) { searchShown = true; addToolEntry(aiEl, '联网搜索', '正在搜索…', false); }
+        }
+        else if (type === 'response.web_search_call.completed') { addToolEntry(aiEl, '联网搜索', '搜索完成', false); }
+        else if (type === 'response.output_item.done' && j.item) {
+          var it = j.item;
+          if (it.type === 'function_call') {
+            toolCalls.push({ id: it.call_id || it.id || ('call_' + toolCalls.length), type: 'function', function: { name: it.name, arguments: it.arguments || '{}' } });
+          } else if (it.type === 'web_search_call') {
+            var srcs = (it.action && it.action.sources) || it.sources || [];
+            for (var s = 0; s < srcs.length; s++) if (srcs[s]) addToolEntry(aiEl, '来源', String(srcs[s].title || srcs[s].url || '').slice(0, 100), false);
+          }
+        }
+        else if (type === 'response.completed') { if (j.response && j.response.usage) receivedUsage = mapResponsesUsage(j.response.usage); }
+        else if (type === 'response.failed') { failMsg = (j.response && j.response.error && j.response.error.message) || '响应失败'; }
+        else if (j.response && j.response.usage && !receivedUsage) { receivedUsage = mapResponsesUsage(j.response.usage); }
+      }
+      function pump() {
+        reader.read().then(function (r) {
+          if (r.done) {
+            if (failMsg) return reject(new Error(failMsg));
+            if (receivedUsage) showUsage(receivedUsage);
+            resolve({ content: content, reasoning_content: reasoning, tool_calls: toolCalls.length ? toolCalls : null });
+            return;
+          }
+          buffer += decoder.decode(r.value, { stream: true });
+          var idx;
+          while ((idx = buffer.indexOf(String.fromCharCode(10))) >= 0) {
+            var line = buffer.slice(0, idx).trim(); buffer = buffer.slice(idx + 1);
+            if (!line || line.indexOf('data:') !== 0) continue;
+            var data = line.slice(5).trim();
+            if (!data || data === '[DONE]') continue;
+            var json; try { json = JSON.parse(data); } catch (e) { continue; }
+            onEvent(json);
+            if (stick) chatEl.scrollTop = chatEl.scrollHeight;
+          }
+          pump();
+        }).catch(reject);
+      }
+      pump();
+    });
   }
 
   function handleStream(response, aiEl) {

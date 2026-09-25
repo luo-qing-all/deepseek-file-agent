@@ -4,7 +4,7 @@
 > 原理：模型只输出结构化文本（工具调用请求），真正的执行由 App 的 Java 桥接层完成。
 
 - **应用名**：LingQiongBuddy
-- **版本**：2.3.4（versionCode 9）
+- **版本**：2.4.0（versionCode 11）
 - **applicationId**：`com.lq.app`（10 字节，与官方 `com.termux` 等长，见下方说明）
 - **代码包名(namespace)**：`com.lingqiong.buddy`
 - **minSdk**：26 ／ **targetSdk**：28 ⚠️（见下方说明）
@@ -57,7 +57,16 @@ files/usr                   指向"当前激活环境"usr 的软链
 
 ---
 
-## 一、2.3.4 更新内容
+## 更新日志
+
+### 2.4.0（versionCode 11）
+
+- 新增「联网搜索」开关：开启后改用 DeepSeek **Responses API**（`/responses`）并声明 `web_search` 工具，由服务端尝试联网搜索、返回带引用的回答；关闭则回到原来的 Chat Completions。
+- 适配 Responses API 的流式事件（`response.output_text.delta` / `response.reasoning_text.delta` / `response.output_item.done` / `response.web_search_call.*` / `response.completed` 等）。
+- 工具调用在 Responses 模式下以 `function_call` / `function_call_output` 回传。
+- 版本号升级为 **2.4.0**（versionCode 11）。
+
+### 2.3.4（versionCode 9）
 
 本次更新应用图标与整体界面视觉。
 
