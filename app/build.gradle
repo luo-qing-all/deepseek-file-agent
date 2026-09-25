@@ -57,7 +57,7 @@ android {
 
         // ★ 以后升版本，只改这两行——这就是"正规"：
         //   读源码的人一眼就懂，不用去逆向二进制。
-        versionCode 13
+        versionCode 15
         versionName "2.4.0"
         multiDexEnabled true
     }

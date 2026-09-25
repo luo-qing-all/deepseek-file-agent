@@ -1119,19 +1119,20 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
   /* ============ 视频抽帧（让 AI 真正“看到”画面） ============ */
   function lqShq(s) { return "'" + String(s == null ? '' : s).replace(/'/g, "'\\''") + "'"; }
   /* ============ 联网搜索（内置 Termux + 必应） ============ */
-  var LQ_WS_PY_B64 = 'IyAtKi0gY29kaW5nOiB1dGYtOCAtKi0KIyDogZTnvZHmkJzntKLvvIhBcHAg5YaF6IGU54mI77yJ77yaMzYw5pCc57SiICsg5oqT5Y+W5q2j5paH77yM5peg6ZyAIEFQSSBrZXnjgIIKaW1wb3J0IHN5cywgb3MsIHJlLCB1cmxsaWIucGFyc2UsIHN1YnByb2Nlc3MKClVBID0gIk1vemlsbGEvNS4wIChXaW5kb3dzIE5UIDEwLjA7IFdpbjY0OyB4NjQpIEFwcGxlV2ViS2l0LzUzNy4zNiAoS0hUTUwsIGxpa2UgR2Vja28pIENocm9tZS8xMjAuMC4wLjAgU2FmYXJpLzUzNy4zNiIKcSA9IChzeXMuYXJndlsxXSBpZiBsZW4oc3lzLmFyZ3YpID4gMSBlbHNlIG9zLmVudmlyb24uZ2V0KCJMUV9RIiwgIiIpKS5zdHJpcCgpCmlmIG5vdCBxOgogICAgcHJpbnQoIl9fTk9ORV9fIik7IHN5cy5leGl0KCkKCmRlZiBmZXRjaCh1cmwsIHQ9MjApOgogICAgdHJ5OgogICAgICAgIHIgPSBzdWJwcm9jZXNzLnJ1bihbImN1cmwiLCAiLXNMIiwgIi0tbWF4LXRpbWUiLCBzdHIodCksICItQSIsIFVBLCB1cmxdLAogICAgICAgICAgICAgICAgICAgICAgICAgICBjYXB0dXJlX291dHB1dD1UcnVlLCB0aW1lb3V0PXQgKyA4KQogICAgICAgIHJldHVybiByLnN0ZG91dC5kZWNvZGUoInV0Zi04IiwgImlnbm9yZSIpCiAgICBleGNlcHQgRXhjZXB0aW9uOgogICAgICAgIHJldHVybiAiIgoKZGVmIHN0cmlwX2goaCk6CiAgICBoID0gcmUuc3ViKHInKD9pcyk8KHNjcmlwdHxzdHlsZXxub3NjcmlwdHxoZWFkKVtePl0qPi4qPzwvXDE+JywgJyAnLCBoKQogICAgaCA9IHJlLnN1YihyJzxbXj5dKz4nLCAnICcsIGgpCiAgICBmb3IgYSwgYiBpbiAoKCcmbmJzcDsnLCAnICcpLCAoJyZhbXA7JywgJyYnKSwgKCcmcXVvdDsnLCAnIicpLCAoJyYjMzk7JywgIiciKSwKICAgICAgICAgICAgICAgICAoJyZsdDsnLCAnPCcpLCAoJyZndDsnLCAnPicpKToKICAgICAgICBoID0gaC5yZXBsYWNlKGEsIGIpCiAgICBoID0gcmUuc3ViKHInJlthLXojMC05XSs7JywgJyAnLCBoKQogICAgcmV0dXJuIHJlLnN1YihyJ1xzKycsICcgJywgaCkuc3RyaXAoKQoKZGVmIGNjKHQpOgogICAgcmV0dXJuIHJlLnN1YihyJyg/PD1bXHU0ZTAwLVx1OWZhNV0pXHMrKD89W1x1NGUwMC1cdTlmYTVdKScsICcnLCB0KS5zdHJpcCgpCgpoID0gZmV0Y2goImh0dHBzOi8vd3d3LnNvLmNvbS9zP3E9IiArIHVybGxpYi5wYXJzZS5xdW90ZShxKSkKcmVzLCBzZWVuID0gW10sIHNldCgpCmZvciBtIGluIHJlLmZpbmRpdGVyKHInPGFbXj5dKj9kYXRhLW1kdXJsPSIoW14iXSspIltePl0qPiguKj8pPC9hPicsIGgsIHJlLlMpOgogICAgdXJsLCB0aXRsZSA9IG0uZ3JvdXAoMSksIGNjKHN0cmlwX2gobS5ncm91cCgyKSkpCiAgICBpZiAobm90IHRpdGxlIG9yIGxlbih0aXRsZSkgPCA2IG9yIG5vdCB1cmwuc3RhcnRzd2l0aCgnaHR0cCcpCiAgICAgICAgICAgIG9yICdiaW5nLmNvbScgaW4gdXJsIG9yICdzby5jb20nIGluIHVybCBvciAnMzYwLmNuJyBpbiB1cmwKICAgICAgICAgICAgb3IgdXJsIGluIHNlZW4gb3IgJzBtbScgaW4gdGl0bGUpOgogICAgICAgIGNvbnRpbnVlCiAgICBpZiByZS5mdWxsbWF0Y2gocidbXGRccy5tbeeCuTpdKycsIHRpdGxlKToKICAgICAgICBjb250aW51ZQogICAgdGFpbCA9IGhbbS5lbmQoKTptLmVuZCgpICsgMzUwMF0KICAgIGRtID0gcmUuc2VhcmNoKHInY2xhc3M9IlteIl0qKD86cmVzLWRlc2N8cmVzLXJpY2gpW14iXSoiW14+XSo+KC4qPyk8L3A+JywgdGFpbCwgcmUuUykKICAgIGRlc2MgPSBjYyhzdHJpcF9oKGRtLmdyb3VwKDEpKSkgaWYgZG0gZWxzZSAnJwogICAgcmVzLmFwcGVuZCgodGl0bGUsIHVybCwgZGVzYykpOyBzZWVuLmFkZCh1cmwpCiAgICBpZiBsZW4ocmVzKSA+PSA2OgogICAgICAgIGJyZWFrCgppZiBub3QgcmVzOgogICAgcHJpbnQoIl9fTk9ORV9fIik7IHN5cy5leGl0KCkKCm91dCA9IFsi44CQ6IGU572R5pCc57Si44CRIiArIHEgKyAi77yI5p2l5rqQ77yaMzYw5pCc57Si77yJ5YWxIiArIHN0cihsZW4ocmVzKSkgKyAi5p2h77yaIl0KZm9yIGksICh0LCB1LCBkKSBpbiBlbnVtZXJhdGUocmVzLCAxKToKICAgIG91dC5hcHBlbmQoIlsiICsgc3RyKGkpICsgIl0gIiArIHQpCiAgICBvdXQuYXBwZW5kKCIgICAg572R5Z2AOiAiICsgdSkKICAgIGlmIGQ6CiAgICAgICAgb3V0LmFwcGVuZCgiICAgIOaRmOimgTogIiArIGRbOjE4MF0pCmZvciBpLCAodCwgdSwgZCkgaW4gZW51bWVyYXRlKHJlc1s6Ml0sIDEpOgogICAgdHh0ID0gY2Moc3RyaXBfaChmZXRjaCh1LCAxOCkpKQogICAgaWYgdHh0OgogICAgICAgIG91dC5hcHBlbmQoIj09PSDnvZHpobXmraPmlodbIiArIHN0cihpKSArICJdICIgKyB0WzozNl0gKyAiID09PSIpCiAgICAgICAgb3V0LmFwcGVuZCh0eHRbOjEyMDBdKQpwcmludCgiXG4iLmpvaW4ob3V0KSkK';
+  var LQ_WS_PY_B64 = 'aW1wb3J0IHN5cyxyZSxodG1sCmg9c3lzLnN0ZGluLnJlYWQoKQpvdXQ9W10KZm9yIG0gaW4gcmUuZmluZGl0ZXIocic8aDJbXj5dKj5ccyo8YVtePl0qaHJlZj0iKFteIl0rKSJbXj5dKj4oLio/KTwvYT4nLCBoLCByZS5TKToKICAgIHU9bS5ncm91cCgxKTsgdD1yZS5zdWIocic8W14+XSo+JywnJyxtLmdyb3VwKDIpKTsgdD1odG1sLnVuZXNjYXBlKHQpLnN0cmlwKCkKICAgIGlmIHUuc3RhcnRzd2l0aCgnaHR0cCcpIGFuZCB0OiBvdXQuYXBwZW5kKCh0LHUpKQpmb3IgaSwodCx1KSBpbiBlbnVtZXJhdGUob3V0Wzo4XSk6CiAgICBwcmludChzdHIoaSsxKSsnLiAnK3QpCiAgICBwcmludCgnICAgJyt1KQppZiBub3Qgb3V0OiBwcmludCgnX19OT05FX18nKQ==';
   async function doWebSearch(query) {
     if (!termuxReady()) return '错误：联网搜索需要内置 Termux 环境。请先到「总设置 → Termux 环境」点击「安装」，装好后重试。';
     var q = String(query == null ? '' : query).trim();
     if (!q) return '错误：搜索关键词为空。';
     var env = currentEnv();
+    var url = 'https://cn.bing.com/search?q=' + encodeURIComponent(q);
     var pyCmd = "import sys,base64;exec(base64.b64decode('" + LQ_WS_PY_B64 + "').decode())";
-    var cmd = 'python3 -c ' + lqShq(pyCmd) + ' ' + lqShq(q);
+    var cmd = 'curl -s -A ' + lqShq('Mozilla/5.0 (Windows NT 10.0; Win64; x64)') + ' -H ' + lqShq('Accept-Language: zh-CN,zh;q=0.9') + ' --max-time 20 ' + lqShq(url) + ' | python3 -c ' + lqShq(pyCmd);
     var r = await lqTermuxRun(cmd, env, 60000);
     var out = String((r && r.out) || '').trim();
     if (!out || out.indexOf('__NONE__') >= 0) return '联网搜索无结果或网络不通（关键词：' + q + '）。';
     if (out.length > 4000) out = out.slice(0, 4000) + String.fromCharCode(10) + '…（已截断）';
-    return out;
+    return '联网搜索结果（来源：必应，仅供参考）：' + String.fromCharCode(10) + out;
   }
 
   async function lqTermuxRun(cmd, env, timeoutMs) {
@@ -2100,12 +2101,9 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
     }
     apiMessages.push({ role: 'user', content: firstUserContent });
 
-    var netRetry = 0, netRetryMax = (cs.netRetry === 0 ? 0 : (cs.netRetry || 3));
     while (loopCount < toolLoopLimit) {
       loopCount++;
       var payload = buildChatPayload(apiMessages, tools, cs);
-      var contentBase = aiEl.content ? aiEl.content.textContent : '';
-      var reasonBase = aiEl.reasonText ? aiEl.reasonText.textContent : '';
 
       var response;
       try {
@@ -2116,15 +2114,6 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
         });
       } catch (fetchErr) {
         if (fetchErr && fetchErr.name === 'AbortError') throw fetchErr;   // 用户主动中断：直接结束，不再自救
-        if (netRetry < netRetryMax) {   // [2.4.0] 网络中断：先静默重连，不打扰模型
-          netRetry++;
-          if (aiEl.content) aiEl.content.textContent = contentBase;
-          if (aiEl.reasonText) aiEl.reasonText.textContent = reasonBase;
-          addToolEntry(aiEl, '网络', '连接中断，自动重试 ' + netRetry + '/' + netRetryMax + '…', true);
-          await new Promise(function (rs) { setTimeout(rs, 700 * netRetry); });
-          continue;
-        }
-        netRetry = 0;
         consecutiveErrors++;
         if (errLimit > 0 && consecutiveErrors >= errLimit) throw new Error('连续 ' + consecutiveErrors + ' 次请求失败：' + (fetchErr.message || fetchErr));
         addToolEntry(aiEl, '网络', '请求失败，让 AI 尝试自救…', true);
@@ -2141,6 +2130,8 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
         continue;
       }
 
+      consecutiveErrors = 0;
+
       var assistantMsg;
       try {
         if (cs.stream) { assistantMsg = await handleStream(response, aiEl); }
@@ -2155,24 +2146,12 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
         }
       } catch (parseErr) {
         if (parseErr && parseErr.name === 'AbortError') throw parseErr;
-        var __netMsg = String((parseErr && parseErr.message) || parseErr || '');
-        if (/network|failed to fetch|load failed|net::|terminated|connection|中断|断开/i.test(__netMsg) && netRetry < netRetryMax) {
-          netRetry++;
-          if (aiEl.content) aiEl.content.textContent = contentBase;
-          if (aiEl.reasonText) aiEl.reasonText.textContent = reasonBase;
-          addToolEntry(aiEl, '网络', '响应中断，自动重试 ' + netRetry + '/' + netRetryMax + '…', true);
-          await new Promise(function (rs) { setTimeout(rs, 700 * netRetry); });
-          continue;
-        }
-        netRetry = 0;
         consecutiveErrors++;
         if (errLimit > 0 && consecutiveErrors >= errLimit) throw new Error('连续 ' + consecutiveErrors + ' 次响应解析失败：' + (parseErr.message || parseErr));
         addToolEntry(aiEl, '解析', '响应解析失败，让 AI 尝试自救…', true);
         apiMessages.push({ role: 'user', content: '[系统] 响应解析失败：' + (parseErr.message || parseErr) + '。请重试。' });
         continue;
       }
-
-      consecutiveErrors = 0; netRetry = 0;   // [2.4.0] 仅在【真正解析成功】后才重置计数，避免断流时无限重试
 
       if (!assistantMsg.tool_calls || !assistantMsg.tool_calls.length) {
         if (assistantMsg.content) messages.push({ role: 'assistant', content: assistantMsg.content });
