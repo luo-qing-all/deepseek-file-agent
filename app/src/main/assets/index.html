@@ -650,7 +650,7 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
 (function () {
   'use strict';
 
-  var APP_VERSION = '2.4.3';
+  var APP_VERSION = '2.4.5';
   var API_URL_CHAT = 'https://api.deepseek.com/chat/completions';
   var API_URL = API_URL_CHAT;
   var STORE_KEY = 'lingqiong-buddy-cfg-v3';
@@ -2222,7 +2222,14 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
         if (assistantMsg.content) {
           var __asst = { role: 'assistant', content: assistantMsg.content };
           if (turnTools.length) __asst.tools = turnTools.slice();
-          messages.push(__asst);
+          // [2.4.5] 续写模式：更新原有那条 assistant，避免历史重复累积同一条内容导致复读
+          var __lastA = messages.length ? messages[messages.length - 1] : null;
+          if (__includeLast && __lastA && __lastA.role === 'assistant' && !__lastA.tool_calls) {
+            __lastA.content = assistantMsg.content;
+            if (turnTools.length) __lastA.tools = turnTools.slice();
+          } else {
+            messages.push(__asst);
+          }
         }
         return;
       }
@@ -2266,6 +2273,11 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
   function buildHistoryMessages(list, includeLast, prefix) {
     var out = [];
     var end = includeLast ? list.length : list.length - 1;
+    // [2.4.5] 续写场景：最后一条 assistant 由 prefix 代表，跳过它，避免历史里出现两条相同 assistant 导致模型复读
+    if (includeLast && prefix && end > 0) {
+      var __lm = list[end - 1];
+      if (__lm && __lm.role === 'assistant') end = end - 1;
+    }
     for (var i = 0; i < end; i++) {
       var m = list[i];
       if (m.tool_calls || m.role === 'tool') continue;
