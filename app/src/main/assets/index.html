@@ -650,7 +650,7 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
 (function () {
   'use strict';
 
-  var APP_VERSION = '2.4.1';
+  var APP_VERSION = '2.4.2';
   var API_URL_CHAT = 'https://api.deepseek.com/chat/completions';
   var API_URL = API_URL_CHAT;
   var STORE_KEY = 'lingqiong-buddy-cfg-v3';
@@ -2024,15 +2024,21 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
   function continueFrom(ai, partial) {
     if (generating) return;
     var old = ai.bubble.querySelector('.btn-continue'); if (old) old.remove();
-    if (partial && partial !== '（无内容）' && partial !== '（已停止）') messages.push({ role: 'assistant', content: partial });
-    messages.push({ role: 'user', content: '（继续）' });
-    var newAi = addMessage('ai', '');
-    newAi.bubble.classList.add('streaming'); usageBar.classList.remove('show');
+    ai.bubble.classList.remove('error');
+    // [2.4.2] 取当前气泡正文作为续写前缀（剥离错误提示/占位符）
+    var base = String(ai.content.textContent || '');
+    var em = base.lastIndexOf('\n\n⚠️');
+    if (em >= 0) base = base.slice(0, em);
+    base = base.trim();
+    if (base === '（无内容）' || base === '（已停止）') base = '';
+    if (base !== String(ai.content.textContent || '')) ai.content.textContent = base;
+    // [2.4.2] 复用同一气泡原地续写，历史不再塞入假“（继续）”
+    ai.bubble.classList.add('streaming'); usageBar.classList.remove('show');
     setGenerating(true); controller = new AbortController();
     var stopped = false;
-    runToolLoop(newAi, '（请从中断处继续，衔接上文，不要重复已输出的内容。）')
-      .catch(function (err) { stopped = handleGenError(newAi, err); })
-      .finally(function () { finishGen(newAi, stopped); });
+    runToolLoop(ai, '（请接着上面的内容继续写：直接从断点处续写，衔接自然，不要重复、也不要复述已经输出过的内容；若确实已经写完，就自然收尾，不要硬凑。）', { includeLast: true, prefix: base })
+      .catch(function (err) { stopped = handleGenError(ai, err); })
+      .finally(function () { finishGen(ai, stopped); });
   }
   function handleGenError(ai, err) {
     if (err && err.name === 'AbortError') {
@@ -2096,8 +2102,12 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
     finally { finishGen(ai, stopped); }
   }
 
-  async function runToolLoop(aiEl, firstUserContent) {
+  async function runToolLoop(aiEl, firstUserContent, opts) {
+    opts = opts || {};
+    var __includeLast = opts.includeLast === true;
+    var __prefix = opts.prefix || '';
     var loopCount = 0, consecutiveErrors = 0;
+    var turnTools = [];
     var cs = CS();
     var tools = buildTools();
     var toolLoopLimit = cs.maxToolLoops > 0 ? cs.maxToolLoops : 999999;
@@ -2114,11 +2124,7 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
       if (env) sysParts.push('你可以使用 termux_exec 工具在内置终端环境「' + env.name + '」里执行命令。环境里默认有常用 Unix 命令，也可用 pkg install 安装新工具。');
     }
     if (sysParts.length) apiMessages.push({ role: 'system', content: sysParts.join('\n\n') });
-    for (var i = 0; i < messages.length - 1; i++) {
-      var m = messages[i];
-      if (m.tool_calls || m.role === 'tool') continue;
-      apiMessages.push({ role: m.role, content: m.content });
-    }
+    apiMessages = apiMessages.concat(buildHistoryMessages(messages, __includeLast, __prefix));
     apiMessages.push({ role: 'user', content: firstUserContent });
 
     var netRetry = 0, netRetryMax = (cs.netRetry === 0 ? 0 : (cs.netRetry || 3));
@@ -2164,7 +2170,7 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
 
       var assistantMsg;
       try {
-        if (cs.stream) { assistantMsg = await handleStream(response, aiEl); }
+        if (cs.stream) { assistantMsg = await handleStream(response, aiEl, contentBase); }
         else {
           var data = await response.json();
           var choice = data.choices && data.choices[0];
@@ -2196,7 +2202,11 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
       consecutiveErrors = 0; netRetry = 0;   // [2.4.0] 仅在【真正解析成功】后才重置计数，避免断流时无限重试
 
       if (!assistantMsg.tool_calls || !assistantMsg.tool_calls.length) {
-        if (assistantMsg.content) messages.push({ role: 'assistant', content: assistantMsg.content });
+        if (assistantMsg.content) {
+          var __asst = { role: 'assistant', content: assistantMsg.content };
+          if (turnTools.length) __asst.tools = turnTools.slice();
+          messages.push(__asst);
+        }
         return;
       }
       apiMessages.push({ role: 'assistant', content: assistantMsg.content || '', tool_calls: assistantMsg.tool_calls });
@@ -2215,23 +2225,51 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
         var result;
         try { result = await executeTool(fnName, args); }
         catch (toolErr) { result = '[工具执行异常] ' + (toolErr.message || toolErr) + '。请判断是否需要换参数、换工具或直接回答。'; addToolEntry(aiEl, fnName, '执行异常', true); }
+        turnTools.push({ name: fnName, args: args, result: String(result) });
         apiMessages.push({ role: 'tool', tool_call_id: tc.id, content: String(result) });
       }
     }
     throw new Error('工具调用达到 ' + toolLoopLimit + ' 轮上限，已停止。可到「对话设置」里把「工具调用最大轮数」改为 0（不限制）或更大值。');
   }
 
+  function summarizeTools(tools) {
+    if (!tools || !tools.length) return '';
+    var out = ['【本轮工具调用记录（仅供延续上下文，无需重复执行）】'];
+    for (var i = 0; i < tools.length; i++) {
+      var t = tools[i] || {};
+      var a = '';
+      try { a = t.args ? JSON.stringify(t.args) : ''; } catch (e) { a = ''; }
+      if (a.length > 160) a = a.slice(0, 160) + '…';
+      var r = String(t.result == null ? '' : t.result).replace(/\s+/g, ' ');
+      if (r.length > 400) r = r.slice(0, 400) + '…';
+      out.push('- ' + (t.name || '?') + '(' + a + ') → ' + r);
+    }
+    return out.join('\n');
+  }
+  function buildHistoryMessages(list, includeLast, prefix) {
+    var out = [];
+    var end = includeLast ? list.length : list.length - 1;
+    for (var i = 0; i < end; i++) {
+      var m = list[i];
+      if (m.tool_calls || m.role === 'tool') continue;
+      var c = m.content;
+      if (m.role === 'assistant' && m.tools && m.tools.length) c = String(c == null ? '' : c) + '\n\n' + summarizeTools(m.tools);
+      out.push({ role: m.role, content: c });
+    }
+    if (prefix) out.push({ role: 'assistant', content: prefix });
+    return out;
+  }
   function buildChatPayload(apiMessages, tools, cs) {
     var payload = { model: cs.model, messages: apiMessages, temperature: cs.temperature, top_p: cs.top_p, stream: !!cs.stream };
     if (cs.max_tokens > 0) payload.max_tokens = cs.max_tokens;
     if (tools && tools.length) { payload.tools = tools; payload.tool_choice = 'auto'; }
     return payload;
   }
-  function handleStream(response, aiEl) {
+  function handleStream(response, aiEl, seed) {
     return new Promise(function (resolve, reject) {
       if (!response.body) return reject(new Error('不支持流式'));
       var reader = response.body.getReader(), decoder = new TextDecoder('utf-8'), buffer = '';
-      var content = '', reasoning = '', toolCallsMap = {}, receivedUsage = null;
+      var content = String(seed || ''), reasoning = '', toolCallsMap = {}, receivedUsage = null;
       function pump() {
         reader.read().then(function (r) {
           if (r.done) {
