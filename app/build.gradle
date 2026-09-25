@@ -1,5 +1,22 @@
 // ─────────────────────────────────────────────────────────────
-//  签名配置读取（本地 / CI 两用）——这是"正规发布"的核心
+//  LingQiongBuddy · app/build.gradle
+//
+//  ⚠ 重要（曾导致 CI 构建失败的坑）：
+//     Gradle 规定 plugins {} 块必须是脚本中"最先出现"的语句，
+//     它前面除 buildscript{} 外不允许任何其它语句。
+//     一旦违反（比如把 def/if 放在 plugins{} 前面），
+//     构建脚本会在编译期直接报错并退出：
+//        "only buildscript {} and other plugins {} script blocks
+//         are allowed before plugins {} blocks"
+//     所以：插件声明永远放最前，签名读取等逻辑一律放其后。
+// ─────────────────────────────────────────────────────────────
+
+plugins {
+    id 'com.android.application'
+}
+
+// ─────────────────────────────────────────────────────────────
+//  签名配置读取（本地 / CI 两用）——"正规发布"的核心
 //    · 本地：工程根放 keystore.properties（已在 .gitignore 忽略）
 //    · CI  ：用 GitHub Secrets 注入 SIGNING_* 环境变量
 // ─────────────────────────────────────────────────────────────
@@ -11,10 +28,6 @@ if (hasLocalSigning) {
 }
 def envStoreFile = System.getenv("SIGNING_STORE_FILE")
 def signingReady = hasLocalSigning || (envStoreFile != null && !envStoreFile.isEmpty())
-
-plugins {
-    id 'com.android.application'
-}
 
 android {
     namespace 'com.lingqiong.buddy'
