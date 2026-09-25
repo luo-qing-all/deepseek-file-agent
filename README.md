@@ -4,7 +4,7 @@
 > 原理：模型只输出结构化文本（工具调用请求），真正的执行由 App 的 Java 桥接层完成。
 
 - **应用名**：LingQiongBuddy
-- **版本**：2.4.3（versionCode 19）
+- **版本**：2.5.0（versionCode 23）
 - **applicationId**：`com.lq.app`（10 字节，与官方 `com.termux` 等长，见下方说明）
 - **代码包名(namespace)**：`com.lingqiong.buddy`
 - **minSdk**：26 ／ **targetSdk**：28 ⚠️（见下方说明）

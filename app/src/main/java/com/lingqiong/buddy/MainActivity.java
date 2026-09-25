@@ -3,7 +3,9 @@ package com.lingqiong.buddy;
 import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.content.pm.Signature;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
@@ -19,8 +21,11 @@ import android.webkit.WebViewClient;
 import android.widget.Toast;
 
 import org.json.JSONArray;
+
+import java.security.MessageDigest;
 import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
@@ -33,6 +38,10 @@ import java.io.OutputStream;
  * 这就是"AI 能操作文件 / 终端"的物理接口——JS 只是喊一声，真正的执行在这里。
  */
 public class MainActivity extends Activity {
+    /** 正式签名（lq-release.jks）证书 SHA-256；与打包签名不一致 → 判定为改包。 */
+    private static final String EXPECTED_SIG = "b7b78c6ffed16fb9e59174e109590f7c47edefa50e4cd844ed57e8d15af7e359";
+    /** 与打包脚本一致的资源解密密钥（index.dat 由 index.html 逐字节异或得到）。 */
+    private static final String ASSET_KEY = "LQB2.5.0-LingQiong-2026";
     private WebView webView;
     private ValueCallback<Uri[]> filePathCallback;
     private static final int FILE_CHOOSER_REQ = 1001;
@@ -89,9 +98,20 @@ public class MainActivity extends Activity {
             }
         });
 
-        webView.loadUrl("file:///android_asset/index.html");
+        // ===== 安全加固①：签名校验（换签 / 改包 → 直接退出）=====
+        if (!checkSignature()) { die("应用完整性校验失败，已停止运行"); return; }
 
-        requestStoragePermission();
+        // ===== 安全加固②：源码加密（MT 解包 assets 仅见乱码）=====
+        String html;
+        try {
+            html = readEncryptedAsset("index.dat");
+        } catch (Throwable t) {
+            die("资源校验失败，已停止运行");
+            return;
+        }
+        webView.loadDataWithBaseURL("file:///android_asset/", html, "text/html", "utf-8", null);
+
+        // 注意：此处不再自动申请存储权限。改由用户在「总设置 → 文件系统权限」手动授权。
     }
 
     /** Android 11+ 用「所有文件访问权限」；更低版本用传统运行时权限。 */
@@ -291,6 +311,68 @@ public class MainActivity extends Activity {
         return "";
     }
 
+    /** SHA-256 → 小写 hex。 */
+    private static String sha256hex(byte[] data) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] h = md.digest(data);
+            StringBuilder sb = new StringBuilder();
+            for (byte b : h) sb.append(String.format("%02x", b));
+            return sb.toString();
+        } catch (Throwable t) { return ""; }
+    }
+
+    /** 校验当前 APK 签名是否为本应用正式签名；被换签 / 改包 → false。 */
+    private boolean checkSignature() {
+        try {
+            PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(), PackageManager.GET_SIGNATURES);
+            if (pi == null || pi.signatures == null) return false;
+            for (Signature sg : pi.signatures) {
+                if (EXPECTED_SIG.equalsIgnoreCase(sha256hex(sg.toByteArray()))) return true;
+            }
+        } catch (Throwable ignore) {}
+        return false;
+    }
+
+    /** 读取加密资源并解密为字符串（密文在 assets 中，MT 解包仅见乱码）。 */
+    private String readEncryptedAsset(String name) throws Exception {
+        InputStream is = getAssets().open(name);
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        byte[] buf = new byte[1 << 13];
+        int n;
+        while ((n = is.read(buf)) > 0) bos.write(buf, 0, n);
+        is.close();
+        byte[] enc = bos.toByteArray();
+        byte[] key = ASSET_KEY.getBytes("UTF-8");
+        byte[] out = new byte[enc.length];
+        for (int i = 0; i < enc.length; i++) out[i] = (byte) (enc[i] ^ key[i % key.length]);
+        return new String(out, "UTF-8");
+    }
+
+    /** 校验失败：提示后退出（不给任何可用界面）。 */
+    private void die(final String msg) {
+        try { Toast.makeText(this, msg, Toast.LENGTH_LONG).show(); } catch (Throwable ignore) {}
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(new Runnable() {
+            public void run() {
+                try { finish(); } catch (Throwable ignore) {}
+                System.exit(0);
+            }
+        }, 900);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // 用户从系统设置返回时，通知前端刷新权限状态
+        if (webView != null) {
+            webView.post(new Runnable() {
+                public void run() {
+                    webView.evaluateJavascript("window.__onPermChanged&&window.__onPermChanged()", null);
+                }
+            });
+        }
+    }
+
     public class SystemBridge {
         @JavascriptInterface
         public String getSdkVersion() {
@@ -316,6 +398,22 @@ public class MainActivity extends Activity {
         /** 宿主包名（com.lq.app，与官方 com.termux 等长，故可共存）。 */
         @JavascriptInterface
         public String getHostPackageName() { return getPackageName(); }
+
+        /** 由「总设置 → 文件系统权限」按钮调用：主动发起存储授权（不再启动即弹）。 */
+        /** 前端探活失败 / 需强制退出时调用。 */
+        @JavascriptInterface
+        public void exitApp() {
+            runOnUiThread(new Runnable() {
+                public void run() { die("无法连接服务器"); }
+            });
+        }
+
+        @JavascriptInterface
+        public void requestStoragePermission() {
+            runOnUiThread(new Runnable() {
+                public void run() { MainActivity.this.requestStoragePermission(); }
+            });
+        }
 
         @JavascriptInterface
         public void toast(final String msg) {
