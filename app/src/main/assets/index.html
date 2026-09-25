@@ -650,7 +650,7 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
 (function () {
   'use strict';
 
-  var APP_VERSION = '2.4.2';
+  var APP_VERSION = '2.4.3';
   var API_URL_CHAT = 'https://api.deepseek.com/chat/completions';
   var API_URL = API_URL_CHAT;
   var STORE_KEY = 'lingqiong-buddy-cfg-v3';
@@ -2006,9 +2006,26 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
     usageBar.innerHTML = html; usageBar.classList.add('show');
   }
 
+  // [2.4.3] 中断时把已生成的部分内容并入历史，避免下一轮“失忆”（对齐官方客户端：纯文本归档）
+  function archivePartial(ai) {
+    if (!ai || !ai.content) return;
+    var txt = String(ai.content.textContent || '');
+    var em = txt.lastIndexOf('\n\n⚠️');
+    if (em >= 0) txt = txt.slice(0, em);
+    else if (/^⚠️/.test(txt)) txt = '';   // [2.4.3-fix] 整条都是错误提示：视为无内容
+    txt = txt.replace(/^\s+|\s+$/g, '');
+    if (!txt || txt === '（无内容）' || txt === '（已停止）') return;
+    var last = messages.length ? messages[messages.length - 1] : null;
+    if (last && last.role === 'assistant' && !last.tool_calls) {
+      last.content = txt;                                  // 续写被中断：更新原来那条，不新增
+    } else {
+      messages.push({ role: 'assistant', content: txt });  // 普通发送被中断：补一条，消除 user→user
+    }
+  }
   function finishGen(ai, stopped) {
     ai.bubble.classList.remove('streaming'); controller = null; setGenerating(false);
     if (!ai.content.textContent && !ai.bubble.classList.contains('error')) ai.content.textContent = '（无内容）';
+    if (stopped || ai.bubble.classList.contains('error')) archivePartial(ai);   // [2.4.3-fix] 中断【或出错】都记忆，杜绝下一轮失忆
     if (ai.content.textContent && !ai.bubble.classList.contains('error')) renderContent(ai.content, ai.content.textContent);
     saveCurrentConversation(); scrollToBottom();
     if (stopped || ai.bubble.classList.contains('error')) maybeShowContinue(ai);
