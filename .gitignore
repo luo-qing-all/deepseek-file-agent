@@ -12,3 +12,10 @@
 
 # CI 打包时会自动下载 Termux bootstrap（体积较大，不入库）
 /app/src/main/assets/bootstrap-*.zip
+
+# ★ 签名密钥与配置——泄露 = 别人能冒充你发升级包，绝对不要入库！
+keystore.properties
+*.jks
+*.keystore
+/keystore/
+/release.jks

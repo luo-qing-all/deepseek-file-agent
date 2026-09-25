@@ -19,12 +19,6 @@ import android.webkit.WebViewClient;
 import android.widget.Toast;
 
 import org.json.JSONArray;
-import org.json.JSONObject;
-
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.io.OutputStream;
 
 /**
  * 宿主 Activity：WebView 装载 index.html，并用 addJavascriptInterface 把
@@ -143,152 +137,44 @@ public class MainActivity extends Activity {
             filePathCallback.onReceiveValue(results);
             filePathCallback = null;
 
-            // 把"可被 ffmpeg 直接读取的真实文件路径"推给前端。
-            // 关键修复：系统文件选择器返回的是 content:// URI（DocumentsProvider），
-            // 它没有 _data 列，且内置 ffmpeg 作为独立进程无法解析 content://
-            // （会报 "No Java virtual machine has been registered / Invalid argument"）。
-            // 因此这里把 URI 的内容复制进 App 私有目录，得到真正的文件路径再交出去。
+            // 把真实文件路径推给前端：视频不读进内存，只靠这条路径交给 AI 处理
             if (results != null && results.length > 0) {
-                final Uri[] uris = results;
-                new Thread(new Runnable() {
-                    @Override public void run() {
-                        JSONArray arr = new JSONArray();
-                        for (Uri u : uris) {
-                            JSONObject o = new JSONObject();
-                            try {
-                                o.put("p", localizeForFfmpeg(u));
-                                o.put("n", displayName(u));
-                            } catch (Throwable ignore) {}
-                            arr.put(o);
-                        }
-                        final String js = "window.__onNativePicker&&window.__onNativePicker(" + arr.toString() + ")";
-                        webView.post(new Runnable() {
-                            @Override public void run() { webView.evaluateJavascript(js, null); }
-                        });
-                    }
-                }, "lqb-picker").start();
+                JSONArray arr = new JSONArray();
+                for (Uri u : results) arr.put(resolvePath(u));
+                final String js = "window.__onNativePicker&&window.__onNativePicker(" + arr.toString() + ")";
+                webView.post(new Runnable() {
+                    @Override public void run() { webView.evaluateJavascript(js, null); }
+                });
             }
         }
     }
 
-    /**
-     * 把选择到的 Uri 变成 ffmpeg 能直接读取的「真实文件路径」：
-    * 1. file:// → 直接用其路径；
-    * 2. content:// 若 _data 列能取到且文件确实可读 → 用真实路径；
-    * 3. 其余情况（DocumentsProvider / FileProvider 等无 _data 的 URI）→
-     *    通过 ContentResolver 读取内容并复制进 App 私有目录 files/tmp/，返回该路径。
-     */
-    private String localizeForFfmpeg(Uri uri) {
+    /** 尽力把 content:// 或 file:// 的 Uri 还原成真实文件路径。 */
+    private String resolvePath(Uri uri) {
         if (uri == null) return "";
         try {
             String scheme = uri.getScheme();
-            if (scheme != null && scheme.equalsIgnoreCase("file")) {
+            if (scheme == null) return uri.toString();
+            if (scheme.equalsIgnoreCase("file")) {
                 String p = uri.getPath();
-                if (p != null && !p.isEmpty()) return p;
+                return p == null ? "" : p;
             }
-            String direct = queryDataColumn(uri);
-            if (direct != null) {
-                File f = new File(direct);
-                if (f.exists() && f.canRead()) return direct;
+            if (scheme.equalsIgnoreCase("content")) {
+                Cursor c = getContentResolver().query(uri, new String[]{"_data"}, null, null, null);
+                if (c != null) {
+                    try {
+                        if (c.moveToFirst()) {
+                            int idx = c.getColumnIndex("_data");
+                            if (idx >= 0) {
+                                String p = c.getString(idx);
+                                if (p != null && !p.isEmpty()) return p;
+                            }
+                        }
+                    } finally { c.close(); }
+                }
             }
-            String copied = copyUriToPrivate(uri);
-            if (copied != null && !copied.isEmpty()) return copied;
         } catch (Throwable ignore) {}
-        // 最后的兜底：至少把原始字符串交出去（前端会显示路径，便于排错）
         return uri.toString();
-    }
-
-    /** 尝试读取 content:// 的 _data 列；不可用时返回 null（不抛异常）。 */
-    private String queryDataColumn(Uri uri) {
-        Cursor c = null;
-        try {
-            c = getContentResolver().query(uri, new String[]{"_data"}, null, null, null);
-            if (c != null && c.moveToFirst()) {
-                int idx = c.getColumnIndex("_data");
-                if (idx >= 0) {
-                    String p = c.getString(idx);
-                    if (p != null && !p.isEmpty()) return p;
-                }
-            }
-        } catch (Throwable ignore) {
-            // DocumentsProvider 没有 _data 列，query 会抛异常，这里静默
-        } finally {
-            try { if (c != null) c.close(); } catch (Throwable ignore) {}
-        }
-        return null;
-    }
-
-    /** 把 content:// 的内容复制到 files/tmp/import_<时间>_<文件名>，返回绝对路径。 */
-    private String copyUriToPrivate(Uri uri) {
-        InputStream in = null;
-        OutputStream out = null;
-        try {
-            File dir = new File(getFilesDir(), "tmp");
-            if (!dir.exists()) dir.mkdirs();
-            cleanupOldImports(dir);
-
-            String base = displayName(uri);
-            if (base == null || base.isEmpty()) base = "video.mp4";
-            base = base.replaceAll("[^0-9A-Za-z._\\-\\u4e00-\\u9fff]", "_");
-            File dst = new File(dir, "import_" + System.currentTimeMillis() + "_" + base);
-
-            in = getContentResolver().openInputStream(uri);
-            if (in == null) return "";
-            out = new FileOutputStream(dst);
-            byte[] buf = new byte[1 << 16];
-            int n;
-            while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
-            out.flush();
-            return dst.getAbsolutePath();
-        } catch (Throwable t) {
-            return "";
-        } finally {
-            try { if (in != null) in.close(); } catch (Throwable ignore) {}
-            try { if (out != null) out.close(); } catch (Throwable ignore) {}
-        }
-    }
-
-    /** 清理超过 24 小时的旧导入临时文件，避免反复发大视频撑爆私有目录。 */
-    private void cleanupOldImports(File dir) {
-        try {
-            File[] fs = dir.listFiles();
-            if (fs == null) return;
-            long now = System.currentTimeMillis();
-            for (File f : fs) {
-                if (f.isFile() && f.getName().startsWith("import_")
-                        && now - f.lastModified() > 24L * 3600L * 1000L) {
-                    //noinspection ResultOfMethodCallIgnored
-                    f.delete();
-                }
-            }
-        } catch (Throwable ignore) {}
-    }
-
-    /** 取 Uri 的显示文件名（用于给复制出的临时文件起个好名字）。 */
-    private String displayName(Uri uri) {
-        if (uri == null) return "";
-        Cursor c = null;
-        try {
-            c = getContentResolver().query(uri, new String[]{"_display_name"}, null, null, null);
-            if (c != null && c.moveToFirst()) {
-                int i = c.getColumnIndex("_display_name");
-                if (i >= 0) {
-                    String s = c.getString(i);
-                    if (s != null && !s.isEmpty()) return s;
-                }
-            }
-        } catch (Throwable ignore) {
-        } finally {
-            try { if (c != null) c.close(); } catch (Throwable ignore) {}
-        }
-        String last = uri.getLastPathSegment();
-        if (last != null) {
-            int idx = last.lastIndexOf('/');
-            if (idx >= 0) last = last.substring(idx + 1);
-            try { last = Uri.decode(last); } catch (Throwable ignore) {}
-            return last;
-        }
-        return "";
     }
 
     public class SystemBridge {

@@ -592,7 +592,7 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
       </div>
     </div>
 
-    <p class="desc" style="text-align:center;margin-top:6px">LingQiongBuddy v<span id="aboutVer">2.3.4.1</span></p>
+    <p class="desc" style="text-align:center;margin-top:6px">LingQiongBuddy v<span id="aboutVer">2.3.4</span></p>
   </div>
 </div>
 
@@ -650,7 +650,7 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
 (function () {
   'use strict';
 
-  var APP_VERSION = '2.3.4.1';
+  var APP_VERSION = '2.3.4';
   var API_URL = 'https://api.deepseek.com/chat/completions';
   var STORE_KEY = 'lingqiong-buddy-cfg-v3';
   var OLD_STORE_KEY = 'lingqiong-buddy-cfg-v2';
@@ -995,7 +995,7 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
       if (useShizuku && hasShizuku()) r = shizukuMoveFile(path, dest);
       else {
         r = nativeMoveFile(path, dest);
-        if (!/^\s*Move OK/i.test(String(r)) && hasShizuku()) r = shizukuMoveFile(path, dest);
+        if (/failed|失败|not found/i.test(String(r)) && hasShizuku()) r = shizukuMoveFile(path, dest);
       }
       if (/OK|Move/i.test(String(r))) {
         cfg.recycleRecords.unshift({ id: genId('rc_'), name: name, origPath: path, recyclePath: dest, time: Date.now() });
@@ -1068,8 +1068,8 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
 
   async function executeTool(name, args) {
     var useShizuku = args.use_shizuku === true;
-    if (name === 'read_file') { if (useShizuku && hasShizuku()) return shizukuReadFile(args.path); var r = nativeReadFile(args.path); if (/^(File not found|No read permission|Read failed|错误：|读取失败)/.test(String(r)) && hasShizuku()) r += '\n\n（提示：可改用 use_shizuku=true）'; return r; }
-    if (name === 'write_file') { if (useShizuku && hasShizuku()) return shizukuWriteFile(args.path, args.content); var w = nativeWriteFile(args.path, args.content); if (/^(Write failed|错误：|写入失败)/.test(String(w)) && hasShizuku()) w += '\n\n（提示：可改用 use_shizuku=true）'; return w; }
+    if (name === 'read_file') { if (useShizuku && hasShizuku()) return shizukuReadFile(args.path); var r = nativeReadFile(args.path); if (/失败/.test(r) && hasShizuku()) r += '\n\n（提示：可改用 use_shizuku=true）'; return r; }
+    if (name === 'write_file') { if (useShizuku && hasShizuku()) return shizukuWriteFile(args.path, args.content); var w = nativeWriteFile(args.path, args.content); if (/失败/.test(w) && hasShizuku()) w += '\n\n（提示：可改用 use_shizuku=true）'; return w; }
     if (name === 'list_dir') { if (useShizuku && hasShizuku()) return shizukuListDir(args.path); if (!hasFileBridge()) return '错误：文件系统不可用'; var j = nativeListDirJson(args.path); try { var arr = JSON.parse(j); if (!arr.length) return '(空目录或无法访问)'; return arr.map(function (o) { return (o.isDir ? '[DIR] ' : '[FILE] ') + o.name + (o.isDir ? '' : ' (' + o.size + ' B)'); }).join('\n'); } catch (e) { return j; } }
     if (name === 'read_file_base64') { if (useShizuku && hasShizuku()) return call(window.AndroidShizuku, 'readFileBase64', [args.path], '读取失败'); return nativeReadFileBase64(args.path); }
     if (name === 'write_file_base64') { if (useShizuku && hasShizuku()) return call(window.AndroidShizuku, 'writeFileBase64', [args.path, args.base64], '写入失败'); return nativeWriteFileBase64(args.path, args.base64); }
@@ -1362,10 +1362,9 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
       if (!confirm('还原「' + filename.replace(/\.json$/i, '') + '」？将覆盖当前全部配置与对话。')) return;
       var srcDir = (cfg.backupDir || '').replace(/\/+$/, '');
       var path = srcDir + '/' + filename;
-      var txt = String(nativeReadFile(path) || '');
-      var data = null;
-      try { data = JSON.parse(txt); } catch (e) { data = null; }
-      if (!data || typeof data !== 'object' || Array.isArray(data)) { toast('读取备份失败：' + (txt ? String(txt).slice(0, 120) : '文件为空或不可读')); return; }
+      var txt = nativeReadFile(path);
+      if (!txt || /not found|失败/i.test(txt)) { toast('读取备份失败'); return; }
+      var data = JSON.parse(txt);
       var dirInFile = (data.config && data.config.backupDir) ? String(data.config.backupDir).replace(/\/+$/, '') : '';
       if (data.config) {
         var c = data.config;
@@ -1770,17 +1769,13 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
   // 视频：不读进内存（多大都行），只取真实路径交给 AI 用终端处理
   videoBtn.addEventListener('click', function () { pendingPick = 'video'; videoInput.click(); });
   videoInput.addEventListener('change', function () { videoInput.value = ''; });
-  window.__onNativePicker = function (items) {
+  window.__onNativePicker = function (paths) {
     if (pendingPick !== 'video') return;
     pendingPick = '';
     var added = 0;
-    (items || []).forEach(function (it) {
-      var p, nm;
-      if (it && typeof it === 'object') { p = it.p; nm = it.n; }
-      else { p = it; nm = ''; }
+    (paths || []).forEach(function (p) {
       if (!p) return;
-      if (!nm) nm = basename(p);
-      pendingVideos.push({ path: p, name: nm });
+      pendingVideos.push({ path: p, name: basename(p) });
       added++;
     });
     renderPreview();

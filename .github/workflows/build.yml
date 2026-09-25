@@ -1,6 +1,6 @@
-name: Build APK
+name: Build Release APK
 
-# 推送到 main/master 时自动打包，也可以在 Actions 页面手动点 Run workflow
+# 推送到 main/master 时自动打包正式签名包，也可在 Actions 页面手动 Run workflow
 on:
   push:
     branches: [ main, master ]
@@ -137,12 +137,43 @@ jobs:
         with:
           gradle-version: '8.2'
 
-      - name: 构建 Debug APK
-        run: gradle assembleDebug --no-daemon --stacktrace
+      # ── ★ 新增：从 Secrets 还原签名密钥（正式包的关键）────────────
+      - name: 从 Secrets 还原签名密钥
+        env:
+          KEYSTORE_B64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+          STORE_PASS:   ${{ secrets.SIGNING_STORE_PASSWORD }}
+          KEY_ALIAS:    ${{ secrets.SIGNING_KEY_ALIAS }}
+          KEY_PASS:     ${{ secrets.SIGNING_KEY_PASSWORD }}
+        run: |
+          set -e
+          if [ -z "${KEYSTORE_B64:-}" ]; then
+            echo "::warning::未配置 SIGNING_KEYSTORE_BASE64，release 将【不签名】（仅供测试）。"
+            echo "::warning::请在仓库 Settings → Secrets and variables → Actions 添加签名密钥。"
+            exit 0
+          fi
+          echo "$KEYSTORE_B64" | base64 -d > "$GITHUB_WORKSPACE/release.jks"
+          {
+            echo "SIGNING_STORE_FILE=$GITHUB_WORKSPACE/release.jks"
+            echo "SIGNING_STORE_PASSWORD=$STORE_PASS"
+            echo "SIGNING_KEY_ALIAS=$KEY_ALIAS"
+            echo "SIGNING_KEY_PASSWORD=$KEY_PASS"
+          } >> "$GITHUB_ENV"
+          echo "签名密钥已还原。"
+
+      - name: 构建 Release APK（正式签名）
+        run: gradle assembleRelease --no-daemon --stacktrace
+
+      - name: 校验签名
+        run: |
+          set -e
+          APK=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          echo "产物: $APK"
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$BT/apksigner" verify --print-certs "$APK" | head -6 || true
 
       - name: 上传 APK（在本次运行的 Artifacts 里下载）
         uses: actions/upload-artifact@v4
         with:
-          name: LingQiongBuddy-2.3.4-debug
-          path: app/build/outputs/apk/debug/*.apk
+          name: LingQiongBuddy-2.3.4.1-release
+          path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
