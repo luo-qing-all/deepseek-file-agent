@@ -650,7 +650,7 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
 (function () {
   'use strict';
 
-  var APP_VERSION = '2.4.5';
+  var APP_VERSION = '2.4.6';
   var API_URL_CHAT = 'https://api.deepseek.com/chat/completions';
   var API_URL = API_URL_CHAT;
   var STORE_KEY = 'lingqiong-buddy-cfg-v3';
@@ -2195,7 +2195,7 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
           assistantMsg = choice.message;
           if (data.usage) showUsage(data.usage);
           if (assistantMsg.reasoning_content && aiEl.reason) { aiEl.reason.style.display = ''; aiEl.reason.open = true; aiEl.reasonText.textContent = assistantMsg.reasoning_content; }
-          if (assistantMsg.content) aiEl.content.textContent += assistantMsg.content;
+          if (assistantMsg.content) aiEl.content.textContent = lqJoinSeed(contentBase, assistantMsg.content);   // [2.4.6] 去重
         }
       } catch (parseErr) {
         if (parseErr && parseErr.name === 'AbortError') throw parseErr;
@@ -2294,11 +2294,18 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
     if (tools && tools.length) { payload.tools = tools; payload.tool_choice = 'auto'; }
     return payload;
   }
+  // [2.4.6] 续写去重：模型若把已输出内容(seed)整段复述，则只保留一份，避免整段重复/重复计费
+  function lqJoinSeed(seed, text) {
+    seed = String(seed || ''); text = String(text || '');
+    if (!seed) return text;
+    if (text.indexOf(seed) === 0) return text;   // 模型输出的是完整内容（已含 seed）
+    return seed + text;                          // 模型只输出了新增部分
+  }
   function handleStream(response, aiEl, seed) {
     return new Promise(function (resolve, reject) {
       if (!response.body) return reject(new Error('不支持流式'));
       var reader = response.body.getReader(), decoder = new TextDecoder('utf-8'), buffer = '';
-      var content = String(seed || ''), reasoning = '', toolCallsMap = {}, receivedUsage = null;
+      var content = '', reasoning = '', toolCallsMap = {}, receivedUsage = null;   // [2.4.6] content 只存模型新增，seed 在渲染时拼接去重
       function pump() {
         reader.read().then(function (r) {
           if (r.done) {
@@ -2307,7 +2314,7 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
               var t = toolCallsMap[k];
               return { id: t.id || ('call_' + k), type: 'function', function: { name: t.name, arguments: t.args || '{}' } };
             });
-            resolve({ content: content, reasoning_content: reasoning, tool_calls: toolCalls.length ? toolCalls : null });
+            resolve({ content: lqJoinSeed(seed, content), reasoning_content: reasoning, tool_calls: toolCalls.length ? toolCalls : null });
             return;
           }
           buffer += decoder.decode(r.value, { stream: true });
@@ -2322,7 +2329,7 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
             var choice = json.choices && json.choices[0]; if (!choice) continue;
             var delta = choice.delta; if (!delta) continue;
             if (delta.reasoning_content) { reasoning += delta.reasoning_content; if (aiEl.reason) { aiEl.reason.style.display = ''; if (!aiEl.reason.open) aiEl.reason.open = true; aiEl.reasonText.textContent = reasoning; } }
-            if (delta.content) { content += delta.content; aiEl.content.textContent = content; }
+            if (delta.content) { content += delta.content; aiEl.content.textContent = lqJoinSeed(seed, content); }
             if (delta.tool_calls) {
               delta.tool_calls.forEach(function (tc) {
                 var index = tc.index !== undefined ? tc.index : 0;
