@@ -778,7 +778,10 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
       cfg.conversations.unshift(c);
     }
     if (!c.settings) c.settings = Object.assign({}, CONV_DEFAULT, cfg.convDefaults);
-    else c.settings = Object.assign({}, CONV_DEFAULT, cfg.convDefaults, c.settings);
+    // 修复(2.4.0)：就地补齐缺失的新字段，保持 c.settings 为【稳定引用】。
+    // 原写法每次调用都 Object.assign 重建对象，导致 CS().x = !CS().x 这类赋值被丢弃（开关点了无效）。
+    var _cd = Object.assign({}, CONV_DEFAULT, cfg.convDefaults);
+    for (var _ck in _cd) { if (!(_ck in c.settings)) c.settings[_ck] = _cd[_ck]; }
     return c;
   }
   function CS() { return ensureConv().settings; }
