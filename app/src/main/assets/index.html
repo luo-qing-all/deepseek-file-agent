@@ -49,11 +49,15 @@ header .title small{font-size:.6875rem;font-weight:400;color:var(--muted);margin
 .header-left{display:flex;align-items:center;gap:2px;min-width:0}
 .header-right{display:flex;align-items:center;gap:0;flex:0 0 auto}
 .header-left .icon-btn{margin-left:-6px;margin-right:2px}
-#chat{flex:1 1 auto;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:18px 14px 10px;background:radial-gradient(120% 60% at 50% 0%,rgba(77,107,254,.045),transparent 70%)}
-.welcome{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:44vh;color:var(--muted);user-select:none;animation:fadeUp .5s var(--ease)}
-.welcome .logo{width:62px;height:62px;border-radius:20px;background:var(--accent-grad);color:#fff;font-weight:700;font-size:1.3rem;display:flex;align-items:center;justify-content:center;box-shadow:var(--sh-accent),inset 0 1px 0 rgba(255,255,255,.35);margin-bottom:16px;position:relative;overflow:hidden}
-.welcome .logo::after{content:'';position:absolute;inset:0;border-radius:inherit;background:radial-gradient(60% 50% at 30% 20%,rgba(255,255,255,.42),transparent 62%)}
-.welcome p{margin:0;font-size:.875rem;letter-spacing:.2px}
+#chat{flex:1 1 auto;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:18px 14px 10px;background:radial-gradient(120% 78% at 50% -12%,rgba(107,139,255,.16),transparent 62%),radial-gradient(95% 60% at 88% 104%,rgba(139,92,246,.10),transparent 68%),linear-gradient(180deg,#fbfcff 0%,#f5f8ff 42%,#ffffff 100%)}
+.welcome{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:44vh;color:var(--muted);user-select:none;animation:fadeUp .5s var(--ease);position:relative}
+.welcome::before{content:'';position:absolute;width:270px;height:270px;border-radius:50%;background:radial-gradient(circle,rgba(107,139,255,.18),transparent 68%);top:38%;left:50%;transform:translate(-50%,-50%);pointer-events:none}
+.welcome .logo{width:78px;height:78px;border-radius:25px;background:linear-gradient(140deg,#7c9bff 0%,#4d6bfe 42%,#8a5cf6 100%);color:#fff;font-weight:800;font-size:1.6rem;letter-spacing:.5px;display:flex;align-items:center;justify-content:center;box-shadow:0 14px 34px rgba(77,107,254,.36),0 6px 14px rgba(138,92,246,.22),inset 0 1.5px 0 rgba(255,255,255,.5),inset 0 -8px 18px rgba(40,60,180,.28);margin-bottom:20px;position:relative;overflow:hidden;text-shadow:0 1px 2px rgba(30,40,120,.35);animation:logoFloat 4.5s ease-in-out infinite}
+.welcome .logo::before{content:'';position:absolute;top:-60%;left:-30%;width:80%;height:160%;background:linear-gradient(115deg,rgba(255,255,255,.55),rgba(255,255,255,0) 70%);transform:rotate(18deg);animation:logoSheen 4.5s ease-in-out infinite}
+.welcome .logo::after{content:'';position:absolute;inset:0;border-radius:inherit;background:radial-gradient(62% 52% at 30% 18%,rgba(255,255,255,.5),transparent 64%)}
+@keyframes logoFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+@keyframes logoSheen{0%,72%{transform:translateX(-30%) rotate(18deg);opacity:0}80%{opacity:.9}100%{transform:translateX(230%) rotate(18deg);opacity:0}}
+.welcome p{margin:0;font-size:.9375rem;letter-spacing:.3px;color:var(--fg-2);font-weight:500}
 .msg{display:flex;margin-bottom:16px;animation:pop .32s var(--ease)}
 @keyframes pop{from{opacity:0;transform:translateY(8px) scale(.99)}to{opacity:1;transform:none}}
 @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
@@ -308,17 +312,9 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9l3 3-3 3M13 15h4"/></svg>
       <span>终端</span>
     </button>
-    <button class="quick-btn" id="webSearchBtn" type="button" title="联网搜索（必应）">
-      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-      <span>联网搜索</span>
-    </button>
     <button class="quick-btn" id="skillBtn" type="button">
       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4L12 17l-6.3 4.4L8 14 2 9.4h7.6z"/></svg>
       <span id="skillBtnLabel">技能</span>
-    </button>
-    <button class="quick-btn" id="fileToolBtn" type="button">
-      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
-      <span id="fileToolLabel">文件读写</span>
     </button>
   </div>
 
@@ -426,8 +422,7 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
 
     <div class="field">
       <label>联网搜索</label>
-      <div style="text-align:right"><label class="switch"><input type="checkbox" id="convWebSearchToggle"><span class="slider"></span></label></div>
-      <p class="desc">开启后，AI 可通过内置 Termux 联网搜索（来源：必应）来获取实时信息，如新闻、天气、股价等。需先安装内置 Termux 环境。</p>
+      <p class="desc">✅ 已默认开启（无需设置）。AI 可通过内置 Termux 联网搜索（来源：360 搜索）获取实时信息，如新闻、天气、股价等。需已安装内置 Termux 环境。</p>
     </div>
 
     <div class="field">
@@ -479,10 +474,16 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
       <div class="tool-toggles">
         <div class="tool-toggle-row">
           <div class="tool-toggle-label">
-            <div class="tool-toggle-name">允许读写文件</div>
-            <div class="tool-toggle-desc">关闭后 AI 将不能调用任何文件工具</div>
+            <div class="tool-toggle-name">文件读写</div>
+            <div class="tool-toggle-desc">✅ 已默认开启。AI 可读写文件（删除默认移入回收站）</div>
           </div>
-          <label class="switch"><input type="checkbox" id="convFileToolToggle"><span class="slider"></span></label>
+        </div>
+        <div class="tool-toggle-row" style="border-top:1px solid var(--line);padding-top:10px">
+          <div class="tool-toggle-label">
+            <div class="tool-toggle-name">允许永久删除 ⚠️</div>
+            <div class="tool-toggle-desc">关闭（默认）：AI 删除的文件一律移入回收站，且 rm 命令被拦截；开启后 AI 才能真正永久删除（不可恢复）</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="convAllowDeleteToggle"><span class="slider"></span></label>
         </div>
         <div class="tool-toggle-row" style="border-top:1px solid var(--line);padding-top:10px">
           <div class="tool-toggle-label">
@@ -490,13 +491,6 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
             <div class="tool-toggle-desc">AI 可以在内置 Termux 里执行命令</div>
           </div>
           <label class="switch"><input type="checkbox" id="convTermuxToggle"><span class="slider"></span></label>
-        </div>
-        <div class="tool-toggle-row" style="border-top:1px solid var(--line);padding-top:10px">
-          <div class="tool-toggle-label">
-            <div class="tool-toggle-name">允许永久删除 ⚠️</div>
-            <div class="tool-toggle-desc">默认删除只是移入回收站；开启后 AI 才能真删，用于必须删除的文件</div>
-          </div>
-          <label class="switch"><input type="checkbox" id="convAllowDeleteToggle"><span class="slider"></span></label>
         </div>
       </div>
     </div>
@@ -598,7 +592,7 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
       </div>
     </div>
 
-    <p class="desc" style="text-align:center;margin-top:6px">LingQiongBuddy v<span id="aboutVer">2.4.0</span></p>
+    <p class="desc" style="text-align:center;margin-top:6px">LingQiongBuddy v<span id="aboutVer">2.4.1</span></p>
   </div>
 </div>
 
@@ -656,7 +650,7 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
 (function () {
   'use strict';
 
-  var APP_VERSION = '2.4.0';
+  var APP_VERSION = '2.4.1';
   var API_URL_CHAT = 'https://api.deepseek.com/chat/completions';
   var API_URL = API_URL_CHAT;
   var STORE_KEY = 'lingqiong-buddy-cfg-v3';
@@ -675,7 +669,7 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
     fileRootPath: '/sdcard/', fileToolEnabled: true, allowDelete: false,
     maxToolLoops: 0, maxConsecutiveErrors: 5,
     termuxEnabled: true, termuxEnvId: '', videoFrames: 16,
-    webSearch: false
+    webSearch: true
   };
 
   // 全局设置
@@ -718,8 +712,6 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
   var recycleSheetEl = $('recycleSheet'), historyDrawer = $('historyDrawer'), termSheetEl = $('termSheet');
   var modelTag = $('modelTag');
   var skillBtn = $('skillBtn'), skillBtnLabel = $('skillBtnLabel');
-  var fileToolBtn = $('fileToolBtn'), fileToolLabel = $('fileToolLabel');
-  var webSearchBtn = $('webSearchBtn');
   var skillListEl = $('skillList'), skillEditor = $('skillEditor');
   var skillEditorTitle = $('skillEditorTitle'), skillEditorHint = $('skillEditorHint');
   var skillNameInput = $('skillNameInput'), skillPromptInput = $('skillPromptInput');
@@ -993,6 +985,16 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
     return d.getFullYear() + z(d.getMonth() + 1) + z(d.getDate()) + '_' + z(d.getHours()) + z(d.getMinutes()) + z(d.getSeconds());
   }
   function manifestPath() { return cfg.recycleDir.replace(/\/+$/, '') + '/_manifest.json'; }
+  var DELETE_POLICY_FILE = '/sdcard/LingQiongBuddy/.delete_policy';
+  function syncDeletePolicy() {
+    try {
+      if (!hasFileBridge()) return;
+      var allow = false;
+      try { allow = !!CS().allowDelete; } catch (e) { allow = false; }
+      nativeMkdirs('/sdcard/LingQiongBuddy');
+      nativeWriteFile(DELETE_POLICY_FILE, allow ? 'allow' : 'recycle');
+    } catch (e) {}
+  }
   function persistRecycle() {
     save();
     try { nativeMkdirs(cfg.recycleDir); nativeWriteFile(manifestPath(), JSON.stringify(cfg.recycleRecords, null, 2)); } catch (e) {}
@@ -1041,7 +1043,7 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
   function buildTools() {
     var tools = [];
     var cs = CS();
-    if (cs.fileToolEnabled) {
+    if (true) {   // [2.4.1] 文件读写永久开启（开关已移除）
       tools.push({ type: 'function', function: { name: 'read_file', description: '读取手机上的文本文件内容。路径如 /sdcard/Documents/note.txt。如果普通权限失败，可尝试 use_shizuku=true 使用高权限。', parameters: { type: 'object', properties: { path: { type: 'string' }, use_shizuku: { type: 'boolean' } }, required: ['path'] } } });
       tools.push({ type: 'function', function: { name: 'write_file', description: '向手机文件写入文本内容。父目录不存在会自动创建。', parameters: { type: 'object', properties: { path: { type: 'string' }, content: { type: 'string' }, use_shizuku: { type: 'boolean' } }, required: ['path', 'content'] } } });
       tools.push({ type: 'function', function: { name: 'list_dir', description: '列出手机某个目录下的文件和子目录。', parameters: { type: 'object', properties: { path: { type: 'string' }, use_shizuku: { type: 'boolean' } }, required: ['path'] } } });
@@ -1069,7 +1071,7 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
       tools.push({ type: 'function', function: { name: 'shell_exec', description: '通过 Shizuku 以高权限执行任意 shell 命令（可访问系统受限目录）。', parameters: { type: 'object', properties: { cmd: { type: 'string', description: '要执行的 shell 命令' } }, required: ['cmd'] } } });
     }
     tools.push({ type: 'function', function: { name: 'ask_user', description: '当你需要用户从若干个选项中做出明确选择，或需要用户补充关键信息时调用。会弹出对话框让用户选择或自定义回答。不要用于闲聊提问，只在真的需要用户决策时使用。', parameters: { type: 'object', properties: { question: { type: 'string' }, options: { type: 'array', items: { type: 'string' } } }, required: ['question'] } } });
-    if (cs.webSearch) {
+    if (true) {   // [2.4.1] 联网搜索永久开启（开关已移除）
       tools.push({ type: 'function', function: {
         name: 'web_search',
         description: '联网搜索。当用户询问实时信息、最新新闻、当前事件、天气、股价等需要最新资料才能回答的问题时调用。返回搜索结果的标题与链接。',
@@ -1134,6 +1136,29 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
     return out;
   }
 
+  var RM_GUARD_B64 = 'IyEvZGF0YS9kYXRhL2NvbS5scS5hcHAvZmlsZXMvdXNyL2Jpbi9iYXNoCiNMUUItUk0tR1VBUkQgdjEgKExpbmdRaW9uZ0J1ZGR5KSDor7fli7/miYvliqjkv67mlLnvvJvliKDpmaTmnKzmlofku7blj6/mgaLlpI3ns7vnu5/ljp8gcm0KUD0ke1BSRUZJWDotL2RhdGEvZGF0YS9jb20ubHEuYXBwL2ZpbGVzL3Vzcn0KUkVBTD0kUC9iaW4vLmxxYi1iaW4vcm0KUE9MSUNZPS9zZGNhcmQvTGluZ1Fpb25nQnVkZHkvLmRlbGV0ZV9wb2xpY3kKUkVDWUNMRT0vc2RjYXJkL0xpbmdRaW9uZ0J1ZGR5L+WbnuaUtuermQoKaGFzZmlsZT0wCmZvciBhIGluICIkQCI7IGRvIGNhc2UgIiRhIiBpbiAtKikgOzsgKikgaGFzZmlsZT0xOzsgZXNhYzsgZG9uZQppZiBbICIkaGFzZmlsZSIgPSAiMCIgXTsgdGhlbiBleGVjICIkUkVBTCIgIiRAIjsgZmkKCmFsbG93PTAKaWYgWyAtZiAiJFBPTElDWSIgXTsgdGhlbgogIHY9JChjYXQgIiRQT0xJQ1kiIDI+L2Rldi9udWxsIHwgdHIgLWQgJyBcdFxyXG4nKQogIFsgIiR2IiA9ICJhbGxvdyIgXSAmJiBhbGxvdz0xCmZpCmlmIFsgIiRhbGxvdyIgPSAiMSIgXTsgdGhlbiBleGVjICIkUkVBTCIgIiRAIjsgZmkKCnJjPTAKZm9yIGEgaW4gIiRAIjsgZG8KICBjYXNlICIkYSIgaW4gLSopIGNvbnRpbnVlOzsgZXNhYwogIGNhc2UgIiRhIiBpbiAvKikgdD0kYTs7ICopIHQ9JChwd2QpLyRhOzsgZXNhYwogIHQ9JHt0JS99CiAgWyAteiAiJHQiIF0gJiYgY29udGludWUKICBjYXNlICIkdCIgaW4KICAgIC9zZGNhcmQvKnwvc3RvcmFnZS9lbXVsYXRlZC8qfC9zdG9yYWdlL3NlbGYvKikgOzsKICAgICopICIkUkVBTCIgLXJmIC0tICIkYSIgMj4vZGV2L251bGw7IHJjPSQ/OyBjb250aW51ZTs7CiAgZXNhYwogIGNhc2UgIiR0IiBpbgogICAgIiRSRUNZQ0xFInwiJFJFQ1lDTEUiLyopICIkUkVBTCIgLXJmIC0tICIkYSIgMj4vZGV2L251bGw7IHJjPSQ/OyBjb250aW51ZTs7CiAgZXNhYwogIGlmIFsgISAtZSAiJHQiIF0gJiYgWyAhIC1MICIkdCIgXTsgdGhlbiBjb250aW51ZTsgZmkKICBta2RpciAtcCAiJFJFQ1lDTEUiIDI+L2Rldi9udWxsCiAgYj0kKGJhc2VuYW1lICIkdCIpCiAgdHM9JChkYXRlICslWSVtJWRfJUglTSVTIDI+L2Rldi9udWxsKTsgWyAteiAiJHRzIiBdICYmIHRzPSQkCiAgZD0iJFJFQ1lDTEUvJHt0c31fXyR7Yn0iCiAgbj0xOyB3aGlsZSBbIC1lICIkZCIgXTsgZG8gZD0iJFJFQ1lDTEUvJHt0c31fJHtufV9fJHtifSI7IG49JCgobisxKSk7IGRvbmUKICBpZiBtdiAtLSAiJHQiICIkZCIgMj4vZGV2L251bGw7IHRoZW4KICAgIGVjaG8gIltMaW5nUWlvbmdCdWRkeV0g5bey56e75YWl5Zue5pS256uZ77yaJGQiID4mMgogIGVsc2UKICAgIGVjaG8gIltMaW5nUWlvbmdCdWRkeV0g5bey5oum5oiq5Yig6Zmk77yI5peg5rOV56e75Yqo5Yiw5Zue5pS256uZ77yJ77yaJHQiID4mMjsgcmM9MQogIGZpCmRvbmUKZXhpdCAkcmMK';
+  function buildRmGuardInstaller() {
+    return [
+      'P=${PREFIX:-/data/data/com.lq.app/files/usr}',
+      'RMF=$P/bin/rm',
+      'if [ -f "$RMF" ] && [ ! -L "$RMF" ] && grep -q LQB-RM-GUARD "$RMF" 2>/dev/null; then echo ok; exit 0; fi',
+      'REAL=$(readlink -f "$RMF" 2>/dev/null)',
+      '[ -z "$REAL" ] && REAL=$P/bin/coreutils',
+      'mkdir -p $P/bin/.lqb-bin',
+      '[ -x "$REAL" ] && ln -sf "$REAL" $P/bin/.lqb-bin/rm',
+      'rm -f "$RMF"',
+      "printf %s " + RM_GUARD_B64 + " | base64 -d > $RMF",
+      'chmod 755 $RMF',
+      'echo installed'
+    ].join('\n');
+  }
+  function ensureRmGuard() {
+    if (!hasTermuxBridge()) return;
+    var st = termuxInfo(false); if (!st || !st.ready) return;
+    var env = currentEnv();
+    lqTermuxRun(buildRmGuardInstaller(), env, 30000).then(function () {}).catch(function () {});
+  }
+
   async function lqTermuxRun(cmd, env, timeoutMs) {
     var started = termuxExecStart(cmd, env ? env.cwd : '', env ? env.id : 'default');
     if (started.err) return { code: -1, out: started.err, timedOut: false };
@@ -1191,15 +1216,15 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
       try { var vn = window.AndroidSystem.getVersionName(); if (vn) $('aboutVer').textContent = vn; } catch (e) {}
     }
     modelTag.textContent = CS().model;
-    syncSkillBtn(); syncFileToolBtn(); syncWebSearchBtn();
+    syncSkillBtn();
     renderSkillList(); renderHistoryList(''); updateFsStatus();
     renderTermuxEnvs(); updateTermuxStatus();
     var conv = findConv(cfg.currentConvId);
     if (conv && conv.messages && conv.messages.length) { messages = conv.messages.slice(); renderLoadedConversation(); }
+    try { syncDeletePolicy(); } catch (e) {}
+    setTimeout(ensureRmGuard, 1500);
   }
   function syncSkillBtn() { var s = getActiveSkill(); skillBtnLabel.textContent = s ? s.name : '技能'; skillBtn.classList.toggle('active', !!s); }
-  function syncFileToolBtn() { var on = !!CS().fileToolEnabled; fileToolBtn.classList.toggle('active', on); fileToolLabel.textContent = on ? '文件读写' : '文件读写(关)'; }
-  function syncWebSearchBtn() { if (webSearchBtn) webSearchBtn.classList.toggle('active', CS().webSearch === true); }
   function updateFsStatus() {
     var fsDot = $('fsStatusDot'), fsText = $('fsStatusText');
     var shDot = $('shizukuStatusDot'), shText = $('shizukuStatusText');
@@ -1560,16 +1585,14 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
     $('convMaxConsecutiveErrors').value = cs.maxConsecutiveErrors;
     $('convFileRootPath').value = cs.fileRootPath || '/sdcard/';
     $('convStreamToggle').checked = !!cs.stream;
-    $('convWebSearchToggle').checked = cs.webSearch === true;
-    $('convFileToolToggle').checked = !!cs.fileToolEnabled;
     $('convTermuxToggle').checked = cs.termuxEnabled !== false;
-    $('convAllowDeleteToggle').checked = !!cs.allowDelete;
+    if ($('convAllowDeleteToggle')) $('convAllowDeleteToggle').checked = !!cs.allowDelete;
     refreshEnvSelects();
     $('convVideoFrames').value = cs.videoFrames || 16;
     $('convVideoFramesVal').textContent = cs.videoFrames || 16;
     var sel = $('convTermuxEnv'); if (sel) sel.value = cs.termuxEnvId || (currentEnv() ? currentEnv().id : '');
     syncSeg('convModelSeg', cs.model); syncSeg('convEffortSeg', cs.reasoning_effort);
-    syncWebSearchBtn();
+    syncDeletePolicy();
     convSheetEl.classList.add('open');
   }
   function closeConvSheet() { convSheetEl.classList.remove('open'); }
@@ -1586,14 +1609,12 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
   $('convTopP').addEventListener('input', function () { CS().top_p = parseFloat(this.value); $('convTopPVal').textContent = CS().top_p.toFixed(2); });
   $('convTopP').addEventListener('change', save);
   $('convStreamToggle').addEventListener('change', function () { CS().stream = this.checked; save(); });
-  $('convWebSearchToggle').addEventListener('change', function () { CS().webSearch = this.checked; syncWebSearchBtn(); save(); toast(this.checked ? '已开启联网搜索' : '已关闭联网搜索'); });
   $('convFileRootPath').addEventListener('input', function () { CS().fileRootPath = this.value.trim(); save(); });
-  $('convFileToolToggle').addEventListener('change', function () { CS().fileToolEnabled = this.checked; save(); syncFileToolBtn(); });
   $('convTermuxToggle').addEventListener('change', function () { CS().termuxEnabled = this.checked; save(); toast(this.checked ? '已允许 AI 使用终端' : '已禁止 AI 使用终端'); });
+  $('convAllowDeleteToggle').addEventListener('change', function () { CS().allowDelete = this.checked; save(); syncDeletePolicy(); toast(this.checked ? '已开启永久删除权限' : '已关闭：删除一律进回收站（rm 亦被拦截）'); });
   $('convTermuxEnv').addEventListener('change', function () { CS().termuxEnvId = this.value; save(); _termuxInfo = null; });
   $('convVideoFrames').addEventListener('input', function () { var v = parseInt(this.value, 10); if (isNaN(v)) v = 16; CS().videoFrames = v; $('convVideoFramesVal').textContent = v; });
   $('convVideoFrames').addEventListener('change', save);
-  $('convAllowDeleteToggle').addEventListener('change', function () { CS().allowDelete = this.checked; save(); toast(this.checked ? '已开启永久删除权限' : '已关闭，删除改为移入回收站'); });
   function convNumberField(id, key, min, fallback) {
     $(id).addEventListener('input', function () { var v = parseInt(this.value, 10); if (isNaN(v) || v < min) v = fallback; CS()[key] = v; save(); });
     $(id).addEventListener('blur', function () { this.value = CS()[key]; });
@@ -1613,8 +1634,6 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
     usageBar.classList.remove('show'); closeConvSheet(); saveCurrentConversation(); toast('已清空');
   });
 
-  fileToolBtn.addEventListener('click', function () { CS().fileToolEnabled = !CS().fileToolEnabled; syncFileToolBtn(); save(); toast(CS().fileToolEnabled ? '文件读写已启用' : '文件读写已关闭'); });
-  webSearchBtn.addEventListener('click', function () { CS().webSearch = !CS().webSearch; syncWebSearchBtn(); save(); if (CS().webSearch && !termuxReady()) toast('已开启联网搜索（提示：需先安装内置 Termux 环境）'); else toast(CS().webSearch ? '已开启联网搜索' : '已关闭联网搜索'); });
 
   /* ============ 历史对话抽屉 ============ */
   $('menuBtn').addEventListener('click', function () { renderHistoryList(historySearchEl.value); historyDrawer.classList.add('open'); });
@@ -1626,7 +1645,8 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
     ensureConv();
     clearPending(); clearPendingFiles(); clearPendingVideos();
     chatEl.innerHTML = '<div class="welcome"><div class="logo">LQ</div><p>有什么可以帮你的？</p></div>';
-    usageBar.classList.remove('show'); save(); modelTag.textContent = CS().model; syncFileToolBtn();
+    usageBar.classList.remove('show'); save(); modelTag.textContent = CS().model;
+    try { syncDeletePolicy(); } catch (e) {}
     historyDrawer.classList.remove('open'); toast('已开始新对话');
   });
   historySearchEl.addEventListener('input', function () { renderHistoryList(historySearchEl.value); });
@@ -1678,7 +1698,8 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
     saveCurrentConversation();
     var c = findConv(id); if (!c) return;
     cfg.currentConvId = id; ensureConv(); messages = c.messages.slice(); save(); renderLoadedConversation();
-    modelTag.textContent = CS().model; syncFileToolBtn(); syncWebSearchBtn();
+    modelTag.textContent = CS().model;
+    try { syncDeletePolicy(); } catch (e) {}
   }
   function renderLoadedConversation() {
     chatEl.innerHTML = ''; usageBar.classList.remove('show');

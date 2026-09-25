@@ -4,7 +4,7 @@
 > 原理：模型只输出结构化文本（工具调用请求），真正的执行由 App 的 Java 桥接层完成。
 
 - **应用名**：LingQiongBuddy
-- **版本**：2.4.0（versionCode 14）
+- **版本**：2.4.1（versionCode 17）
 - **applicationId**：`com.lq.app`（10 字节，与官方 `com.termux` 等长，见下方说明）
 - **代码包名(namespace)**：`com.lingqiong.buddy`
 - **minSdk**：26 ／ **targetSdk**：28 ⚠️（见下方说明）
@@ -58,6 +58,15 @@ files/usr                   指向"当前激活环境"usr 的软链
 ---
 
 ## 更新日志
+
+### 2.4.1（versionCode 17）
+
+- **恢复「允许永久删除」开关**（对话设置 → 工具权限）：默认**关闭** —— AI 删除一律移入回收站；打开后 AI 才可真正永久删除（不可恢复）。
+- **新增 rm 硬守卫**：开关关闭时，连内置 Termux 里的 `rm` 命令也被拦截 —— 删除 `/sdcard`、`/storage` 下的文件会被自动移入回收站；其它路径（如 `$PREFIX` 系统目录）照常放行，不影响 `pkg` 等操作。App 启动时自动安装/校验（`usr/bin/rm` 包装脚本 + `usr/bin/.lqb-bin/rm` 真删代理），无需手动干预。
+- **删除策略文件**：开关状态同步写入 `/sdcard/LingQiongBuddy/.delete_policy`（`allow` / `recycle`），App 对话与终端 `rm` 共用同一策略。
+- **保留**：对话设置、总设置两个入口按钮；「联网搜索」「文件读写」维持**永久开启**（不设开关）。
+- **新对话首页 UI**：蓝紫渐变背景 + 重绘居中「LQ」图标（多层渐变 / 高光 / 呼吸浮动动画）。
+- 版本号 **2.4.1**（versionCode 17）。
 
 ### 2.4.0（versionCode 14）
 
