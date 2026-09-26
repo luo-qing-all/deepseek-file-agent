@@ -22,3 +22,7 @@ keystore.properties
 
 # 解密/编辑用的临时工作目录（含明文 index.html，绝不入库）
 /_work/
+
+# 本地编译实验残留（避免误入库）
+/_build/
+/repo.xml
