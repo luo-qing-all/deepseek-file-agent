@@ -59,6 +59,14 @@ files/usr                   指向"当前激活环境"usr 的软链
 
 ## 更新日志
 
+### 2.5.0（versionCode 23）
+
+- **登录 / 注册对接新版后端**：登录改为「**用户名 + 密码**」；注册需填「**用户名 / 密码 / 手机号或邮箱 / 验证码**」。
+- **验证码发送修正**（对应后端 `auth.py` 改动）：`/auth/send_code` 请求体由 `{email, scene}` 改为 **`{target}`**（target＝手机号或邮箱），与后端一致。
+- 注册走 `POST /auth/register {username, password, target, code}`；登录走 `POST /auth/login {username, password}`；成功后保存 `app_token`。
+- 前端加入基本校验：用户名 3-20 位字母/数字/下划线、密码 ≥6 位、验证码为 6 位数字。
+- 说明：调试期验证码由后端**明文打印在服务器日志**（`grep '[CODE]' /home/ubuntu/flask_start.log` 查看），前端仅作「已发送」提示。
+
 ### 2.4.3（versionCode 19）
 
 - **修复「打断/出错后失忆」**：此前只有手动停止会归档；网络中断或出错时，那条 AI 回复不会写入历史，导致下一轮「失忆」（典型表现：明明只输出到第 28 条，下一轮却答「第 100 条」）。
