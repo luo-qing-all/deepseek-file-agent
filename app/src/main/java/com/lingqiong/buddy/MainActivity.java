@@ -40,8 +40,7 @@ import java.io.OutputStream;
 public class MainActivity extends Activity {
     /** 正式签名（lq-release.jks）证书 SHA-256；与打包签名不一致 → 判定为改包。 */
     private static final String EXPECTED_SIG = "b7b78c6ffed16fb9e59174e109590f7c47edefa50e4cd844ed57e8d15af7e359";
-    /** 与打包脚本一致的资源解密密钥（index.dat 由 index.html 逐字节异或得到）。 */
-    private static final String ASSET_KEY = "LQB2.5.0-LingQiong-2026";
+    /** 前端资源由服务器动态下发（AES-256-GCM + RSA 验签），APK 内不含可解密密钥。 */
     private WebView webView;
     private ValueCallback<Uri[]> filePathCallback;
     private static final int FILE_CHOOSER_REQ = 1001;
@@ -101,15 +100,22 @@ public class MainActivity extends Activity {
         // ===== 安全加固①：签名校验（换签 / 改包 → 直接退出）=====
         if (!checkSignature()) { die("应用完整性校验失败，已停止运行"); return; }
 
-        // ===== 安全加固②：源码加密（MT 解包 assets 仅见乱码）=====
-        String html;
-        try {
-            html = readEncryptedAsset("index.dat");
-        } catch (Throwable t) {
-            die("资源校验失败，已停止运行");
-            return;
-        }
-        webView.loadDataWithBaseURL("file:///android_asset/", html, "text/html", "utf-8", null);
+        // ===== 安全加固②：前端资源【动态下发 + 验签解密】=====
+        // APK 内不含可解密钥匙；密文与 AES 密钥由服务器下发，服务器私钥签名防篡改。
+        // 首次需联网；之后可用本地缓存（加密态）离线兜底。
+        webView.loadDataWithBaseURL("file:///android_asset/", LOADING_HTML, "text/html", "utf-8", null);
+        final String cachePath = new File(getFilesDir(), "front_pack.json").getAbsolutePath();
+        new Thread(new Runnable() {
+            @Override public void run() {
+                final String html = FrontLoader.load(FrontLoader.PACK_URL, cachePath, 8000);
+                webView.post(new Runnable() {
+                    @Override public void run() {
+                        if (html == null) { die("无法获取前端资源，请检查网络后重试"); return; }
+                        webView.loadDataWithBaseURL("file:///android_asset/", html, "text/html", "utf-8", null);
+                    }
+                });
+            }
+        }, "lqb-front-load").start();
 
         // 注意：此处不再自动申请存储权限。改由用户在「总设置 → 文件系统权限」手动授权。
     }
@@ -334,20 +340,15 @@ public class MainActivity extends Activity {
         return false;
     }
 
-    /** 读取加密资源并解密为字符串（密文在 assets 中，MT 解包仅见乱码）。 */
-    private String readEncryptedAsset(String name) throws Exception {
-        InputStream is = getAssets().open(name);
-        ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        byte[] buf = new byte[1 << 13];
-        int n;
-        while ((n = is.read(buf)) > 0) bos.write(buf, 0, n);
-        is.close();
-        byte[] enc = bos.toByteArray();
-        byte[] key = ASSET_KEY.getBytes("UTF-8");
-        byte[] out = new byte[enc.length];
-        for (int i = 0; i < enc.length; i++) out[i] = (byte) (enc[i] ^ key[i % key.length]);
-        return new String(out, "UTF-8");
-    }
+    /** 启动加载时的占位页（前端 HTML 由 FrontLoader 联网取回后再替换）。 */
+    private static final String LOADING_HTML =
+        "<!DOCTYPE html><html><head><meta charset='utf-8'>"
+        + "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+        + "<style>html,body{height:100%;margin:0;display:flex;align-items:center;justify-content:center;"
+        + "background:#fff}@keyframes r{to{transform:rotate(360deg)}}"
+        + ".s{width:26px;height:26px;border:3px solid #e2e5ec;border-top-color:#4c7dff;"
+        + "border-radius:50%;animation:r .8s linear infinite}</style></head>"
+        + "<body><div class='s'></div></body></html>";
 
     /** 校验失败：提示后退出（不给任何可用界面）。 */
     private void die(final String msg) {
@@ -393,6 +394,28 @@ public class MainActivity extends Activity {
             try {
                 return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
             } catch (PackageManager.NameNotFoundException e) { return "2.3.4"; }
+        }
+
+        @JavascriptInterface
+        public int getVersionCode() {
+            try {
+                return getPackageManager().getPackageInfo(getPackageName(), 0).versionCode;
+            } catch (PackageManager.NameNotFoundException e) { return 0; }
+        }
+
+        /** 用系统浏览器/下载器打开链接（用于「检查更新」跳转下载 APK）。 */
+        @JavascriptInterface
+        public void openUrl(final String url) {
+            if (url == null || url.trim().isEmpty()) return;
+            runOnUiThread(new Runnable() {
+                public void run() {
+                    try {
+                        startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+                    } catch (Exception e) {
+                        Toast.makeText(MainActivity.this, "无法打开链接", Toast.LENGTH_SHORT).show();
+                    }
+                }
+            });
         }
 
         /** 宿主包名（com.lq.app，与官方 com.termux 等长，故可共存）。 */

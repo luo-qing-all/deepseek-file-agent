@@ -4,7 +4,7 @@
 > 原理：模型只输出结构化文本（工具调用请求），真正的执行由 App 的 Java 桥接层完成。
 
 - **应用名**：LingQiongBuddy
-- **版本**：2.5.1（versionCode 24）
+- **版本**：2.5.2（versionCode 25）
 - **applicationId**：`com.lq.app`（10 字节，与官方 `com.termux` 等长，见下方说明）
 - **代码包名(namespace)**：`com.lingqiong.buddy`
 - **minSdk**：26 ／ **targetSdk**：28 ⚠️（见下方说明）
@@ -58,6 +58,14 @@ files/usr                   指向"当前激活环境"usr 的软链
 ---
 
 ## 更新日志
+
+### 2.5.2（versionCode 25）
+
+- 新增**官网页面**（后端 `GET /`）：展示全部功能、更新日志，并可**下载最新版 APK**（仅提供最新版）。
+- 新增**「检查更新」**：在「我」页面可查看当前版本号并一键检查；发现新版本时弹窗询问跳转下载。
+- 后端新增 `GET /version.json`（版本信息）与 `GET /download/apk`（最新版下载）；原公告页移至 `/notice`。
+- 客户端桥接新增 `getVersionCode()` 与 `openUrl()`。
+- 版本号 **2.5.2**（versionCode 25）。
 
 ### 2.5.1（versionCode 24）
 - 新增**底部导航**：底部两个入口 —— **主界面 / 我**。
