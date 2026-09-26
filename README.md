@@ -4,7 +4,7 @@
 > 原理：模型只输出结构化文本（工具调用请求），真正的执行由 App 的 Java 桥接层完成。
 
 - **应用名**：LingQiongBuddy
-- **版本**：2.5.0（versionCode 23）
+- **版本**：2.5.1（versionCode 24）
 - **applicationId**：`com.lq.app`（10 字节，与官方 `com.termux` 等长，见下方说明）
 - **代码包名(namespace)**：`com.lingqiong.buddy`
 - **minSdk**：26 ／ **targetSdk**：28 ⚠️（见下方说明）
@@ -58,6 +58,13 @@ files/usr                   指向"当前激活环境"usr 的软链
 ---
 
 ## 更新日志
+
+### 2.5.1（versionCode 24）
+- 新增**底部导航**：底部两个入口 —— **主界面 / 我**。
+- 新增**「我」页面**：展示用户名、绑定邮箱。
+- 新增**头像设置**：点击头像可自选图片，自动压缩为 256px 保存。
+- 新增**退出登录**：清除本地登录态并返回登录页。
+- 后端新增 `/auth/me` 接口（凭 app_token 返回用户名与邮箱）。
 
 ### 2.5.0（versionCode 23）
 
