@@ -107,7 +107,19 @@ public class MainActivity extends Activity {
         final String cachePath = new File(getFilesDir(), "front_pack.json").getAbsolutePath();
         new Thread(new Runnable() {
             @Override public void run() {
-                final String html = FrontLoader.load(FrontLoader.PACK_URL, cachePath, 8000);
+                // [2.5.5] 版本对比 + 不限时下载 + 进度回调（进度条实时更新）
+                final String html = FrontLoader.load(FrontLoader.PACK_URL, cachePath, 15000, new FrontLoader.Progress() {
+                    @Override public void onStatus(final String msg) {
+                        webView.post(new Runnable() { @Override public void run() {
+                            webView.evaluateJavascript("window.__lqStatus&&window.__lqStatus(" + jsStr(msg) + ")", null);
+                        }});
+                    }
+                    @Override public void onProgress(final long d, final long total, final long bps) {
+                        webView.post(new Runnable() { @Override public void run() {
+                            webView.evaluateJavascript("window.__lqLoad&&window.__lqLoad(" + d + "," + total + "," + bps + ")", null);
+                        }});
+                    }
+                });
                 webView.post(new Runnable() {
                     @Override public void run() {
                         if (html == null) { die("无法获取前端资源，请检查网络后重试"); return; }
@@ -340,15 +352,43 @@ public class MainActivity extends Activity {
         return false;
     }
 
-    /** 启动加载时的占位页（前端 HTML 由 FrontLoader 联网取回后再替换）。 */
+    /** [2.5.5] 启动加载页：进度条 + 百分比 + 速度 + 预计剩余时间（前端 HTML 取回后替换）。 */
     private static final String LOADING_HTML =
         "<!DOCTYPE html><html><head><meta charset='utf-8'>"
         + "<meta name='viewport' content='width=device-width,initial-scale=1'>"
-        + "<style>html,body{height:100%;margin:0;display:flex;align-items:center;justify-content:center;"
-        + "background:#fff}@keyframes r{to{transform:rotate(360deg)}}"
-        + ".s{width:26px;height:26px;border:3px solid #e2e5ec;border-top-color:#4c7dff;"
-        + "border-radius:50%;animation:r .8s linear infinite}</style></head>"
-        + "<body><div class='s'></div></body></html>";
+        + "<style>"
+        + "html,body{height:100%;margin:0;display:flex;align-items:center;justify-content:center;"
+        + "background:#fff;font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;color:#222}"
+        + ".box{width:80%;max-width:360px}"
+        + ".tt{font-size:15px;font-weight:600;text-align:center;margin-bottom:14px}"
+        + ".bar{height:8px;border-radius:5px;background:#eceef3;overflow:hidden}"
+        + ".fill{height:100%;width:0;border-radius:5px;background:linear-gradient(90deg,#4c7dff,#7aa2ff);transition:width .2s ease}"
+        + ".ind{width:38%;animation:sl 1.1s ease-in-out infinite}"
+        + "@keyframes sl{0%{margin-left:-38%}100%{margin-left:100%}}"
+        + ".pct{font-size:13px;font-weight:600;text-align:center;color:#4c7dff;margin-top:10px;min-height:18px}"
+        + ".meta{font-size:12px;text-align:center;color:#8a8f99;margin-top:6px;line-height:1.6;min-height:16px}"
+        + "</style></head><body>"
+        + "<div class='box'>"
+        + "<div class='tt' id='tt'>正在连接服务器…</div>"
+        + "<div class='bar'><div class='fill ind' id='fl'></div></div>"
+        + "<div class='pct' id='pc'></div>"
+        + "<div class='meta' id='mt'></div>"
+        + "</div>"
+        + "<script>"
+        + "function _fmt(b){if(b<1024)return b+' B';if(b<1048576)return (b/1024).toFixed(1)+' KB';return (b/1048576).toFixed(2)+' MB';}"
+        + "function _ft(s){if(s<60)return s+' 秒';var m=Math.floor(s/60),x=s%60;return m+' 分 '+x+' 秒';}"
+        + "function _draw(d,t,b){var f=document.getElementById('fl'),p=document.getElementById('pc'),m=document.getElementById('mt');"
+        + "if(!f)return;"
+        + "if(t>0){f.className='fill';var pc=Math.floor(d*100/t);if(pc>100)pc=100;f.style.width=pc+'%';p.textContent=pc+'%';}"
+        + "else{f.className='fill ind';p.textContent='';}"
+        + "var s='';"
+        + "if(t>0){s=_fmt(d)+' / '+_fmt(t);}else{s=_fmt(d);}"
+        + "if(b>0){s+='  ·  '+_fmt(b)+'/s';}"
+        + "if(b>0&&t>0&&d<t){s+='  ·  剩余约 '+_ft(Math.ceil((t-d)/b));}"
+        + "m.textContent=s;}"
+        + "window.__lqLoad=function(d,t,b){_draw(d,t,b);};"
+        + "window.__lqStatus=function(s){var e=document.getElementById('tt');if(e)e.textContent=s;};"
+        + "</script></body></html>";
 
     /** 校验失败：提示后退出（不给任何可用界面）。 */
     private void die(final String msg) {
@@ -359,6 +399,22 @@ public class MainActivity extends Activity {
                 System.exit(0);
             }
         }, 900);
+    }
+
+    /** [2.5.5] 把字符串转成安全的 JS 字面量（用于 evaluateJavascript 传参）。 */
+    private static String jsStr(String s) {
+        if (s == null) return "''";
+        StringBuilder sb = new StringBuilder("'");
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '\\') sb.append("\\\\");
+            else if (c == '\'') sb.append("\\'");
+            else if (c == '\n') sb.append("\\n");
+            else if (c == '\r') sb.append("\\r");
+            else if (c == '<') sb.append("\\u003c");
+            else sb.append(c);
+        }
+        return sb.append("'").toString();
     }
 
     @Override
