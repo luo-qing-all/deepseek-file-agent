@@ -225,7 +225,11 @@ public class MainActivity extends Activity {
                 if (p != null && !p.isEmpty()) return p;
             }
             String direct = queryDataColumn(uri);
-            if (direct != null) {
+            // [2.5.11] 排除相册选择器(PhotoPicker)返回的虚拟合成路径：
+            // 形如 /sdcard/.transforms/synthetic/picker_get_content/... ，
+            // 主进程 File.exists() 为真但内容是合成的，独立进程 ffmpeg 读不到有效数据。
+            // 这类路径强制走下方 copyUriToPrivate 复制出真实文件。
+            if (direct != null && direct.indexOf(".transforms/synthetic") < 0 && direct.indexOf("picker_get_content") < 0) {
                 File f = new File(direct);
                 if (f.exists() && f.canRead()) return direct;
             }
