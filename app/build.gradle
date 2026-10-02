@@ -100,6 +100,36 @@ android {
         abortOnError false
         checkReleaseBuilds false
     }
+
+    // ── [v28] 修复 CI 构建失败：DuplicateRelativeFileException ──────────
+    // BouncyCastle 的 bcprov-jdk18on / bcpkix-jdk18on 都是 multi-release JAR，
+    // 两个包各自都带一份 META-INF/versions/9/OSGI-INF/MANIFEST.MF 与
+    // META-INF/versions/9/module-info.class；打包合并时同名冲突，
+    // Gradle 直接抛 "3 files found with path ..."，构建中断。
+    // 这些是 Java 9+ 模块系统 / OSGi 的元数据，Android 运行时完全用不到，
+    // 显式排除即可（同时排除 JAR 自带签名，避免与 APK 签名冲突）。
+    packaging {
+        resources {
+            excludes += [
+                // 整个 multi-release 目录：Android(ART) 用不到 versions/* 的内容，
+                // 而 bcprov / bcpkix / bcutil 三个 jar 都带一份 versions/9/OSGI-INF/MANIFEST.MF
+                // 与 versions/9/module-info.class，合并打包时同名冲突（3 files found）导致构建中断。
+                // 一并用通配排除，避免遗漏其它版本目录（11/15/21）。
+                'META-INF/versions/**',
+                'META-INF/DEPENDENCIES',
+                'META-INF/INDEX.LIST',
+                'META-INF/LICENSE',
+                'META-INF/LICENSE.txt',
+                'META-INF/LICENSE.html',
+                'META-INF/NOTICE',
+                'META-INF/NOTICE.txt',
+                'META-INF/NOTICE.html',
+                'META-INF/*.SF',
+                'META-INF/*.DSA',
+                'META-INF/*.RSA'
+            ]
+        }
+    }
 }
 
 dependencies {
