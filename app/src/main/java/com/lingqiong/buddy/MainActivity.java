@@ -8,6 +8,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.Signature;
 import android.database.Cursor;
 import android.net.Uri;
+import android.net.VpnService;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
@@ -45,6 +46,7 @@ public class MainActivity extends Activity {
     private ValueCallback<Uri[]> filePathCallback;
     private static final int FILE_CHOOSER_REQ = 1001;
     private static final int PERM_REQ = 2001;
+    private static final int VPN_REQ = 3001;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -66,6 +68,7 @@ public class MainActivity extends Activity {
         webView.addJavascriptInterface(new ShizukuBridge(this), "AndroidShizuku");
         webView.addJavascriptInterface(new TermuxBridge(this), "AndroidTermux");
         webView.addJavascriptInterface(new SystemBridge(), "AndroidSystem");
+        webView.addJavascriptInterface(new CaptureBridge(), "AndroidCapture");
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
@@ -164,6 +167,16 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == VPN_REQ) {
+            if (resultCode == Activity.RESULT_OK) {
+                try {
+                    Intent svc = new Intent(this, CaptureVpnService.class);
+                    svc.setAction(CaptureVpnService.ACTION_START);
+                    startService(svc);
+                } catch (Throwable ignore) {}
+            }
+            return;
+        }
         if (requestCode == FILE_CHOOSER_REQ) {
             if (filePathCallback == null) return;
             Uri[] results = null;
@@ -432,6 +445,59 @@ public class MainActivity extends Activity {
                 }
             });
         }
+    }
+
+    /** [v27] 抓包桥：前端通过 window.AndroidCapture 控制 VPN 抓包。 */
+    public class CaptureBridge {
+        @JavascriptInterface
+        public boolean isRunning() { return CaptureVpnService.isRunning(); }
+
+        @JavascriptInterface
+        public String start() {
+            try {
+                Intent prep = VpnService.prepare(MainActivity.this);
+                if (prep != null) {
+                    runOnUiThread(new Runnable() {
+                        public void run() {
+                            try { startActivityForResult(prep, VPN_REQ); } catch (Throwable ignore) {}
+                        }
+                    });
+                    return "need_auth";
+                }
+                runOnUiThread(new Runnable() {
+                    public void run() {
+                        try {
+                            Intent svc = new Intent(MainActivity.this, CaptureVpnService.class);
+                            svc.setAction(CaptureVpnService.ACTION_START);
+                            startService(svc);
+                        } catch (Throwable ignore) {}
+                    }
+                });
+                return "starting";
+            } catch (Throwable t) { return "error:" + t.getMessage(); }
+        }
+
+        @JavascriptInterface
+        public void stop() {
+            runOnUiThread(new Runnable() {
+                public void run() {
+                    try {
+                        Intent svc = new Intent(MainActivity.this, CaptureVpnService.class);
+                        svc.setAction(CaptureVpnService.ACTION_STOP);
+                        startService(svc);
+                    } catch (Throwable ignore) {}
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public String list() { return CaptureStore.toJson(); }
+
+        @JavascriptInterface
+        public int count() { return CaptureStore.size(); }
+
+        @JavascriptInterface
+        public void clear() { CaptureStore.clear(); }
     }
 
     public class SystemBridge {
