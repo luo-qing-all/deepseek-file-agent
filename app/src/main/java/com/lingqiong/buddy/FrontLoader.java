@@ -1,12 +1,13 @@
 package com.lingqiong.buddy;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -60,18 +61,55 @@ public class FrontLoader {
         try {
             String json = httpGet(packUrl, timeoutMs);
             String html = FrontCrypto.decode(json, PUB_PEM);   // 验签/解密任一失败即抛异常
-            try { Files.write(Paths.get(cachePath), json.getBytes("UTF-8")); } catch (Throwable ignore) {}
+            writeText(cachePath, json);
             return html;
         } catch (Throwable netErr) {
             // ② 回退本地缓存
             try {
-                if (Files.exists(Paths.get(cachePath))) {
-                    String json = new String(Files.readAllBytes(Paths.get(cachePath)), "UTF-8");
+                if (new File(cachePath).exists()) {
+                    String json = readText(cachePath);
                     return FrontCrypto.decode(json, PUB_PEM);
                 }
             } catch (Throwable ignore) {}
             return null;
         }
+    }
+
+    // ═══════════════ [minSdk 24 兼容] java.io 读写 ═══════════════
+    // 原来用的是 java.nio.file.Files/Paths，但那是 Android API 26 才有的类，
+    // 降到 minSdk 24 后会在运行期 NoClassDefFoundError，故改为纯 java.io 实现。
+
+    /** 覆盖写入文本（UTF-8）。失败静默——与原 Files.write 外裹 try/catch 的语义一致。 */
+    private static void writeText(String path, String text) {
+        try {
+            FileOutputStream o = new FileOutputStream(path);
+            try { o.write(text.getBytes("UTF-8")); } finally { o.close(); }
+        } catch (Throwable ignore) {}
+    }
+
+    /** 读取整个文件的字节。 */
+    static byte[] readBytes(String path) throws IOException {
+        File f = new File(path);
+        FileInputStream in = new FileInputStream(f);
+        try {
+            int len = (int) Math.min(f.length(), (long) Integer.MAX_VALUE);
+            byte[] b = new byte[len > 0 ? len : 0];
+            int off = 0, n;
+            while (off < b.length && (n = in.read(b, off, b.length - off)) > 0) off += n;
+            if (off < b.length) {
+                byte[] t = new byte[off];
+                System.arraycopy(b, 0, t, 0, off);
+                return t;
+            }
+            return b;
+        } finally {
+            in.close();
+        }
+    }
+
+    /** 读取整个文件的文本（UTF-8）。 */
+    static String readText(String path) throws IOException {
+        return new String(readBytes(path), "UTF-8");
     }
 
     static String httpGet(String urlStr, int timeoutMs) throws IOException {
@@ -141,8 +179,8 @@ public class FrontLoader {
     /** 读本地缓存包头版本号（缓存是加密态 json，头部同样有明文 v）。无缓存/损坏返回 -1。 */
     static int localVersion(String cachePath) {
         try {
-            if (!Files.exists(Paths.get(cachePath))) return -1;
-            byte[] all = Files.readAllBytes(Paths.get(cachePath));
+            if (!new File(cachePath).exists()) return -1;
+            byte[] all = readBytes(cachePath);
             int n = Math.min(all.length, 256);
             return parseVersion(new String(all, 0, n, "UTF-8"));
         } catch (Throwable t) {
@@ -175,7 +213,7 @@ public class FrontLoader {
 
         if (!needDownload) {
             try {
-                String json = new String(Files.readAllBytes(Paths.get(cachePath)), "UTF-8");
+                String json = readText(cachePath);
                 return FrontCrypto.decode(json, PUB_PEM);
             } catch (Throwable ignore) {
                 // 缓存损坏 → 强制走下载
@@ -186,13 +224,13 @@ public class FrontLoader {
             if (cb != null) cb.onStatus(remoteV > 0 ? ("发现新版本 v" + remoteV + "，开始下载…") : "正在下载…");
             String json = httpGetWithProgress(packUrl, cb);
             String html = FrontCrypto.decode(json, PUB_PEM);
-            try { Files.write(Paths.get(cachePath), json.getBytes("UTF-8")); } catch (Throwable ignore) {}
+            writeText(cachePath, json);
             return html;
         } catch (Throwable netErr) {
             if (cb != null) cb.onStatus("下载失败，尝试使用本地缓存…");
             try {
-                if (Files.exists(Paths.get(cachePath))) {
-                    String json = new String(Files.readAllBytes(Paths.get(cachePath)), "UTF-8");
+                if (new File(cachePath).exists()) {
+                    String json = readText(cachePath);
                     return FrontCrypto.decode(json, PUB_PEM);
                 }
             } catch (Throwable ignore) {}

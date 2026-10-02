@@ -48,7 +48,12 @@ android {
         //     · applicationId ≠ com.termux → 与官方 Termux 可以并存，互不干扰。
         //   若你想换包名：改成任意 10 字符的包名即可，并同步改 .github/workflows/build.yml 里的 APP_ID。
         applicationId "com.lq.app"
-        minSdk 26
+        // [minSdk 24] 2026-10-02：本行 26 → 24（支持 Android 7.0+，原 8.0+）。
+        // 降到 24 前已把全部 API 26+ 调用清掉：
+        //   · java.nio.file.Files/Paths → java.io（FrontLoader / FrontCrypto）
+        //   · java.util.Base64        → 内置 B64（FrontCrypto，启动路径）
+        // coreLibraryDesugaring 保持开启（java.time / stream 等兜底）。
+        minSdk 24
 
         // ★ 关键：targetSdk 必须是 28。
         //   Android 10+ 只对 targetSdk>=29 的应用禁止"从私有目录执行二进制"(W^X)，
