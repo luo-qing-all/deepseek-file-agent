@@ -5,6 +5,7 @@ import android.os.ParcelFileDescriptor;
 
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -32,6 +33,12 @@ public class CaptureEngine implements Runnable {
 
     private final ConcurrentHashMap<String, TcpConn> tcpConns = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, UdpConn> udpConns = new ConcurrentHashMap<>();
+
+    // [v28] HTTPS 解密（MITM）
+    private volatile MitmCa mitm = null;
+    private volatile boolean decryptHttps = false;
+
+    public void setMitm(MitmCa ca, boolean decrypt) { this.mitm = ca; this.decryptHttps = decrypt; }
 
     public CaptureEngine(ParcelFileDescriptor tun, VpnService service) {
         this.tun = tun;
@@ -148,6 +155,13 @@ public class CaptureEngine implements Runnable {
     }
 
     private void connectServer(final TcpConn c) {
+        if (mitm != null && decryptHttps && c.dstPort == 443) {
+            // [v28] MITM：不直连真实服务器，等客户端 ClientHello 后再建解密通道
+            c.mitmPending = true;
+            sendTcp(c.dstIp, c.srcIp, c.dstPort, c.srcPort, c.mySeq, c.clientSeq, 0x12, null, 0); // SYN|ACK
+            c.mySeq = (c.mySeq + 1) & 0xffffffffL;
+            return;
+        }
         try {
             Socket s = new Socket();
             s.setTcpNoDelay(true);
@@ -189,7 +203,50 @@ public class CaptureEngine implements Runnable {
         if (c == null) return;
         c.closed = true;
         try { if (c.sock != null) c.sock.close(); } catch (Throwable ignore) {}
+        try { if (c.mitmT != null) c.mitmT.close(); } catch (Throwable ignore) {}
+        try { if (c.localSock != null) c.localSock.close(); } catch (Throwable ignore) {}
         tcpConns.remove(c.key);
+    }
+
+    // ============================ [v28] MITM 解密 ============================
+    private void handleMitmClientData(TcpConn c, byte[] p, int off, int len) {
+        try {
+            if (c.mitmPending) {
+                String sni = parseSni(p, off, Math.min(len, 4096));
+                if (sni == null || sni.isEmpty()) sni = (c.record != null && c.record.host != null && !c.record.host.isEmpty()) ? c.record.host : ipStr(c.dstIp);
+                c.mitmT = new MitmTerminator(mitm, sni, c.dstIp, c.dstPort, c.record, service);
+                int port = c.mitmT.start();
+                Socket ls = new Socket("127.0.0.1", port);
+                ls.setTcpNoDelay(true);
+                c.localSock = ls;
+                c.localOut = ls.getOutputStream();
+                c.mitmPending = false;
+                c.mitmReady = true;
+                new Thread(new Runnable() { public void run() { readLocal(c); } }, "cap-mitm-read").start();
+            }
+            if (c.localOut != null) { c.localOut.write(p, off, len); c.localOut.flush(); }
+        } catch (Throwable e) {
+            if (c.record != null) CaptureStore.addLog(c.record, "✗ 解密转发失败: " + e.getClass().getSimpleName());
+            closeTcp(c);
+        }
+    }
+
+    private void readLocal(TcpConn c) {
+        byte[] buf = new byte[16384];
+        try {
+            InputStream in2 = c.localSock.getInputStream();
+            int n;
+            while (running && !c.closed && (n = in2.read(buf)) > 0) {
+                sendTcp(c.dstIp, c.srcIp, c.dstPort, c.srcPort, c.mySeq, c.clientSeq, 0x18, buf, n);
+                c.mySeq = (c.mySeq + n) & 0xffffffffL;
+                if (c.record != null) c.record.down += n;
+            }
+        } catch (Throwable ignore) {}
+        try {
+            sendTcp(c.dstIp, c.srcIp, c.dstPort, c.srcPort, c.mySeq, c.clientSeq, 0x11, null, 0);
+            c.mySeq = (c.mySeq + 1) & 0xffffffffL;
+        } catch (Throwable ignore) {}
+        closeTcp(c);
     }
 
     // ============================ UDP ============================
@@ -332,6 +389,7 @@ public class CaptureEngine implements Runnable {
 
     // ============================ 解析：HTTP / TLS / DNS ============================
     private void onClientData(TcpConn c, byte[] p, int off, int len) {
+        if (c.mitmPending || c.mitmReady) { handleMitmClientData(c, p, off, len); return; }
         try {
             int cap = Math.min(len, 4096);
             String s = new String(p, off, cap, StandardCharsets.ISO_8859_1);
@@ -501,6 +559,12 @@ public class CaptureEngine implements Runnable {
         long clientSeq;
         volatile boolean closed = false;
         CaptureStore.Entry record;
+        // [v28] MITM 状态
+        volatile boolean mitmPending = false;
+        volatile boolean mitmReady = false;
+        MitmTerminator mitmT;
+        Socket localSock;
+        java.io.OutputStream localOut;
 
         TcpConn(String key, byte[] srcIp, byte[] dstIp, int srcPort, int dstPort) {
             this.key = key;

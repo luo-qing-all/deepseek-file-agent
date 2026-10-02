@@ -26,11 +26,27 @@ public class CaptureVpnService extends VpnService {
     private static final String CH_ID = "lq_capture";
     private static final int NOTI_ID = 0x4C71; // 'LQ'
 
+    /** [v28] 是否开启「解密 HTTPS」。 */
+    public static volatile boolean decryptHttps = false;
+    private static MitmCa staticMitmCa;
+
     private static volatile CaptureVpnService instance;
     private ParcelFileDescriptor tun;
     private Thread engineThread;
     private CaptureEngine engine;
     private volatile boolean running = false;
+
+    /** [v28] 惰性创建/获取 MITM CA（供抓包与装证书共用）。 */
+    public static MitmCa ensureMitmCa(Context ctx) {
+        if (staticMitmCa == null) {
+            synchronized (CaptureVpnService.class) {
+                if (staticMitmCa == null) {
+                    try { staticMitmCa = new MitmCa(ctx); } catch (Throwable ignore) {}
+                }
+            }
+        }
+        return staticMitmCa;
+    }
 
     public static boolean isRunning() {
         CaptureVpnService s = instance;
@@ -98,6 +114,10 @@ public class CaptureVpnService extends VpnService {
                 return;
             }
             engine = new CaptureEngine(tun, this);
+            if (decryptHttps) {
+                MitmCa ca = ensureMitmCa(this);
+                if (ca != null) engine.setMitm(ca, true);
+            }
             engineThread = new Thread(engine, "cap-engine");
             engineThread.start();
             running = true;

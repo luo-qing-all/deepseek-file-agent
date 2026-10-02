@@ -498,6 +498,48 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public void clear() { CaptureStore.clear(); }
+
+        // [v28] HTTPS 解密开关 + 根证书安装
+        @JavascriptInterface
+        public void setDecryptHttps(boolean b) { CaptureVpnService.decryptHttps = b; }
+
+        @JavascriptInterface
+        public boolean getDecryptHttps() { return CaptureVpnService.decryptHttps; }
+
+        @JavascriptInterface
+        public String caStatus() {
+            try {
+                MitmCa ca = CaptureVpnService.ensureMitmCa(MainActivity.this);
+                JSONObject o = new JSONObject();
+                o.put("hasRoot", RootCaInstaller.hasRoot());
+                o.put("installed", ca != null && RootCaInstaller.isInstalled(ca));
+                return o.toString();
+            } catch (Throwable t) { return "{}"; }
+        }
+
+        @JavascriptInterface
+        public String installCa() {
+            try {
+                MitmCa ca = CaptureVpnService.ensureMitmCa(MainActivity.this);
+                if (ca == null) return "{\"ok\":false,\"message\":\"CA 初始化失败\"}";
+                RootCaInstaller.Result r = RootCaInstaller.install(MainActivity.this, ca);
+                JSONObject o = new JSONObject();
+                o.put("ok", r.ok);
+                o.put("hasRoot", r.hasRoot);
+                o.put("message", r.message);
+                return o.toString();
+            } catch (Throwable t) { return "{\"ok\":false,\"message\":\"安装异常\"}"; }
+        }
+
+        @JavascriptInterface
+        public String exportCa() {
+            try {
+                MitmCa ca = CaptureVpnService.ensureMitmCa(MainActivity.this);
+                if (ca == null) return "";
+                String p = RootCaInstaller.exportPem(ca);
+                return p == null ? "" : p;
+            } catch (Throwable t) { return ""; }
+        }
     }
 
     public class SystemBridge {
