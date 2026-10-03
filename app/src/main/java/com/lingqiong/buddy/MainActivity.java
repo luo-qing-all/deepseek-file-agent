@@ -2,6 +2,11 @@ package com.lingqiong.buddy;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
@@ -12,6 +17,7 @@ import android.net.VpnService;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.PowerManager;
 import android.provider.Settings;
 import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
@@ -47,6 +53,14 @@ public class MainActivity extends Activity {
     private static final int FILE_CHOOSER_REQ = 1001;
     private static final int PERM_REQ = 2001;
     private static final int VPN_REQ = 3001;
+
+    /* ===== [2.6.0] 后台持续运行 + 完成通知 ===== */
+    private static final String WORK_CHANNEL_ID = "lq_ai_work";
+    private static final String DONE_CHANNEL_ID = "lq_ai_done";
+    private static final int WORK_NOTI_ID = 20001;
+    private static final int DONE_NOTI_ID = 20002;
+    private volatile boolean isForeground = false;
+    private PowerManager.WakeLock wakeLock;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -162,6 +176,99 @@ public class MainActivity extends Activity {
                 }, PERM_REQ);
             }
         }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        isForeground = false;
+    }
+
+    @Override
+    protected void onDestroy() {
+        try { releaseWake(); } catch (Throwable ignore) {}
+        super.onDestroy();
+    }
+
+    /* ===== [2.6.0] AI 后台持续运行 + 完成通知 ===== */
+
+    /** 获取 CPU 唤醒锁：熄屏时 CPU 不休眠，WebView 的 AI 流式输出得以继续。 */
+    private void acquireWake() {
+        try {
+            if (wakeLock == null) {
+                PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+                if (pm == null) return;
+                wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "lq:ai_work");
+                wakeLock.setReferenceCounted(false);
+            }
+            if (!wakeLock.isHeld()) wakeLock.acquire(30L * 60L * 1000L);   // 30 分钟兜底自动释放
+        } catch (Throwable ignore) {}
+    }
+
+    private void releaseWake() {
+        try { if (wakeLock != null && wakeLock.isHeld()) wakeLock.release(); } catch (Throwable ignore) {}
+    }
+
+    /** 生成开始：持有唤醒锁 + 启动前台服务（防止 App 切后台/熄屏被冻结）。 */
+    public void workBegin(final String title) {
+        runOnUiThread(new Runnable() { public void run() {
+            acquireWake();
+            try {
+                Intent svc = new Intent(MainActivity.this, LqbForegroundService.class);
+                svc.setAction(LqbForegroundService.ACTION_START);
+                svc.putExtra(LqbForegroundService.EXTRA_TITLE, title == null ? "AI 正在生成" : title);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(svc);
+                else startService(svc);
+            } catch (Throwable ignore) {}
+        }});
+    }
+
+    /** 生成结束：释放唤醒锁 + 停止前台服务；后台运行或耗时较长时发「完成」通知。 */
+    public void workEnd(final String convTitle, final String digest, final long elapsedMs) {
+        runOnUiThread(new Runnable() { public void run() {
+            releaseWake();
+            try { stopService(new Intent(MainActivity.this, LqbForegroundService.class)); } catch (Throwable ignore) {}
+            if (!isForeground || elapsedMs > 6000L) {
+                String head = (convTitle != null && convTitle.length() > 0) ? ("「" + convTitle + "」") : "";
+                String body = (digest != null && digest.length() > 0) ? digest : "AI 回复已完成";
+                sendDoneNotification(head + "AI 回复已完成", body);
+            }
+        }});
+    }
+
+    private void ensureChannel(String id, String name, int importance) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
+        try {
+            NotificationManager m = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            if (m == null || m.getNotificationChannel(id) != null) return;
+            NotificationChannel ch = new NotificationChannel(id, name, importance);
+            m.createNotificationChannel(ch);
+        } catch (Throwable ignore) {}
+    }
+
+    /** 在通知栏发出「AI 回复已完成」，点击可回到 App。 */
+    private void sendDoneNotification(String title, String body) {
+        try {
+            ensureChannel(DONE_CHANNEL_ID, "AI 完成提醒", NotificationManager.IMPORTANCE_DEFAULT);
+            NotificationManager m = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            if (m == null) return;
+            Intent open = new Intent(this, MainActivity.class);
+            open.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            int piFlag = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
+                    ? (PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE)
+                    : PendingIntent.FLAG_UPDATE_CURRENT;
+            PendingIntent pi = PendingIntent.getActivity(this, 0, open, piFlag);
+            Notification.Builder b = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                    ? new Notification.Builder(this, DONE_CHANNEL_ID)
+                    : new Notification.Builder(this);
+            b.setContentTitle(title == null ? "AI 回复已完成" : title)
+             .setContentText(body == null ? "" : body)
+             .setSmallIcon(getApplicationInfo().icon)
+             .setAutoCancel(true)
+             .setContentIntent(pi)
+             .setStyle(new Notification.BigTextStyle().bigText(body == null ? "" : body));
+            m.notify(DONE_NOTI_ID, b.build());
+        } catch (Throwable ignore) {}
     }
 
     @Override
@@ -437,6 +544,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        isForeground = true;
         // 用户从系统设置返回时，通知前端刷新权限状态
         if (webView != null) {
             webView.post(new Runnable() {
@@ -613,6 +721,15 @@ public class MainActivity extends Activity {
                     Toast.makeText(MainActivity.this, msg, Toast.LENGTH_SHORT).show();
                 }
             });
+        }
+
+        /* ===== [2.6.0] AI 后台运行 + 完成通知（前端在生成开始/结束时调用） ===== */
+        @JavascriptInterface
+        public void beginWork(String title) { MainActivity.this.workBegin(title); }
+
+        @JavascriptInterface
+        public void endWork(String convTitle, String digest, long elapsedMs) {
+            MainActivity.this.workEnd(convTitle, digest, elapsedMs);
         }
     }
 }
