@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">LingQiongBuddy</string>
+    <string name="a11y_desc">「AI 操作手机」：在你授权后，让 AI 代替你点按屏幕（读取界面文字、点击、滑动、返回、打开其它 App），用于完成填表、跨 App 操作等任务。仅在 AI 调用对应工具时工作，不会在后台自行操作手机，也不会上传屏幕内容。</string>
+</resources>

@@ -82,6 +82,7 @@ public class MainActivity extends Activity {
         webView.addJavascriptInterface(new ShizukuBridge(this), "AndroidShizuku");
         webView.addJavascriptInterface(new TermuxBridge(this), "AndroidTermux");
         webView.addJavascriptInterface(new SystemBridge(), "AndroidSystem");
+        webView.addJavascriptInterface(new A11yBridge(), "AndroidA11y");
         webView.addJavascriptInterface(new CaptureBridge(), "AndroidCapture");
 
         webView.setWebViewClient(new WebViewClient() {
@@ -650,6 +651,73 @@ public class MainActivity extends Activity {
         }
     }
 
+
+    /* ===== [v43] AI 操作手机：无障碍桥接（前端 window.AndroidA11y） ===== */
+    public class A11yBridge {
+        @JavascriptInterface
+        public boolean isEnabled() { return LqbAccessibilityService.isEnabled(); }
+
+        /** 打开系统无障碍设置页（引导用户手动开启，不强制）。 */
+        @JavascriptInterface
+        public void openSettings() {
+            runOnUiThread(new Runnable() { public void run() {
+                try {
+                    Intent i = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
+                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(i);
+                    Toast.makeText(MainActivity.this, "请在系统列表中找到并开启「LingQiongBuddy」", Toast.LENGTH_LONG).show();
+                } catch (Exception e) {
+                    Toast.makeText(MainActivity.this, "无法打开无障碍设置", Toast.LENGTH_SHORT).show();
+                }
+            }});
+        }
+
+        @JavascriptInterface
+        public boolean tap(float x, float y) { return LqbAccessibilityService.tap(x, y); }
+
+        @JavascriptInterface
+        public boolean longPress(float x, float y, long dur) { return LqbAccessibilityService.longPress(x, y, dur); }
+
+        @JavascriptInterface
+        public boolean swipe(float x1, float y1, float x2, float y2, long dur) {
+            return LqbAccessibilityService.swipe(x1, y1, x2, y2, dur);
+        }
+
+        @JavascriptInterface
+        public boolean key(String name) { return LqbAccessibilityService.globalAction(name); }
+
+        @JavascriptInterface
+        public String readScreen() { return LqbAccessibilityService.readScreen(); }
+
+        /** 按应用名或包名打开 App。 */
+        @JavascriptInterface
+        public String openApp(String q) {
+            if (q == null || q.trim().isEmpty()) return "错误：未提供应用名";
+            String query = q.trim();
+            try {
+                PackageManager pm = getPackageManager();
+                Intent launch = pm.getLaunchIntentForPackage(query);
+                if (launch == null) {
+                    String low = query.toLowerCase();
+                    java.util.List<android.content.pm.ApplicationInfo> apps = pm.getInstalledApplications(0);
+                    for (android.content.pm.ApplicationInfo ai : apps) {
+                        String label = String.valueOf(pm.getApplicationLabel(ai));
+                        if (label.toLowerCase().contains(low) || ai.packageName.toLowerCase().contains(low)) {
+                            launch = pm.getLaunchIntentForPackage(ai.packageName);
+                            if (launch != null) break;
+                        }
+                    }
+                }
+                if (launch == null) return "未找到应用：" + q;
+                launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(launch);
+                return "ok";
+            } catch (Exception e) {
+                return "打开失败：" + (e.getMessage() == null ? "未知错误" : e.getMessage());
+            }
+        }
+    }
+
     public class SystemBridge {
         @JavascriptInterface
         public String getSdkVersion() {
@@ -721,6 +789,17 @@ public class MainActivity extends Activity {
                     Toast.makeText(MainActivity.this, msg, Toast.LENGTH_SHORT).show();
                 }
             });
+        }
+
+        /* ===== [v43] 定时任务：前端同步全部任务 & 取走到点待执行队列 ===== */
+        @JavascriptInterface
+        public void syncSchedules(String json) {
+            try { ScheduleManager.apply(MainActivity.this, json == null ? "[]" : json); } catch (Throwable ignore) {}
+        }
+
+        @JavascriptInterface
+        public String takePendingSchedule() {
+            try { return ScheduleStore.takePending(MainActivity.this); } catch (Throwable t) { return "[]"; }
         }
 
         /* ===== [2.6.0] AI 后台运行 + 完成通知（前端在生成开始/结束时调用） ===== */
