@@ -131,6 +131,11 @@ jobs:
 
           yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
           "$SDKMANAGER" "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+          # ── [加固 v2] NDK + CMake：编译 native 库 liblqkey.so（内嵌包密钥解包私钥）──
+          # 版本必须与 app/build.gradle 里的 ndkVersion / cmake version 保持一致。
+          "$SDKMANAGER" "ndk;25.1.8937393" "cmake;3.22.1"
+          echo "== NDK =="; ls "$ANDROID_HOME/ndk" 2>/dev/null || true
+          echo "== CMake =="; ls "$ANDROID_HOME/cmake" 2>/dev/null || true
 
       - name: 准备 Gradle（本仓库无 gradlew，故直接安装 Gradle）
         uses: gradle/actions/setup-gradle@v4
@@ -174,6 +179,6 @@ jobs:
       - name: 上传 APK（在本次运行的 Artifacts 里下载）
         uses: actions/upload-artifact@v4
         with:
-          name: LingQiongBuddy-2.6.0-release
+          name: LingQiongBuddy-2.7.1-release
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error

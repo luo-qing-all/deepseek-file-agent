@@ -29,6 +29,13 @@ public class FrontLoader {
     /** 前端加密包地址（服务器只需把这个静态文件放上来，无需任何密码学依赖）。 */
     public static final String PACK_URL = "https://lingqiong.top/front_pack.json";
 
+    /**
+     * [加固 v2] 新格式前端包地址：AES 密钥以 ekey 形式下发（由 native 私钥解包），
+     * 因此即使该文件被公开下载，也无法还原出前端源码。
+     * 旧格式 PACK_URL 保留，用于：① 新包不可用时的降级；② 兼容旧版 App。
+     */
+    public static final String PACK_URL_V2 = "https://lingqiong.top/front_pack2.json";
+
     /** 内置验签公钥（RSA-2048，与服务器私钥配对）。 */
     public static final String PUB_PEM =
         "-----BEGIN PUBLIC KEY-----\n"
@@ -234,6 +241,97 @@ public class FrontLoader {
                     return FrontCrypto.decode(json, PUB_PEM);
                 }
             } catch (Throwable ignore) {}
+            return null;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  [加固 v2] 新加载入口：v2 优先 → v1 回退 → 缓存兜底
+    //  设计要点：任何一步失败都只"降级"，绝不把异常抛到调用方（绝不闪退）。
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * 新加载入口。
+     * @param v2Url  新格式包地址（可为 null/空 = 跳过）
+     * @param v2Cache v2 本地缓存路径（存加密态）
+     * @param v1Url  旧格式包地址（可为 null/空 = 跳过）
+     * @param v1Cache v1 本地缓存路径
+     * @return 解密后的 HTML；全部失败返回 null。
+     */
+    public static String load(String v2Url, String v2Cache, String v1Url, String v1Cache,
+                              int timeoutMs, Progress cb) {
+        // ① 优先 v2
+        if (v2Url != null && v2Url.length() > 0) {
+            try {
+                String h = loadOne(v2Url, v2Cache, timeoutMs, cb);
+                if (h != null) return h;
+            } catch (Throwable ignore) { /* 降级 */ }
+        }
+        // ② 回退 v1
+        if (v1Url != null && v1Url.length() > 0) {
+            try {
+                String h = loadOne(v1Url, v1Cache, timeoutMs, cb);
+                if (h != null) return h;
+            } catch (Throwable ignore) { /* 降级 */ }
+        }
+        // ③ 缓存兜底
+        String h = tryCache(v2Cache);
+        if (h != null) return h;
+        return tryCache(v1Cache);
+    }
+
+    /** 单来源加载：版本对比 → 下载/用缓存 → 解码 → 落缓存。失败返回 null。 */
+    private static String loadOne(String url, String cachePath, int timeoutMs, Progress cb) {
+        int localV = localVersion(cachePath);
+        if (cb != null) cb.onStatus("正在检查更新…");
+        int remoteV = fetchRemoteVersion(url, timeoutMs);
+
+        boolean needDownload;
+        if (remoteV < 0) {
+            needDownload = (localV < 0);
+            if (!needDownload && cb != null) cb.onStatus("使用本地版本启动…");
+        } else if (localV < 0) {
+            needDownload = true;
+        } else {
+            needDownload = (remoteV > localV);
+            if (!needDownload && cb != null) cb.onStatus("已是最新版本，正在启动…");
+        }
+
+        if (!needDownload) {
+            try {
+                return decodeAny(readText(cachePath));
+            } catch (Throwable ignore) { /* 缓存坏了 → 强制下载 */ }
+        }
+
+        try {
+            if (cb != null) cb.onStatus(remoteV > 0 ? ("发现新版本 v" + remoteV + "，开始下载…") : "正在下载…");
+            String json = httpGetWithProgress(url, cb);
+            String html = decodeAny(json);      // 先解码；失败则抛，不写入坏缓存
+            writeText(cachePath, json);
+            return html;
+        } catch (Throwable netErr) {
+            if (cb != null) cb.onStatus("下载失败，尝试使用本地缓存…");
+            try {
+                if (new File(cachePath).exists()) return decodeAny(readText(cachePath));
+            } catch (Throwable ignore) {}
+            return null;
+        }
+    }
+
+    /** 按内容自动识别格式解码：含 ekey → v2（native 解包）；否则 v1（旧明文 key）。 */
+    private static String decodeAny(String json) throws Exception {
+        if (json != null && json.indexOf("\"ekey\"") >= 0) {
+            return FrontCrypto.decodeV2(json, PUB_PEM);
+        }
+        return FrontCrypto.decode(json, PUB_PEM);
+    }
+
+    /** 读缓存并解码；任何失败返回 null。 */
+    private static String tryCache(String cachePath) {
+        try {
+            if (cachePath == null || !new File(cachePath).exists()) return null;
+            return decodeAny(readText(cachePath));
+        } catch (Throwable t) {
             return null;
         }
     }

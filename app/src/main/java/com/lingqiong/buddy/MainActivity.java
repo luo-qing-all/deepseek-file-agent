@@ -123,10 +123,16 @@ public class MainActivity extends Activity {
         // 首次需联网；之后可用本地缓存（加密态）离线兜底。
         webView.loadDataWithBaseURL("file:///android_asset/", LOADING_HTML, "text/html", "utf-8", null);
         final String cachePath = new File(getFilesDir(), "front_pack.json").getAbsolutePath();
+        // [加固 v2] 新格式独立缓存（存加密态）。v2 解密需要 native 私钥，
+        // 若 native 不可用会自动降级到下面的 v1 通道，不影响启动。
+        final String cachePathV2 = new File(getFilesDir(), "front_pack2.json").getAbsolutePath();
         new Thread(new Runnable() {
             @Override public void run() {
                 // [2.5.5] 版本对比 + 不限时下载 + 进度回调（进度条实时更新）
-                final String html = FrontLoader.load(FrontLoader.PACK_URL, cachePath, 15000, new FrontLoader.Progress() {
+                final String html = FrontLoader.load(
+                        FrontLoader.PACK_URL_V2, cachePathV2,
+                        FrontLoader.PACK_URL, cachePath,
+                        15000, new FrontLoader.Progress() {
                     @Override public void onStatus(final String msg) {
                         webView.post(new Runnable() { @Override public void run() {
                             webView.evaluateJavascript("window.__lqStatus&&window.__lqStatus(" + jsStr(msg) + ")", null);

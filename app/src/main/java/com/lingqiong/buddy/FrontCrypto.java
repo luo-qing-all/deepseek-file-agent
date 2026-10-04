@@ -6,6 +6,10 @@ import java.security.spec.X509EncodedKeySpec;
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import javax.crypto.spec.OAEPParameterSpec;
+import javax.crypto.spec.PSource;
+import java.security.spec.MGF1ParameterSpec;
+import java.security.spec.PKCS8EncodedKeySpec;
 
 /**
  * FrontCrypto —— 客户端解密核心（纯 JDK，可脱离 Android 单独编译验证）。
@@ -79,6 +83,63 @@ public class FrontCrypto {
         c.init(Cipher.DECRYPT_MODE, new SecretKeySpec(B64.decode(keyB), "AES"),
                 new GCMParameterSpec(128, B64.decode(ivB)));
         return new String(c.doFinal(B64.decode(cipherB)), "UTF-8");
+    }
+
+    /**
+     * [加固 v2] 解包流程（密钥不落地）：
+     *   ① 验签 (2|ekey|iv|cipher)                —— 防篡改
+     *   ② 用 native 私钥做 RSA-OAEP 解出 AES 密钥  —— 下载者也拿不到明文密钥
+     *   ③ AES-256-GCM 解密正文
+     * 任何一步失败都会抛异常，由 FrontLoader 捕获并降级（绝不闪退）。
+     */
+    public static String decodeV2(String json, String pubPem) throws Exception {
+        String ekeyB = grab(json, "ekey");
+        String ivB = grab(json, "iv");
+        String cipherB = grab(json, "cipher");
+        String sigB = grab(json, "sig");
+        if (ekeyB.length() == 0 || ivB.length() == 0 || cipherB.length() == 0 || sigB.length() == 0) {
+            throw new SecurityException("V2_MISSING_FIELDS");
+        }
+
+        // ① 验签
+        byte[] toSign = ("2|" + ekeyB + "|" + ivB + "|" + cipherB).getBytes("UTF-8");
+        Signature s = Signature.getInstance("SHA256withRSA");
+        s.initVerify(pubFromPem(pubPem));
+        s.update(toSign);
+        if (!s.verify(B64.decode(sigB))) throw new SecurityException("SIG_FAIL");
+
+        // ② 取 native 私钥并解包 ekey
+        byte[] der = NativeKey.privateDer();
+        if (der == null) throw new IllegalStateException("NATIVE_KEY_UNAVAILABLE");
+        PrivateKey priv = KeyFactory.getInstance("RSA")
+                .generatePrivate(new PKCS8EncodedKeySpec(der));
+
+        byte[] ek = B64.decode(ekeyB);
+        byte[] aesKey;
+        try {
+            // 标准：SHA-256 摘要 + MGF1(SHA-256)
+            aesKey = rsaUnwrap(priv, ek, "SHA-256");
+        } catch (Throwable t1) {
+            // 兼容：部分 Android 实现会忽略 OAEPParameterSpec 的 MGF1 参数而固定用 SHA-1，
+            // 此时上面会失败，这里用 MGF1(SHA-1) 再试一次（hash 仍是 SHA-256）。
+            aesKey = rsaUnwrap(priv, ek, "SHA-1");
+        }
+        if (aesKey == null || aesKey.length != 32) throw new SecurityException("EKEY_UNWRAP_FAIL");
+
+        // ③ AES-GCM 解密
+        Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
+        c.init(Cipher.DECRYPT_MODE, new SecretKeySpec(aesKey, "AES"),
+                new GCMParameterSpec(128, B64.decode(ivB)));
+        return new String(c.doFinal(B64.decode(cipherB)), "UTF-8");
+    }
+
+    /** RSA-OAEP 解包：hash=SHA-256，MGF1 摘要由参数指定（兼容不同 Android 实现）。 */
+    private static byte[] rsaUnwrap(PrivateKey priv, byte[] ek, String mgf1) throws Exception {
+        Cipher rc = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
+        OAEPParameterSpec oaep = new OAEPParameterSpec(
+                "SHA-256", "MGF1", new MGF1ParameterSpec(mgf1), PSource.PSpecified.DEFAULT);
+        rc.init(Cipher.DECRYPT_MODE, priv, oaep);
+        return rc.doFinal(ek);
     }
 
     static PublicKey pubFromPem(String pem) throws Exception {
