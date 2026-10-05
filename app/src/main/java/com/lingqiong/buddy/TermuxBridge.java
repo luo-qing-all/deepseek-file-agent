@@ -73,6 +73,9 @@ public class TermuxBridge {
 
     /** 单条命令默认超时（毫秒）。超时后强制结束，避免无限挂起。 */
     private static final long DEFAULT_TIMEOUT_MS = 600_000L;
+
+    /** [内置终端] 交互式会话兜底超时（24 小时），避免长驻 shell 被默认 10 分钟超时误杀。 */
+    private static final long SESSION_TIMEOUT_MS = 86_400_000L;
     /** 打包/还原整个 Termux 环境可能很慢（体积大），单独放宽到 1 小时。 */
     private static final long ENV_TAR_TIMEOUT_MS = 3_600_000L;
     /** 单次执行保留的最大输出字符数，防止超大输出撑爆内存。 */
@@ -358,6 +361,8 @@ public class TermuxBridge {
         volatile Process proc;
         volatile OutputStream stdin;
         volatile long timeoutMs = DEFAULT_TIMEOUT_MS;
+        /** 因滚动缓冲丢弃的头部字符数（配合 execPollFrom 的绝对偏移）。 */
+        volatile long headDropped = 0;
         Task() {}
     }
 
@@ -367,10 +372,24 @@ public class TermuxBridge {
      */
     @JavascriptInterface
     public String execStart(String cmd, String cwd, String envId) {
+        return startTask(cmd, cwd, envId, DEFAULT_TIMEOUT_MS);
+    }
+
+    /**
+     * [内置终端] 启动一个长驻任务（交互式终端会话）。
+     * timeoutMs <= 0 时按 SESSION_TIMEOUT_MS（24 小时）兜底，避免交互会话被默认超时误杀。
+     */
+    @JavascriptInterface
+    public String execStartEx(String cmd, String cwd, String envId, long timeoutMs) {
+        return startTask(cmd, cwd, envId, timeoutMs > 0 ? timeoutMs : SESSION_TIMEOUT_MS);
+    }
+
+    private String startTask(String cmd, String cwd, String envId, long timeoutMs) {
         if (cmd == null || cmd.trim().isEmpty()) return "err:命令为空";
         if (!isReady()) return "err:内置 Termux 环境尚未安装，请先到「总设置 → Termux 环境」点安装。";
         String id = "t" + (++TASK_SEQ);
         Task t = new Task();
+        t.timeoutMs = timeoutMs;
         TASKS.put(id, t);
         final String fcmd = cmd, fcwd = cwd, fenv = envId;
         new Thread(new Runnable() {
@@ -401,7 +420,13 @@ public class TermuxBridge {
                     try {
                         while ((n = rd.read(cbuf)) != -1) {
                             synchronized (t.out) {
-                                if (t.out.length() < MAX_OUT) t.out.append(cbuf, 0, n);
+                                t.out.append(cbuf, 0, n);
+                                // 滚动缓冲：只保留最近 MAX_OUT 个字符（像真终端一样留住最新输出）
+                                if (t.out.length() > MAX_OUT) {
+                                    int drop = t.out.length() - MAX_OUT;
+                                    t.out.delete(0, drop);
+                                    t.headDropped += drop;
+                                }
                             }
                         }
                     } catch (Throwable ignore) {}
@@ -444,6 +469,34 @@ public class TermuxBridge {
         TASKS.remove(taskId);
         return "{\"state\":\"done\",\"code\":" + t.code + ",\"cost\":" + t.cost
                 + ",\"timedOut\":" + t.timedOut + ",\"out\":\"" + esc(out) + "\"}";
+    }
+
+    /**
+     * [内置终端] 增量轮询：只返回 offset 之后的新输出，避免每次回传整段缓冲。
+     * 返回 from（本次可用起点）/ next（下次应传入的 offset）/ out（新增内容）。
+     */
+    @JavascriptInterface
+    public String execPollFrom(String taskId, long offset) {
+        Task t = TASKS.get(taskId);
+        if (t == null) return "{\"state\":\"missing\"}";
+        String chunk;
+        long base, next;
+        synchronized (t.out) {
+            base = t.headDropped;
+            long end = base + t.out.length();
+            if (offset < base) offset = base;   // 已滚出缓冲的部分无法补发
+            if (offset > end) offset = end;
+            chunk = t.out.substring((int) (offset - base));
+            next = end;
+        }
+        if (!t.done) {
+            return "{\"state\":\"running\",\"from\":" + base + ",\"next\":" + next
+                    + ",\"out\":\"" + esc(chunk) + "\"}";
+        }
+        TASKS.remove(taskId);
+        return "{\"state\":\"done\",\"code\":" + t.code + ",\"cost\":" + t.cost
+                + ",\"timedOut\":" + t.timedOut + ",\"from\":" + base + ",\"next\":" + next
+                + ",\"out\":\"" + esc(chunk) + "\"}";
     }
 
     @JavascriptInterface
