@@ -232,7 +232,25 @@ public class ShizukuBridge {
 
     private static String esc(String s) {
         if (s == null) return "";
-        return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "");
+        StringBuilder sb = new StringBuilder(s.length() + 16);
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case '\\': sb.append("\\\\"); break;
+                case '"':  sb.append("\\\""); break;
+                case '\n': sb.append("\\n"); break;
+                case '\r': break;
+                case '\t': sb.append("\\t"); break;
+                default:
+                    if (c < 0x20) {
+                        sb.append("\\u");
+                        String h = Integer.toHexString(c);
+                        for (int k = h.length(); k < 4; k++) sb.append('0');
+                        sb.append(h);
+                    } else sb.append(c);
+            }
+        }
+        return sb.toString();
     }
 
     /** 单引号安全转义，用于包住路径/参数，防止命令注入 */

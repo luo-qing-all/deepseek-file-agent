@@ -834,8 +834,35 @@ exit 0
         try { return p.exitValue(); } catch (Throwable t) { return -1; }
     }
 
+    /**
+     * 转义成 JSON 字符串字面量。
+     * ★ 必须覆盖全部控制字符（U+0000–U+001F）：JSON 规范禁止字符串里出现裸控制字符。
+     *   此前只处理了 \\ " \n \r，漏掉了 ESC(0x1B) —— 而终端 PTY 输出必然带 ANSI
+     *   （\x1b[...），于是桥接返回值不是合法 JSON，前端 JSON.parse 抛错，
+     *   表现为「内置终端一打开就提示会话已断开 / 重启也一样」。
+     */
     private static String esc(String s) {
         if (s == null) return "";
-        return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "");
+        StringBuilder sb = new StringBuilder(s.length() + 16);
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case '\\': sb.append("\\\\"); break;
+                case '"':  sb.append("\\\""); break;
+                case '\n': sb.append("\\n"); break;
+                case '\r': break;                 // 终端里 \r 是行内覆盖，直接丢弃
+                case '\t': sb.append("\\t"); break;
+                default:
+                    if (c < 0x20) {                // 其余控制字符一律转义成 uXXXX 形式
+                        sb.append("\\u");
+                        String h = Integer.toHexString(c);
+                        for (int k = h.length(); k < 4; k++) sb.append('0');
+                        sb.append(h);
+                    } else {
+                        sb.append(c);
+                    }
+            }
+        }
+        return sb.toString();
     }
 }

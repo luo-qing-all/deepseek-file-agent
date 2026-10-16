@@ -768,6 +768,109 @@ public class MainActivity extends Activity {
             });
         }
 
+        /** [v56] 调起系统分享面板（用于「水晶主题」分享解锁等）。 */
+        @JavascriptInterface
+        public void share(final String text) {
+            runOnUiThread(new Runnable() {
+                public void run() {
+                    try {
+                        Intent i = new Intent(Intent.ACTION_SEND);
+                        i.setType("text/plain");
+                        i.putExtra(Intent.EXTRA_TEXT, text == null ? "" : text);
+                        Intent c = Intent.createChooser(i, "分享到");
+                        c.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        startActivity(c);
+                    } catch (Exception e) { Toast.makeText(MainActivity.this, "无法分享", Toast.LENGTH_SHORT).show(); }
+                }
+            });
+        }
+
+        /** [v56] 内存/进程概况（需求6）。无权限也能读到系统内存与本 App 内存。 */
+        @JavascriptInterface
+        public String memInfo() {
+            try {
+                org.json.JSONObject o = new org.json.JSONObject();
+                android.app.ActivityManager am = (android.app.ActivityManager) MainActivity.this.getSystemService(Context.ACTIVITY_SERVICE);
+                if (am != null) {
+                    android.app.ActivityManager.MemoryInfo mi = new android.app.ActivityManager.MemoryInfo();
+                    am.getMemoryInfo(mi);
+                    o.put("total", mi.totalMem);
+                    o.put("avail", mi.availMem);
+                    o.put("low", mi.lowMemory);
+                    o.put("threshold", mi.threshold);
+                }
+                Runtime rt = Runtime.getRuntime();
+                o.put("appHeapUsed", rt.totalMemory() - rt.freeMemory());
+                o.put("appHeapTotal", rt.totalMemory());
+                o.put("appHeapMax", rt.maxMemory());
+                int procs = 0;
+                try {
+                    String[] ps = new java.io.File("/proc").list();
+                    if (ps != null) for (String x : ps) { try { if (Integer.parseInt(x) > 0) procs++; } catch (Throwable ignore) {} }
+                } catch (Throwable ignore) {}
+                o.put("procCount", procs);
+                o.put("sdk", Build.VERSION.SDK_INT);
+                return o.toString();
+            } catch (Throwable t) { return "{\"err\":\"" + String.valueOf(t.getMessage()) + "\"}"; }
+        }
+
+        /** [v56] 用其他应用打开指定文件（弹出系统「打开方式」选择器）。 */
+        @JavascriptInterface
+        public void openFile(final String path, final String mime) {
+            if (path == null || path.trim().isEmpty()) return;
+            final String p = path;
+            final String m = (mime == null || mime.trim().isEmpty()) ? "*/*" : mime;
+            runOnUiThread(new Runnable() {
+                public void run() {
+                    try {
+                        java.io.File f = new java.io.File(p);
+                        if (!f.exists()) { Toast.makeText(MainActivity.this, "文件不存在：" + p, Toast.LENGTH_SHORT).show(); return; }
+                        Uri uri;
+                        try {
+                            uri = androidx.core.content.FileProvider.getUriForFile(MainActivity.this, getPackageName() + ".fileprovider", f);
+                        } catch (Throwable t) { uri = Uri.fromFile(f); }
+                        Intent i = new Intent(Intent.ACTION_VIEW);
+                        i.setDataAndType(uri, m);
+                        i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        Intent choose = Intent.createChooser(i, "选择打开方式");
+                        choose.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        startActivity(choose);
+                    } catch (Exception e) {
+                        Toast.makeText(MainActivity.this, "无法打开： " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                }
+            });
+        }
+
+        /** [v56] 用系统文件管理器打开某个目录。 */
+        @JavascriptInterface
+        public void openDir(final String path) {
+            if (path == null || path.trim().isEmpty()) return;
+            final String p = path;
+            runOnUiThread(new Runnable() {
+                public void run() {
+                    try {
+                        java.io.File f = new java.io.File(p);
+                        if (!f.exists()) { Toast.makeText(MainActivity.this, "目录不存在：" + p, Toast.LENGTH_SHORT).show(); return; }
+                        Uri uri;
+                        try {
+                            uri = androidx.core.content.FileProvider.getUriForFile(MainActivity.this, getPackageName() + ".fileprovider", f);
+                        } catch (Throwable t) { uri = Uri.fromFile(f); }
+                        Intent i = new Intent(Intent.ACTION_VIEW);
+                        i.setDataAndType(uri, "resource/folder");
+                        i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        Intent choose = Intent.createChooser(i, "选择文件管理器");
+                        choose.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        startActivity(choose);
+                    } catch (Exception e) {
+                        Toast.makeText(MainActivity.this, "无法打开目录（可用 App 内置文件浏览）", Toast.LENGTH_SHORT).show();
+                    }
+                }
+            });
+        }
+
         /** 宿主包名（com.lq.app，与官方 com.termux 等长，故可共存）。 */
         @JavascriptInterface
         public String getHostPackageName() { return getPackageName(); }
