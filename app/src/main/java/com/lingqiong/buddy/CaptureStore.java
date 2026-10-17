@@ -3,24 +3,39 @@ package com.lingqiong.buddy;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.Inflater;
 
 /**
  * [v27] 抓包记录的全局存储（内存态，供前端通过 JS 桥查询）。
  *
- * [v71] 重大升级 —— 旧版「看不到具体内容」的真凶在这里：
- *   1. 旧版每条只存 30 行 log、每行 500 字        → 正文被截成碎片
- *   2. 旧版【根本没有响应体字段】，onServerData 只取了状态行
- *   3. proto 只有 "TCP"/"UDP"                     → DNS/QUIC/HTTP/HTTPS 全糊在一起
+ * [v71] 第一次升级：加了 reqHead/respHead/reqBody/respBody 字段。
  *
- * 新版：
- *   · 逐条保存 reqHead / respHead / reqBody / respBody / alpn / kind
- *   · log 上限 400 行 × 8192 字
- *   · list() 只带正文摘要（前 2KB），完整正文用 detail(id) 单独取（避免桥调用序列化爆炸）
- *   · 二进制（图片/视频/字体…）不存字节，只记长度和 Content-Type，避免 JSON 被控制字符污染
+ * [v77] 第二次升级 —— 用户反馈「还是看不到请求头/请求体」的真凶在这里：
+ *   1. ★ MITM 解密后的明文完全没进采集缓冲
+ *      Engine 里写的是 `if (!c.mitmReady) feedResp(...)`、`if (!c.mitmPending && !c.mitmReady) feedReq(...)`，
+ *      而 MitmTerminator.pump() 只把明文截 2048 字、取第一行 + trim(400) 塞进 log。
+ *      结果：HTTPS 解密后 reqHead/respHead/reqBody/respBody 全是空字符串。
+ *      → 现在 MitmTerminator 里直接 feedReq/feedResp，并把数据完整缓冲。
+ *   2. ★ 只在「连接关闭」时才切分头/体
+ *      HTTP/1.1 keep-alive 长连接可以挂几十秒甚至几分钟，期间详情页一片空白。
+ *      → 新增 flushPartial()：每收到数据就尝试切分，内容即时可见。
+ *   3. ★ 响应体 gzip/deflate 没解压
+ *      绝大多数站点的响应都是压缩的，旧版一律判成「[二进制内容]」。
+ *      → 新增 decompress()，按 Content-Encoding 解压后再展示。
+ *   4. ★ 头只有一坨文本，前端没法做表格
+ *      → 新增 reqHeaderList/respHeaderList（结构化 k/v）+ 查询参数解析。
+ *   5. ★ 二进制没内容
+ *      → 新增 hex dump（前 1KB），至少能看到文件头魔数判断真实类型。
+ *
+ * 设计原则：
+ *   · list() 只带摘要（前 2KB），完整内容走 detail(id) —— 否则每次轮询序列化几十 MB 必卡死
+ *   · 二进制不塞进 JSON（控制字符会污染），改存 hex + 类型 + 长度
  */
 public class CaptureStore {
 
@@ -40,7 +55,7 @@ public class CaptureStore {
         public long down = 0;
         public List<String> log = new ArrayList<>();
 
-        // [v71] 新增：内容明细
+        // [v71] 内容明细
         public String reqHead = "";
         public String respHead = "";
         public String reqBody = "";
@@ -48,6 +63,19 @@ public class CaptureStore {
         public int reqBodyLen = 0;
         public int respBodyLen = 0;
         public boolean truncated = false;
+
+        // [v77] 结构化明细
+        public String reqHeaderList = "";   // JSONArray 字符串 [{k,v}]
+        public String respHeaderList = "";  // JSONArray 字符串 [{k,v}]
+        public String reqBodyKind = "";     // text / json / form / image / binary / empty
+        public String respBodyKind = "";
+        public String reqHex = "";          // 二进制时的十六进制（前 1KB）
+        public String respHex = "";
+        public String contentEncoding = ""; // gzip / deflate / br
+        public long reqMs = 0;              // 首次收到请求的时刻
+        public long respMs = 0;             // 首次收到响应的时刻
+        public int httpVersion = 0;         // 11 / 20 / 30
+        public String query = "";           // URL 里的查询串
 
         // 采集缓冲（不参与 JSON）
         public ByteArrayOutputStream reqRaw;
@@ -58,11 +86,13 @@ public class CaptureStore {
     private static final int MAX = 300;
     private static final int MAX_LOG_LINES = 400;
     private static final int MAX_LOG_CHARS = 8192;
-    private static final int CAP_RAW = 256 * 1024;       // 单方向最多缓冲 256KB（文本响应通常够；超出会明确标注）
-    private static final int HEAD_MAX = 8192;            // 头部最多存 8KB
+    private static final int CAP_RAW = 512 * 1024;       // [v77] 单方向最多缓冲 512KB（大页面也够看）
+    private static final int HEAD_MAX = 16384;           // [v77] 头部最多存 16KB（含 Cookie 的长头也够）
     private static final int BODY_LIST_MAX = 2048;       // list() 里带的正文摘要
-    private static final int BODY_FULL_MAX = 200 * 1024; // detail() 里带的正文上限
+    private static final int BODY_FULL_MAX = 256 * 1024; // detail() 里带的正文上限
+    private static final int HEX_MAX = 1024;             // hex dump 取前 1KB
     private static final Charset LATIN1 = Charset.forName("ISO-8859-1");
+    private static final Charset UTF8 = Charset.forName("UTF-8");
     private static final Object LOCK = new Object();
     private static final ArrayList<Entry> LIST = new ArrayList<>();
     private static long SEQ = 0;
@@ -121,6 +151,7 @@ public class CaptureStore {
                 // 前几个字节就能判断是不是明文 HTTP / TLS，不是就不缓冲
                 if (!looksWorthBuffering(p, off, len)) return;
                 e.reqRaw = new ByteArrayOutputStream(Math.min(len, 4096));
+                if (e.reqMs == 0) e.reqMs = System.currentTimeMillis();
             }
             int room = CAP_RAW - e.reqRaw.size();
             if (room <= 0) { e.truncated = true; return; }
@@ -137,6 +168,7 @@ public class CaptureStore {
             if (e.respRaw == null) {
                 if (!looksWorthBufferingResp(p, off, len)) return;
                 e.respRaw = new ByteArrayOutputStream(Math.min(len, 4096));
+                if (e.respMs == 0) e.respMs = System.currentTimeMillis();
             }
             int room = CAP_RAW - e.respRaw.size();
             if (room <= 0) { e.truncated = true; return; }
@@ -167,6 +199,31 @@ public class CaptureStore {
         } catch (Throwable t) { return false; }
     }
 
+    /**
+     * [v77] 实时切分：每收到一批数据就尝试把头/体切开并落库。
+     *
+     * 为什么需要它：finish() 只在连接关闭时调用，而 HTTP/1.1 默认 keep-alive，
+     * 一条连接可能挂很久 —— 期间用户点开详情页看到的是空白。
+     * 这里不释放缓冲（后面可能还有数据），只把当前已有内容切分出来。
+     */
+    public static void flushPartial(Entry e) {
+        if (e == null) return;
+        byte[] rq = null, rs = null;
+        int rqLen = 0, rsLen = 0;
+        synchronized (LOCK) {
+            try {
+                if (e.reqRaw != null && e.reqRaw.size() > 0) {
+                    rq = e.reqRaw.toByteArray(); rqLen = rq.length;
+                }
+                if (e.respRaw != null && e.respRaw.size() > 0) {
+                    rs = e.respRaw.toByteArray(); rsLen = rs.length;
+                }
+            } catch (Throwable t) { return; }
+        }
+        if (rq != null && rqLen > 0) splitInto(e, true, rq, rqLen);
+        if (rs != null && rsLen > 0) splitInto(e, false, rs, rsLen);
+    }
+
     /** 连接结束：把缓冲切分成「头 / 正文」并落库，随后释放缓冲。 */
     public static void finish(Entry e) {
         if (e == null) return;
@@ -187,45 +244,124 @@ public class CaptureStore {
             if (e.respBody != null && !e.respBody.startsWith("[二进制")) e.respBody = e.respBody + tip;
             if (e.reqBody != null && !e.reqBody.startsWith("[二进制")) e.reqBody = e.reqBody + tip;
         }
-        if (!e.reqHead.isEmpty() && (e.reqBody.isEmpty())) {
-            // 没有 body 但也把请求行/头补进 log，方便详情页直接看
-        }
     }
+
+    /* ==================== [v77] 头 / 体 切分 ==================== */
 
     private static void splitInto(Entry e, boolean isReq, byte[] data, int len) {
         try {
             String txt = new String(data, 0, len, LATIN1);
             int hdrEnd = txt.indexOf("\r\n\r\n");
+            int hdrEndLen = 4;
+            if (hdrEnd < 0) {
+                // 有些服务器用裸 \n\n
+                hdrEnd = txt.indexOf("\n\n");
+                hdrEndLen = 2;
+            }
             String head, body;
             if (hdrEnd >= 0) {
                 head = txt.substring(0, hdrEnd);
-                body = txt.substring(hdrEnd + 4);
+                body = txt.substring(hdrEnd + hdrEndLen);
             } else {
                 if (txt.startsWith("HTTP/") || looksLikeReqLine(txt)) { head = txt; body = ""; }
                 else { head = ""; body = txt; }
             }
+
             String ct = headerValue(head, "content-type");
-            boolean isText = looksText(ct, body);
+            String ce = headerValue(head, "content-encoding");
+            byte[] bodyBytes = body.getBytes(LATIN1);
+
+            // [v77] 压缩体先解压，否则永远显示「二进制」
+            if (ce != null && bodyBytes.length > 0) {
+                byte[] dec = decompress(bodyBytes, ce);
+                if (dec != null) bodyBytes = dec;
+            }
+
+            String kind = classifyBody(ct, bodyBytes);
             String headOut = clip(sanitize(head), HEAD_MAX);
-            int blen = body.length();
+            int blen = bodyBytes.length;
             String bodyOut;
+            String hexOut = "";
+
             if (blen == 0) {
                 bodyOut = "";
-            } else if (isText) {
-                bodyOut = clip(sanitize(body), BODY_FULL_MAX);
+            } else if ("text".equals(kind) || "json".equals(kind) || "form".equals(kind)) {
+                // 文本类：按 UTF-8 解（比 LATIN1 正确），失败再退回 LATIN1
+                String decoded;
+                try {
+                    decoded = new String(bodyBytes, UTF8);
+                    // UTF-8 解出大量替换字符 → 其实不是 UTF-8，退回 LATIN1
+                    int bad = 0;
+                    for (int i = 0; i < decoded.length(); i++) if (decoded.charAt(i) == '\uFFFD') bad++;
+                    if (bad > 0 && bad * 20 > decoded.length()) decoded = new String(bodyBytes, LATIN1);
+                } catch (Throwable t) {
+                    decoded = new String(bodyBytes, LATIN1);
+                }
+                bodyOut = clip(sanitize(decoded), BODY_FULL_MAX);
+                if ("json".equals(kind)) bodyOut = prettyJson(bodyOut);
             } else {
+                // 二进制：给长度 + 类型 + hex（至少能看魔数）
                 bodyOut = "[二进制内容 " + blen + " 字节" + (ct != null && ct.length() > 0 ? " · " + ct : "") + "]";
+                hexOut = hexDump(bodyBytes, HEX_MAX);
             }
+
+            String headerList = parseHeaderList(head);
+
             if (isReq) {
                 e.reqHead = headOut;
                 e.reqBody = bodyOut;
                 e.reqBodyLen = blen;
+                e.reqBodyKind = kind;
+                e.reqHex = hexOut;
+                e.reqHeaderList = headerList;
+                // 请求行 → method / url
+                try {
+                    String firstLine = head;
+                    int nl = firstLine.indexOf('\n');
+                    if (nl > 0) firstLine = firstLine.substring(0, nl);
+                    firstLine = firstLine.replace("\r", "").trim();
+                    if (looksLikeReqLine(firstLine)) {
+                        String[] pr = firstLine.split(" ");
+                        if (pr.length >= 2) {
+                            e.method = pr[0];
+                            e.url = pr[1];
+                            int q = pr[1].indexOf('?');
+                            if (q >= 0 && q + 1 < pr[1].length()) e.query = pr[1].substring(q + 1);
+                            if (e.host == null || e.host.length() == 0) {
+                                String h = headerValue(head, "host");
+                                if (h != null) e.host = h;
+                            }
+                        }
+                        if (firstLine.endsWith("HTTP/1.0")) e.httpVersion = 10;
+                        else if (firstLine.endsWith("HTTP/1.1")) e.httpVersion = 11;
+                        else if (firstLine.endsWith("HTTP/2")) e.httpVersion = 20;
+                        else if (firstLine.endsWith("HTTP/3")) e.httpVersion = 30;
+                    }
+                } catch (Throwable ignore) {}
             } else {
                 e.respHead = headOut;
                 e.respBody = bodyOut;
                 e.respBodyLen = blen;
+                e.respBodyKind = kind;
+                e.respHex = hexOut;
+                e.respHeaderList = headerList;
                 if (ct != null) e.ctype = ct;
+                if (ce != null) e.contentEncoding = ce;
+                // 状态行
+                try {
+                    if (head.startsWith("HTTP/")) {
+                        String firstLine = head;
+                        int nl = firstLine.indexOf('\n');
+                        if (nl > 0) firstLine = firstLine.substring(0, nl);
+                        e.status = firstLine.replace("\r", "").trim();
+                        if (firstLine.contains("HTTP/2")) e.httpVersion = 20;
+                        else if (firstLine.contains("HTTP/3")) e.httpVersion = 30;
+                        else if (firstLine.contains("HTTP/1.1")) e.httpVersion = 11;
+                        else if (firstLine.contains("HTTP/1.0")) e.httpVersion = 10;
+                    }
+                } catch (Throwable ignore) {}
             }
+
             // [v71] 协议自动细分（Engine 没判断出来时兜底）
             if (e.kind == null || e.kind.length() == 0) {
                 if (!isReq && head.startsWith("HTTP/")) e.kind = "HTTP";
@@ -239,13 +375,13 @@ public class CaptureStore {
         if (s == null) return false;
         return s.startsWith("GET ") || s.startsWith("POST ") || s.startsWith("PUT ")
                 || s.startsWith("DELETE ") || s.startsWith("HEAD ") || s.startsWith("PATCH ")
-                || s.startsWith("OPTIONS ") || s.startsWith("TRACE ");
+                || s.startsWith("OPTIONS ") || s.startsWith("TRACE ") || s.startsWith("CONNECT ");
     }
 
     private static String headerValue(String head, String name) {
         if (head == null || head.length() == 0) return null;
         try {
-            String[] lines = head.split("\r\n");
+            String[] lines = head.split("\r?\n");
             for (int i = 0; i < lines.length; i++) {
                 String ln = lines[i];
                 int c = ln.indexOf(':');
@@ -257,38 +393,146 @@ public class CaptureStore {
         return null;
     }
 
-    /** 文本 / 二进制判定：先看 Content-Type，再看控制字符比例。 */
-    private static boolean looksText(String ct, String body) {
+    /** [v77] 把头部文本解析成结构化 [{k,v}]，前端可直接渲染成表格。 */
+    private static String parseHeaderList(String head) {
+        if (head == null || head.length() == 0) return "";
         try {
-            if (ct != null && ct.length() > 0) {
-                String c = ct.toLowerCase();
-                if (c.startsWith("image/") || c.startsWith("video/") || c.startsWith("audio/")
-                        || c.contains("octet-stream") || c.contains("font")
-                        || c.contains("protobuf") || c.contains("zip") || c.contains("gzip")
-                        || c.contains("mpeg") || c.contains("webp") || c.contains("avif")) {
-                    return false;
-                }
+            JSONArray arr = new JSONArray();
+            String[] lines = head.split("\r?\n");
+            boolean first = true;
+            for (int i = 0; i < lines.length; i++) {
+                String ln = lines[i];
+                if (ln == null) continue;
+                ln = ln.replace("\r", "");
+                if (ln.length() == 0) continue;
+                if (first) { first = false; continue; } // 首行是请求行/状态行，不是头
+                int c = ln.indexOf(':');
+                if (c <= 0) continue;
+                JSONObject o = new JSONObject();
+                o.put("k", ln.substring(0, c).trim());
+                o.put("v", ln.substring(c + 1).trim());
+                arr.put(o);
             }
-            if (body == null || body.length() == 0) return true;
-            int n = Math.min(body.length(), 4096);
-            int bad = 0;
-            for (int i = 0; i < n; i++) {
-                char ch = body.charAt(i);
-                if (ch < 9 || (ch > 13 && ch < 32) || ch == 127) bad++;
-            }
-            return n == 0 || bad * 10 < n;
-        } catch (Throwable t) { return true; }
+            return arr.toString();
+        } catch (Throwable t) { return ""; }
     }
 
-    /** 去掉会在 JSON 里惹麻烦的控制字符（§38 的教训）。 */
-    private static String sanitize(String s) {
-        if (s == null || s.length() == 0) return "";
-        StringBuilder sb = new StringBuilder(s.length());
-        int n = s.length();
+    /** [v77] 按 Content-Encoding 解压。br 没有标准库，返回 null（前端会提示）。 */
+    private static byte[] decompress(byte[] in, String enc) {
+        if (in == null || in.length == 0 || enc == null) return null;
+        String e = enc.toLowerCase().trim();
+        try {
+            if (e.indexOf("gzip") >= 0) {
+                ByteArrayOutputStream bos = new ByteArrayOutputStream(in.length * 4);
+                GZIPInputStream gz = new GZIPInputStream(new ByteArrayInputStream(in));
+                byte[] buf = new byte[8192];
+                int n, total = 0;
+                while ((n = gz.read(buf)) > 0) {
+                    total += n;
+                    if (total > CAP_RAW * 2) break;  // 防解压炸弹
+                    bos.write(buf, 0, n);
+                }
+                gz.close();
+                return bos.toByteArray();
+            }
+            if (e.indexOf("deflate") >= 0) {
+                Inflater inf = new Inflater(false);
+                inf.setInput(in);
+                ByteArrayOutputStream bos = new ByteArrayOutputStream(in.length * 4);
+                byte[] buf = new byte[8192];
+                int total = 0;
+                while (!inf.finished()) {
+                    int n = inf.inflate(buf);
+                    if (n <= 0) break;
+                    total += n;
+                    if (total > CAP_RAW * 2) break;
+                    bos.write(buf, 0, n);
+                }
+                inf.end();
+                return bos.toByteArray();
+            }
+        } catch (Throwable ignore) {}
+        return null;
+    }
+
+    /** [v77] 正文类型分类。 */
+    private static String classifyBody(String ct, byte[] body) {
+        if (body == null || body.length == 0) return "empty";
+        String c = ct == null ? "" : ct.toLowerCase();
+        if (c.indexOf("json") >= 0) return "json";
+        if (c.indexOf("x-www-form-urlencoded") >= 0) return "form";
+        if (c.indexOf("image/") >= 0) return "image";
+        if (c.indexOf("text/") >= 0 || c.indexOf("xml") >= 0
+                || c.indexOf("javascript") >= 0 || c.indexOf("xhtml") >= 0) return "text";
+        // 没有 Content-Type 时靠内容判断
+        if (looksText(ct, new String(body, LATIN1))) return "text";
+        return "binary";
+    }
+
+    /** [v77] 十六进制 + ASCII 对照（前 max 字节）。 */
+    private static String hexDump(byte[] b, int max) {
+        if (b == null || b.length == 0) return "";
+        int n = Math.min(b.length, max);
+        StringBuilder sb = new StringBuilder(n * 4 + 64);
+        for (int i = 0; i < n; i += 16) {
+            sb.append(String.format("%08x  ", i));
+            StringBuilder asc = new StringBuilder();
+            for (int j = 0; j < 16; j++) {
+                if (i + j < n) {
+                    int v = b[i + j] & 0xff;
+                    sb.append(String.format("%02x ", v));
+                    asc.append(v >= 32 && v < 127 ? (char) v : '.');
+                } else {
+                    sb.append("   ");
+                    asc.append(' ');
+                }
+                if (j == 7) sb.append(' ');
+            }
+            sb.append(" |").append(asc).append("|\n");
+        }
+        if (b.length > n) sb.append("…（共 ").append(b.length).append(" 字节，只显示前 ").append(n).append(" 字节）");
+        return sb.toString();
+    }
+
+    /** [v77] JSON 美化（解析失败就原样返回，不破坏内容）。 */
+    private static String prettyJson(String s) {
+        if (s == null || s.length() == 0) return s;
+        String t = s.trim();
+        if (!(t.startsWith("{") || t.startsWith("["))) return s;
+        try {
+            Object o = t.startsWith("{") ? (Object) new JSONObject(t) : (Object) new JSONArray(t);
+            return o instanceof JSONObject ? ((JSONObject) o).toString(2) : ((JSONArray) o).toString(2);
+        } catch (Throwable ignore) { return s; }
+    }
+
+    /** 文本 / 二进制判定：先看 Content-Type，再看控制字符比例。 */
+    private static boolean looksText(String ct, String body) {
+        if (ct != null) {
+            String c = ct.toLowerCase();
+            if (c.indexOf("text/") >= 0 || c.indexOf("json") >= 0 || c.indexOf("xml") >= 0
+                    || c.indexOf("javascript") >= 0 || c.indexOf("x-www-form-urlencoded") >= 0) return true;
+            if (c.indexOf("image/") >= 0 || c.indexOf("video/") >= 0 || c.indexOf("audio/") >= 0
+                    || c.indexOf("font") >= 0 || c.indexOf("octet-stream") >= 0 || c.indexOf("zip") >= 0
+                    || c.indexOf("pdf") >= 0) return false;
+        }
+        if (body == null || body.length() == 0) return true;
+        int n = Math.min(body.length(), 4096), ctrl = 0;
         for (int i = 0; i < n; i++) {
+            char ch = body.charAt(i);
+            if (ch == 0) { ctrl += 10; continue; }
+            if (ch < 9 || (ch > 13 && ch < 32)) ctrl++;
+        }
+        return ctrl * 100 / Math.max(n, 1) < 5;
+    }
+
+    private static String sanitize(String s) {
+        if (s == null) return "";
+        StringBuilder sb = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
-            if (c == '\n' || c == '\r' || c == '\t') sb.append(c);
-            else if (c < 32 || c == 127) sb.append('.');
+            if (c == '\n' || c == '\t') sb.append(c);
+            else if (c == '\r') { /* 丢掉 \r，前端按 \n 分行 */ }
+            else if (c < 32 || c == 127) sb.append(' ');
             else sb.append(c);
         }
         return sb.toString();
@@ -297,10 +541,10 @@ public class CaptureStore {
     private static String clip(String s, int max) {
         if (s == null) return "";
         if (s.length() <= max) return s;
-        return s.substring(0, max) + "\n…（已截断，原始长度 " + s.length() + "）";
+        return s.substring(0, max) + "\n…（已截断，共 " + s.length() + " 字符）";
     }
 
-    /* ==================== 输出 JSON ==================== */
+    /* ==================== JSON 输出 ==================== */
 
     public static String toJson() {
         JSONArray arr = new JSONArray();
@@ -315,7 +559,7 @@ public class CaptureStore {
         return arr.toString();
     }
 
-    /** [v71] 单条完整内容（正文最多 200KB），给「详情页」和 AI 用。 */
+    /** [v71] 单条完整内容（正文最多 256KB），给「详情页」和 AI 用。 */
     public static String detailJson(long id) {
         synchronized (LOCK) {
             for (int i = 0; i < LIST.size(); i++) {
@@ -344,14 +588,30 @@ public class CaptureStore {
         o.put("up", e.up);
         o.put("down", e.down);
         o.put("log", new JSONArray(e.log));
-        o.put("reqHead", clip(e.reqHead == null ? "" : e.reqHead, 4096));
-        o.put("respHead", clip(e.respHead == null ? "" : e.respHead, 4096));
+        o.put("reqHead", clip(e.reqHead == null ? "" : e.reqHead, HEAD_MAX));
+        o.put("respHead", clip(e.respHead == null ? "" : e.respHead, HEAD_MAX));
         o.put("reqBody", clip(e.reqBody == null ? "" : e.reqBody, bodyMax));
         o.put("respBody", clip(e.respBody == null ? "" : e.respBody, bodyMax));
         o.put("reqBodyLen", e.reqBodyLen);
         o.put("respBodyLen", e.respBodyLen);
         o.put("ctype", e.ctype == null ? "" : e.ctype);
         o.put("truncated", e.truncated);
+
+        // [v77] 结构化明细（list 时不带，省流量；detail 时全给）
+        boolean full = bodyMax > BODY_LIST_MAX;
+        if (full) {
+            o.put("reqHeaderList", e.reqHeaderList == null ? "" : e.reqHeaderList);
+            o.put("respHeaderList", e.respHeaderList == null ? "" : e.respHeaderList);
+            o.put("reqHex", e.reqHex == null ? "" : e.reqHex);
+            o.put("respHex", e.respHex == null ? "" : e.respHex);
+            o.put("query", e.query == null ? "" : e.query);
+            o.put("contentEncoding", e.contentEncoding == null ? "" : e.contentEncoding);
+            o.put("reqMs", e.reqMs);
+            o.put("respMs", e.respMs);
+            o.put("httpVersion", e.httpVersion);
+        }
+        o.put("reqBodyKind", e.reqBodyKind == null ? "" : e.reqBodyKind);
+        o.put("respBodyKind", e.respBodyKind == null ? "" : e.respBodyKind);
         return o;
     }
 }

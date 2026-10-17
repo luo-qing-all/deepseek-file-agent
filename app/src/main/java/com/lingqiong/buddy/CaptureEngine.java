@@ -398,7 +398,13 @@ public class CaptureEngine implements Runnable {
     // ============================ 解析：HTTP / TLS / DNS ============================
     private void onClientData(TcpConn c, byte[] p, int off, int len) {
         // [v71] 采集上行字节（请求头 / 请求体）。加密流量会在 looksWorthBuffering 里被挡住。
-        try { if (c.record != null && !c.mitmPending && !c.mitmReady) CaptureStore.feedReq(c.record, p, off, len); } catch (Throwable ignore) {}
+        try {
+            if (c.record != null && !c.mitmPending && !c.mitmReady) {
+                CaptureStore.feedReq(c.record, p, off, len);
+                /* [v77] 实时切分：HTTP/1.1 keep-alive 长连接不关闭也能立刻看到请求头/体 */
+                CaptureStore.flushPartial(c.record);
+            }
+        } catch (Throwable ignore) {}
         if (c.mitmPending || c.mitmReady) { handleMitmClientData(c, p, off, len); return; }
         try {
             int cap = Math.min(len, 4096);
@@ -458,7 +464,13 @@ public class CaptureEngine implements Runnable {
 
     private void onServerData(TcpConn c, byte[] p, int off, int len) {
         // [v71] 采集下行字节（响应头 / 响应体）—— 旧版完全没有这一步，所以「看不到内容」
-        try { if (c.record != null && !c.mitmReady) CaptureStore.feedResp(c.record, p, off, len); } catch (Throwable ignore) {}
+        try {
+            if (c.record != null && !c.mitmReady) {
+                CaptureStore.feedResp(c.record, p, off, len);
+                /* [v77] 实时切分：响应边到边可见，不用等连接关闭 */
+                CaptureStore.flushPartial(c.record);
+            }
+        } catch (Throwable ignore) {}
         try {
             int cap = Math.min(len, 4096);
             String s = new String(p, off, cap, StandardCharsets.ISO_8859_1);

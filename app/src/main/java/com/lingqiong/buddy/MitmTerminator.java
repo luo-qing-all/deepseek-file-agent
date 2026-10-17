@@ -98,9 +98,19 @@ public class MitmTerminator {
             OutputStream out = to.getOutputStream();
             int n;
             while (!closed && (n = in.read(buf)) > 0) {
+                /* [v77] 关键修复：解密后的明文必须真正进采集缓冲。
+                   旧版只在这里 logPlain（截 2048 字、取首行 + trim 400），
+                   导致 reqHead/respHead/reqBody/respBody 永远为空 —— 这就是
+                   「根本看不到请求头/请求体」的直接原因。 */
+                try {
+                    if (isRequest) CaptureStore.feedReq(record, buf, 0, n);
+                    else CaptureStore.feedResp(record, buf, 0, n);
+                } catch (Throwable ignore) {}
                 logPlain(buf, n, isRequest);
                 out.write(buf, 0, n);
                 out.flush();
+                /* [v77] 实时切分：keep-alive 长连接不关闭也能立刻看到内容 */
+                try { CaptureStore.flushPartial(record); } catch (Throwable ignore) {}
             }
         } catch (Throwable ignore) {}
         close();
@@ -136,7 +146,10 @@ public class MitmTerminator {
     }
 
     public void close() {
+        if (closed) return;
         closed = true;
+        /* [v77] 连接结束：把缓冲里剩余内容最终切分落库 */
+        try { CaptureStore.finish(record); } catch (Throwable ignore) {}
         try { if (clientSide != null) clientSide.close(); } catch (Throwable ignore) {}
         try { if (serverSide != null) serverSide.close(); } catch (Throwable ignore) {}
         try { if (serverSocket != null) serverSocket.close(); } catch (Throwable ignore) {}
