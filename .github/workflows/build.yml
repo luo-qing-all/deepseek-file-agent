@@ -18,6 +18,8 @@ jobs:
       # 且长度必须等于官方包名 com.termux（10 字节），否则等长替换会损坏 ELF。
       APP_ID: com.lq.app
       UPSTREAM_ID: com.termux
+      # 产物命名用；与 app/build.gradle 的 versionName 保持一致
+      VERSION_NAME: "2.7.5"
 
     steps:
       - name: 检出代码
@@ -179,6 +181,6 @@ jobs:
       - name: 上传 APK（在本次运行的 Artifacts 里下载）
         uses: actions/upload-artifact@v4
         with:
-          name: LingQiongBuddy-2.7.4-release
+          name: LingQiongBuddy-${{ env.VERSION_NAME }}-release
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error

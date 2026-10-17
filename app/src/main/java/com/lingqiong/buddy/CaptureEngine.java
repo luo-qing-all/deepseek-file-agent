@@ -202,6 +202,8 @@ public class CaptureEngine implements Runnable {
     private void closeTcp(TcpConn c) {
         if (c == null) return;
         c.closed = true;
+        // [v71] 连接结束 → 把头/正文切分落库（这是「能看到具体内容」的关键一步）
+        try { CaptureStore.finish(c.record); } catch (Throwable ignore) {}
         try { if (c.sock != null) c.sock.close(); } catch (Throwable ignore) {}
         try { if (c.mitmT != null) c.mitmT.close(); } catch (Throwable ignore) {}
         try { if (c.localSock != null) c.localSock.close(); } catch (Throwable ignore) {}
@@ -269,11 +271,17 @@ public class CaptureEngine implements Runnable {
             c = new UdpConn(key, srcIp, dstIp, srcPort, dstPort);
             c.record = CaptureStore.add("UDP", ipStr(srcIp) + ":" + srcPort, ipStr(dstIp) + ":" + dstPort);
             if (dstPort == 53) {
+                c.record.kind = "DNS";
                 String d = parseDnsName(p, payloadOff, payloadLen);
                 if (d != null && !d.isEmpty()) {
                     c.record.host = d;
                     CaptureStore.addLog(c.record, "DNS 查询: " + d);
                 }
+            } else if (dstPort == 443 || dstPort == 80) {
+                c.record.kind = "QUIC";   // UDP 443/80 基本都是 QUIC（HTTP/3）
+                CaptureStore.addLog(c.record, "⚡ 疑似 QUIC（HTTP/3）流量");
+            } else {
+                c.record.kind = "UDP";
             }
             try {
                 DatagramSocket ds = new DatagramSocket();
@@ -389,6 +397,8 @@ public class CaptureEngine implements Runnable {
 
     // ============================ 解析：HTTP / TLS / DNS ============================
     private void onClientData(TcpConn c, byte[] p, int off, int len) {
+        // [v71] 采集上行字节（请求头 / 请求体）。加密流量会在 looksWorthBuffering 里被挡住。
+        try { if (c.record != null && !c.mitmPending && !c.mitmReady) CaptureStore.feedReq(c.record, p, off, len); } catch (Throwable ignore) {}
         if (c.mitmPending || c.mitmReady) { handleMitmClientData(c, p, off, len); return; }
         try {
             int cap = Math.min(len, 4096);
@@ -400,6 +410,17 @@ public class CaptureEngine implements Runnable {
                 String reqLine = nl > 0 ? s.substring(0, nl) : s;
                 if (c.record != null) {
                     c.record.method = reqLine;
+                    // [v71] 协议细分 + 抽出请求路径
+                    try {
+                        if (reqLine.indexOf("GET ", 0) == 0 || reqLine.indexOf("POST ", 0) == 0
+                                || reqLine.indexOf("PUT ", 0) == 0 || reqLine.indexOf("DELETE ", 0) == 0
+                                || reqLine.indexOf("PATCH ", 0) == 0 || reqLine.indexOf("HEAD ", 0) == 0
+                                || reqLine.indexOf("OPTIONS ", 0) == 0) {
+                            String[] pr = reqLine.split(" ");
+                            if (pr.length >= 2 && pr[1] != null) c.record.url = pr[1];
+                            if (c.record.kind == null || c.record.kind.length() == 0) c.record.kind = "HTTP";
+                        }
+                    } catch (Throwable ignore2) {}
                     int hi = s.indexOf("\r\nHost:");
                     if (hi < 0) hi = s.indexOf("\r\nhost:");
                     if (hi >= 0) {
@@ -416,15 +437,28 @@ public class CaptureEngine implements Runnable {
             } else if (cap > 5 && (p[off] & 0xff) == 0x16 && (p[off + 1] & 0xff) == 0x03) {
                 // TLS ClientHello → 提取 SNI
                 String sni = parseSni(p, off, cap);
-                if (c.record != null && sni != null && !sni.isEmpty() && c.record.host.isEmpty()) {
-                    c.record.host = sni;
-                    CaptureStore.addLog(c.record, "🔒 TLS 目标域名: " + sni);
+                if (c.record != null) {
+                    if (c.record.kind == null || c.record.kind.length() == 0) c.record.kind = "HTTPS";
+                    if (sni != null && !sni.isEmpty() && c.record.host.isEmpty()) {
+                        c.record.host = sni;
+                        CaptureStore.addLog(c.record, "🔒 TLS 目标域名: " + sni);
+                    }
+                    // [v71] 顺手取 ALPN（h2 / http/1.1），详情页能显示
+                    try {
+                        String alp = parseAlpn(p, off, cap);
+                        if (alp != null && alp.length() > 0) {
+                            c.record.alpn = alp;
+                            CaptureStore.addLog(c.record, "  ALPN: " + alp);
+                        }
+                    } catch (Throwable ignore3) {}
                 }
             }
         } catch (Throwable ignore) {}
     }
 
     private void onServerData(TcpConn c, byte[] p, int off, int len) {
+        // [v71] 采集下行字节（响应头 / 响应体）—— 旧版完全没有这一步，所以「看不到内容」
+        try { if (c.record != null && !c.mitmReady) CaptureStore.feedResp(c.record, p, off, len); } catch (Throwable ignore) {}
         try {
             int cap = Math.min(len, 4096);
             String s = new String(p, off, cap, StandardCharsets.ISO_8859_1);
@@ -433,7 +467,18 @@ public class CaptureEngine implements Runnable {
                 String statusLine = nl > 0 ? s.substring(0, nl) : s;
                 if (c.record != null) {
                     c.record.status = statusLine;
+                    if (c.record.kind == null || c.record.kind.length() == 0) c.record.kind = "HTTP";
                     CaptureStore.addLog(c.record, "← " + statusLine);
+                    // [v71] 记录 Content-Type，详情页据此决定「按文本显示」还是「按二进制提示」
+                    try {
+                        int ci = s.toLowerCase().indexOf("\r\ncontent-type:");
+                        if (ci >= 0) {
+                            int ce = s.indexOf("\r\n", ci + 2);
+                            if (ce > ci) c.record.ctype = s.substring(ci + 15, ce).trim();
+                        }
+                        int uw = s.toLowerCase().indexOf("\r\nupgrade: websocket");
+                        if (uw >= 0) c.record.kind = "WebSocket";
+                    } catch (Throwable ignore4) {}
                 }
             }
         } catch (Throwable ignore) {}
@@ -463,6 +508,48 @@ public class CaptureEngine implements Runnable {
     }
 
     /** 从 TLS ClientHello 里提取 SNI。 */
+    /** [v71] 从 TLS ClientHello 的扩展里取 ALPN（h2 / http/1.1）。取不到返回 ""。 */
+    private static String parseAlpn(byte[] p, int off, int len) {
+        try {
+            if (len < 50) return "";
+            int base = off + 43;                       // TLS record(5) + handshake(4) + version(2) + random(32)
+            if (base >= off + len) return "";
+            int sidLen = p[base] & 0xff;
+            int pos = base + 1 + sidLen;
+            if (pos + 2 > off + len) return "";
+            int csLen = ((p[pos] & 0xff) << 8) | (p[pos + 1] & 0xff);
+            pos += 2 + csLen;
+            if (pos >= off + len) return "";
+            int compLen = p[pos] & 0xff;
+            pos += 1 + compLen;
+            if (pos + 2 > off + len) return "";
+            int extTotal = ((p[pos] & 0xff) << 8) | (p[pos + 1] & 0xff);
+            pos += 2;
+            int extEnd = Math.min(pos + extTotal, off + len);
+            while (pos + 4 <= extEnd) {
+                int type = ((p[pos] & 0xff) << 8) | (p[pos + 1] & 0xff);
+                int elen = ((p[pos + 2] & 0xff) << 8) | (p[pos + 3] & 0xff);
+                pos += 4;
+                if (pos + elen > extEnd) break;
+                if (type == 16) {   // ALPN
+                    int q = pos + 2;
+                    StringBuilder sb = new StringBuilder();
+                    while (q < pos + elen) {
+                        int l = p[q] & 0xff;
+                        q++;
+                        if (q + l > pos + elen) break;
+                        if (sb.length() > 0) sb.append(", ");
+                        sb.append(new String(p, q, l, StandardCharsets.ISO_8859_1));
+                        q += l;
+                    }
+                    return sb.toString();
+                }
+                pos += elen;
+            }
+        } catch (Throwable ignore) {}
+        return "";
+    }
+
     private static String parseSni(byte[] p, int off, int len) {
         try {
             int end = off + len;

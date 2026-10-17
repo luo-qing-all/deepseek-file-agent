@@ -608,6 +608,10 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public String list() { return CaptureStore.toJson(); }
 
+        /** [v71] 单条完整内容（正文最多 200KB）。list() 只带 2KB 摘要，完整正文走这里。 */
+        @JavascriptInterface
+        public String detail(long id) { return CaptureStore.detailJson(id); }
+
         @JavascriptInterface
         public int count() { return CaptureStore.size(); }
 
@@ -641,9 +645,17 @@ public class MainActivity extends Activity {
                 JSONObject o = new JSONObject();
                 o.put("ok", r.ok);
                 o.put("hasRoot", r.hasRoot);
+                o.put("mode", r.mode);          // [v71] 1=直接写 2=bind-mount 3=Magisk模块
+                o.put("detail", r.detail);      // [v71] 安装过程日志，便于诊断
                 o.put("message", r.message);
                 return o.toString();
             } catch (Throwable t) { return "{\"ok\":false,\"message\":\"安装异常\"}"; }
+        }
+
+        /** [v71] 撤销已安装的 CA（含临时 bind-mount）。 */
+        @JavascriptInterface
+        public boolean uninstallCa() {
+            try { return RootCaInstaller.uninstall(); } catch (Throwable t) { return false; }
         }
 
         @JavascriptInterface
