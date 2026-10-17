@@ -88,6 +88,8 @@ public class MitmTerminator {
         try {
             clientSide = (SSLSocket) serverSocket.accept();
             clientSide.setUseClientMode(false);
+            /* [v79] 给客户端握手设超时，避免 App 不握手时线程永久阻塞 */
+            try { clientSide.setSoTimeout(15000); } catch (Throwable ignore0) {}
 
             // 连接真实服务器（再套一层 TLS）
             Socket raw = new Socket();
@@ -112,6 +114,35 @@ public class MitmTerminator {
                 return;
             }
 
+            /* [v79] 关键：主动完成【客户端】这一段握手。
+               旧版这里没握手，clientSide 是懒握手（第一次 read 才握手），
+               于是 addLog("已解密") 打在手之前 —— App 立刻用 alert 48 拒绝时，
+               界面已经先显示了「已解密」，纯属假成功。 */
+            try {
+                clientSide.startHandshake();
+            } catch (Throwable chs) {
+                String why = (chs.getMessage() != null ? chs.getMessage() : chs.getClass().getSimpleName());
+                boolean certReject = why.contains("CERTIFICATE_UNKNOWN")
+                        || why.contains("certificate_unknown")
+                        || why.contains("ALERT_CERTIFICATE")
+                        || why.toLowerCase().contains("certificate unknown")
+                        || why.contains("bad_certificate")
+                        || why.contains("unknown_ca");
+                if (record != null) {
+                    if (certReject) {
+                        CaptureStore.addLog(record,
+                                "✗ 该 App 拒绝我们的证书 —— 多半启用了证书固定（pinning），"
+                                + "或装完证书后没把它从后台彻底划掉重开");
+                    } else {
+                        CaptureStore.addLog(record, "✗ 客户端 TLS 握手失败：" + why);
+                    }
+                }
+                blacklist(host);   /* 下次同域名直接直连，App 不会断网 */
+                close();
+                return;
+            }
+
+            /* 两段握手都成功 → 这次是真的能解密，才可以说「已解密」 */
             if (record != null) CaptureStore.addLog(record, "🔓 HTTPS 已解密（" + host + "）");
 
             Thread t1 = new Thread(new Runnable() { public void run() { pump(clientSide, serverSide, true); } }, "mitm-c2s");
@@ -168,8 +199,20 @@ public class MitmTerminator {
                         || m.contains("Connection reset") || m.contains("EOF"));
             if (!benign && record != null) {
                 try {
-                    CaptureStore.addLog(record, "✗ " + (isRequest ? "上行" : "下行") + "转发中断: "
-                            + e.getClass().getSimpleName() + (m.isEmpty() ? "" : " " + m));
+                    boolean certReject = m.contains("CERTIFICATE_UNKNOWN")
+                            || m.contains("certificate_unknown")
+                            || m.contains("ALERT_CERTIFICATE")
+                            || m.contains("bad_certificate")
+                            || m.contains("unknown_ca");
+                    if (certReject) {
+                        /* 长连接跑到一半被 App 拒绝（有些 App 只对特定请求做校验） */
+                        CaptureStore.addLog(record,
+                                "✗ 该 App 拒绝我们的证书（证书固定 / 装完没重开）—— 后续该域名改为直连");
+                        blacklist(host);
+                    } else {
+                        CaptureStore.addLog(record, "✗ " + (isRequest ? "上行" : "下行") + "转发中断: "
+                                + e.getClass().getSimpleName() + (m.isEmpty() ? "" : " " + m));
+                    }
                 } catch (Throwable ignore2) {}
             }
         } finally {
