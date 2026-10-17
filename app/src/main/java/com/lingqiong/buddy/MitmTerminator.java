@@ -41,6 +41,27 @@ public class MitmTerminator {
     private SSLSocket serverSide;   // 与真实服务器（客户端角色）
     private volatile boolean closed = false;
 
+    /* [v78] 解密失败的域名黑名单：命中后该域名不再尝试 MITM，直接直连透传。
+       这是「解密失败就断网」的根治办法 —— App 至少能正常上网，只是看不到明文。 */
+    private static final java.util.Set<String> FAILED_HOSTS =
+            java.util.Collections.synchronizedSet(new java.util.HashSet<String>());
+
+    public static boolean isBlacklisted(String host) {
+        if (host == null || host.isEmpty()) return false;
+        return FAILED_HOSTS.contains(host);
+    }
+
+    public static void blacklist(String host) {
+        if (host != null && !host.isEmpty()) FAILED_HOSTS.add(host);
+    }
+
+    public static void clearBlacklist() { FAILED_HOSTS.clear(); }
+
+    /* [v78] pump 引用计数：两个方向都结束才真正 close。
+       旧版任一方结束就 close 全部，另一线程正在 write 已关闭的 socket → SocketException 刷屏。 */
+    private final java.util.concurrent.atomic.AtomicInteger pumpAlive =
+            new java.util.concurrent.atomic.AtomicInteger(2);
+
     public MitmTerminator(MitmCa ca, String host, byte[] realIp, int realPort,
                           CaptureStore.Entry record, VpnService service) {
         this.ca = ca;
@@ -76,7 +97,20 @@ public class MitmTerminator {
             SSLSocketFactory f = ca.clientContext().getSocketFactory();
             serverSide = (SSLSocket) f.createSocket(raw, host, realPort, true);
             serverSide.setUseClientMode(true);
-            try { serverSide.startHandshake(); } catch (Throwable ignore) {}
+
+            /* [v78] 服务器握手不再 try{}catch(ignore){} —— 吞掉它会让后续所有 write 抛
+               SocketException，表现为「解密转发失败: SocketException」刷屏。 */
+            try {
+                serverSide.startHandshake();
+            } catch (Throwable hs) {
+                String why = (hs.getMessage() != null ? hs.getMessage() : hs.getClass().getSimpleName());
+                if (record != null) {
+                    CaptureStore.addLog(record, "✗ 与真实服务器 TLS 握手失败：" + why);
+                }
+                blacklist(host);   // 该域名以后直接直连，不再折腾
+                close();
+                return;
+            }
 
             if (record != null) CaptureStore.addLog(record, "🔓 HTTPS 已解密（" + host + "）");
 
@@ -85,8 +119,21 @@ public class MitmTerminator {
             t1.setDaemon(true); t2.setDaemon(true);
             t1.start(); t2.start();
         } catch (Throwable t) {
-            if (record != null) CaptureStore.addLog(record, "✗ 解密失败: " + t.getClass().getSimpleName()
-                    + (t.getMessage() != null ? " " + t.getMessage() : ""));
+            if (record != null) {
+                String why = (t.getMessage() != null ? t.getMessage() : "");
+                /* 客户端握手失败 = 对方不认我们的 CA（证书固定 / App 没重开） */
+                boolean clientReject = (t instanceof javax.net.ssl.SSLException)
+                        || t.getClass().getName().contains("SSL")
+                        || why.toLowerCase().contains("certificate")
+                        || why.toLowerCase().contains("handshake");
+                if (clientReject) {
+                    CaptureStore.addLog(record, "✗ 客户端拒绝我们的证书（该 App 可能启用了证书固定，或装完证书后没重开它）");
+                    blacklist(host);
+                } else {
+                    CaptureStore.addLog(record, "✗ 解密失败: " + t.getClass().getSimpleName()
+                            + (why.isEmpty() ? "" : " " + why));
+                }
+            }
             close();
         }
     }
@@ -112,8 +159,24 @@ public class MitmTerminator {
                 /* [v77] 实时切分：keep-alive 长连接不关闭也能立刻看到内容 */
                 try { CaptureStore.flushPartial(record); } catch (Throwable ignore) {}
             }
-        } catch (Throwable ignore) {}
-        close();
+        } catch (Throwable e) {
+            /* [v78] 区分「正常收尾」和「真出错」，不再一律静默。
+               只有真异常才记一笔，且写明方向，方便判断是客户端断还是服务器断。 */
+            String m = (e.getMessage() != null ? e.getMessage() : "");
+            boolean benign = (e instanceof java.net.SocketException)
+                    && (m.contains("Socket closed") || m.contains("Broken pipe")
+                        || m.contains("Connection reset") || m.contains("EOF"));
+            if (!benign && record != null) {
+                try {
+                    CaptureStore.addLog(record, "✗ " + (isRequest ? "上行" : "下行") + "转发中断: "
+                            + e.getClass().getSimpleName() + (m.isEmpty() ? "" : " " + m));
+                } catch (Throwable ignore2) {}
+            }
+        } finally {
+            /* [v78] 引用计数：只有两个方向都结束才真正 close，
+               否则另一线程正在 write 已关闭的 socket 会刷 SocketException。 */
+            if (pumpAlive.decrementAndGet() <= 0) close();
+        }
     }
 
     private void logPlain(byte[] buf, int n, boolean isRequest) {

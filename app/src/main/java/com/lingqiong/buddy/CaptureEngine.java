@@ -211,11 +211,49 @@ public class CaptureEngine implements Runnable {
     }
 
     // ============================ [v28] MITM 解密 ============================
+
+    /** [v78] 纯 TCP 透传：不做 MITM，直接把密文原样转发。用于「解密失败过的域名」。 */
+    private boolean directTunnel(TcpConn c, byte[] p, int off, int len) {
+        try {
+            Socket s = new Socket();
+            s.setTcpNoDelay(true);
+            try { if (service != null) service.protect(s); } catch (Throwable ignore) {}
+            s.connect(new InetSocketAddress(InetAddress.getByAddress(c.dstIp), c.dstPort), 15000);
+            c.sock = s;
+            c.sin = s.getInputStream();
+            c.sout = s.getOutputStream();
+            c.mitmPending = false;
+            c.mitmReady = false;
+            sendTcp(c.dstIp, c.srcIp, c.dstPort, c.srcPort, c.mySeq, c.clientSeq, 0x12, null, 0);
+            c.mySeq = (c.mySeq + 1) & 0xffffffffL;
+            new Thread(new Runnable() { public void run() { readServer(c); } }, "cap-tcp-read").start();
+            if (len > 0 && c.sout != null) {
+                c.sout.write(p, off, len);
+                c.sout.flush();
+                if (c.record != null) c.record.up += len;
+            }
+            return true;
+        } catch (Throwable e) {
+            return false;
+        }
+    }
+
     private void handleMitmClientData(TcpConn c, byte[] p, int off, int len) {
         try {
             if (c.mitmPending) {
                 String sni = parseSni(p, off, Math.min(len, 4096));
                 if (sni == null || sni.isEmpty()) sni = (c.record != null && c.record.host != null && !c.record.host.isEmpty()) ? c.record.host : ipStr(c.dstIp);
+
+                /* [v78] 这个域名以前解密失败过 → 本次直接纯 TCP 透传。
+                   好处：App 能正常上网，只是这条看不到明文（总比断网强）。 */
+                if (MitmTerminator.isBlacklisted(sni)) {
+                    if (directTunnel(c, p, off, len)) {
+                        if (c.record != null) CaptureStore.addLog(c.record,
+                                "↪ " + sni + " 解密失败过，本次直连（App 正常上网，看不到明文）");
+                        return;
+                    }
+                }
+
                 c.mitmT = new MitmTerminator(mitm, sni, c.dstIp, c.dstPort, c.record, service);
                 int port = c.mitmT.start();
                 Socket ls = new Socket("127.0.0.1", port);
@@ -228,7 +266,15 @@ public class CaptureEngine implements Runnable {
             }
             if (c.localOut != null) { c.localOut.write(p, off, len); c.localOut.flush(); }
         } catch (Throwable e) {
-            if (c.record != null) CaptureStore.addLog(c.record, "✗ 解密转发失败: " + e.getClass().getSimpleName());
+            /* [v78] 转发失败 → 记清楚 + 把该域名拉黑，下次直接直连，不再反复失败 */
+            String hn = (c.record != null && c.record.host != null) ? c.record.host : "";
+            if (hn.isEmpty() && c.record != null) hn = ipStr(c.dstIp);
+            MitmTerminator.blacklist(hn);
+            if (c.record != null) {
+                String m = (e.getMessage() != null ? e.getMessage() : "");
+                CaptureStore.addLog(c.record, "✗ 解密转发失败: " + e.getClass().getSimpleName()
+                        + (m.isEmpty() ? "" : " " + m) + "（该域名后续将直连）");
+            }
             closeTcp(c);
         }
     }
