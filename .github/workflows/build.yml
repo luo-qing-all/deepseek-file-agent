@@ -19,7 +19,7 @@ jobs:
       APP_ID: com.lq.app
       UPSTREAM_ID: com.termux
       # 产物命名用；与 app/build.gradle 的 versionName 保持一致
-      VERSION_NAME: "2.7.8"
+      VERSION_NAME: "2.7.9"
 
     steps:
       - name: 检出代码

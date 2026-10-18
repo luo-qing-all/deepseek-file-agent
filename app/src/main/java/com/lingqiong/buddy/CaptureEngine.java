@@ -123,8 +123,25 @@ public class CaptureEngine implements Runnable {
             c.clientSeq = (seq + 1) & 0xffffffffL;
             c.mySeq = (long) (Math.random() * 1000000000L) + 1;
             c.record = CaptureStore.add("TCP", ipStr(srcIp) + ":" + srcPort, ipStr(dstIp) + ":" + dstPort);
+            /* ===== [v80] 关键：在 SYN 这一层【同步】判定是否 MITM =====
+               旧版把 mitmPending=true 放在 connectServer（新线程）里，
+               而 SYN|ACK 也在那个线程里才发。于是：
+                 · 客户端要等线程调度才收到 SYN|ACK
+                 · ClientHello 若先到，mitmPending 还是 false → 走普通路径
+                   → c.sout 为 null → ClientHello 被静默丢弃 → 握手必失败
+               现在改为：这里就判定、这里就回 SYN|ACK，只有「直连」才交给线程。 */
+            boolean doMitm = (mitm != null && decryptHttps && dstPort == 443);
+            if (doMitm && c.record != null && c.record.host != null
+                    && !c.record.host.isEmpty() && MitmTerminator.isBlacklisted(c.record.host)) {
+                doMitm = false;
+            }
+            if (doMitm) c.mitmPending = true;
             tcpConns.put(key, c);
-            new Thread(new Runnable() { public void run() { connectServer(c); } }, "cap-tcp-conn").start();
+            sendTcp(c.dstIp, c.srcIp, c.dstPort, c.srcPort, c.mySeq, c.clientSeq, 0x12, null, 0); // SYN|ACK
+            c.mySeq = (c.mySeq + 1) & 0xffffffffL;
+            if (!doMitm) {
+                new Thread(new Runnable() { public void run() { connectServer(c); } }, "cap-tcp-conn").start();
+            }
             return;
         }
 
@@ -154,14 +171,8 @@ public class CaptureEngine implements Runnable {
         }
     }
 
+    /** [v80] 只负责「直连真实服务器」；是否 MITM 已在 handleTcp 的 SYN 分支同步判定。 */
     private void connectServer(final TcpConn c) {
-        if (mitm != null && decryptHttps && c.dstPort == 443) {
-            // [v28] MITM：不直连真实服务器，等客户端 ClientHello 后再建解密通道
-            c.mitmPending = true;
-            sendTcp(c.dstIp, c.srcIp, c.dstPort, c.srcPort, c.mySeq, c.clientSeq, 0x12, null, 0); // SYN|ACK
-            c.mySeq = (c.mySeq + 1) & 0xffffffffL;
-            return;
-        }
         try {
             Socket s = new Socket();
             s.setTcpNoDelay(true);
@@ -241,6 +252,33 @@ public class CaptureEngine implements Runnable {
     private void handleMitmClientData(TcpConn c, byte[] p, int off, int len) {
         try {
             if (c.mitmPending) {
+                /* ===== [v80] 先缓冲到「完整的第一条 TLS record」再建 MITM =====
+                   TLS1.3 的 ClientHello 常 1000+ 字节（带 PQ key_share 的更多），
+                   会跨多个 TCP 段。旧版第一段到了就建 MITM：
+                     · parseSni 在不完整数据上失败 → SNI 为空 → 用 IP 签证书
+                     · 客户端随后报证书错误 / 握手异常
+                   现在收全再建。 */
+                if (c.hsBuf == null) c.hsBuf = new java.io.ByteArrayOutputStream(Math.max(len, 2048));
+                if (c.hsBuf.size() + len <= 16384) {
+                    c.hsBuf.write(p, off, len);
+                }
+                byte[] hsAll = c.hsBuf.toByteArray();
+                int hsNeed = tlsRecordTotal(hsAll);
+                if (hsNeed <= 0) {
+                    /* 不是 TLS 记录开头（可能不是 HTTPS），放弃 MITM，原样透传 */
+                    c.mitmPending = false;
+                    c.hsBuf = null;
+                    if (c.localOut != null) { c.localOut.write(p, off, len); c.localOut.flush(); }
+                    return;
+                }
+                if (hsAll.length < hsNeed) {
+                    return;   /* 还没收全，继续等下一段 */
+                }
+                c.hsBuf = null;
+                p = hsAll;
+                off = 0;
+                len = hsNeed;   /* 只把完整 ClientHello 交给 MITM */
+
                 String sni = parseSni(p, off, Math.min(len, 4096));
                 if (sni == null || sni.isEmpty()) sni = (c.record != null && c.record.host != null && !c.record.host.isEmpty()) ? c.record.host : ipStr(c.dstIp);
 
@@ -264,12 +302,32 @@ public class CaptureEngine implements Runnable {
                 c.mitmReady = true;
                 new Thread(new Runnable() { public void run() { readLocal(c); } }, "cap-mitm-read").start();
             }
-            if (c.localOut != null) { c.localOut.write(p, off, len); c.localOut.flush(); }
+            if (c.localOut != null) {
+                /* [v80] 丢弃「重传的 ClientHello」。
+                   客户端等不到 ServerHello 时会重发 ClientHello；
+                   已握手的 SSLSocket 再收到一个 ClientHello 会报
+                   UNEXPECTED_MESSAGE / WRONG_VERSION_NUMBER。
+                   只认 handshake type 0x01（ClientHello），
+                   post-handshake 的 KeyUpdate(0x18) 等不能误伤。 */
+                if (len >= 6 && (p[off] & 0xff) == 0x16 && (p[off + 1] & 0xff) == 0x03
+                        && (p[off + 5] & 0xff) == 0x01) {
+                    if (c.record != null) CaptureStore.addLog(c.record, "· 已丢弃重复的 ClientHello（客户端重传）");
+                    return;
+                }
+                c.localOut.write(p, off, len);
+                c.localOut.flush();
+            }
         } catch (Throwable e) {
             /* [v78] 转发失败 → 记清楚 + 把该域名拉黑，下次直接直连，不再反复失败 */
             String hn = (c.record != null && c.record.host != null) ? c.record.host : "";
             if (hn.isEmpty() && c.record != null) hn = ipStr(c.dstIp);
-            MitmTerminator.blacklist(hn);
+            /* [v80] 旧版这里【无条件】拉黑：任何异常（端口占用、临时 IO 错、客户端提前断开）
+               都会让该域名以后永远只能直连。现在只有「客户端拒绝证书」才拉黑。 */
+            String em = (e.getMessage() != null ? e.getMessage() : "");
+            boolean certReject = em.contains("CERTIFICATE_UNKNOWN") || em.contains("certificate_unknown")
+                    || em.contains("bad_certificate") || em.contains("unknown_ca")
+                    || em.contains("ALERT_CERTIFICATE");
+            if (certReject) MitmTerminator.blacklist(hn);
             if (c.record != null) {
                 String m = (e.getMessage() != null ? e.getMessage() : "");
                 CaptureStore.addLog(c.record, "✗ 解密转发失败: " + e.getClass().getSimpleName()
@@ -643,6 +701,19 @@ public class CaptureEngine implements Runnable {
         return "";
     }
 
+    /** [v80] 返回第一条 TLS record 的总长度（5 字节头 + 声明长度）；不是 TLS 返回 -1。 */
+    private static int tlsRecordTotal(byte[] b) {
+        try {
+            if (b == null || b.length < 5) return -1;
+            if ((b[0] & 0xff) != 0x16) return -1;          // handshake
+            int len = ((b[3] & 0xff) << 8) | (b[4] & 0xff);
+            if (len <= 0 || len > 16384) return -1;
+            return 5 + len;
+        } catch (Throwable t) {
+            return -1;
+        }
+    }
+
     // ============================ 工具 ============================
     private static long readU32(byte[] p, int off) {
         return ((long) (p[off] & 0xff) << 24) | ((p[off + 1] & 0xff) << 16)
@@ -707,6 +778,9 @@ public class CaptureEngine implements Runnable {
         // [v28] MITM 状态
         volatile boolean mitmPending = false;
         volatile boolean mitmReady = false;
+        /* [v80] ClientHello 分片缓冲：TLS1.3 的 ClientHello 常 1000+ 字节，
+           会跨多个 TCP 段。必须收全再交给 MITM，否则 parseSni 失败 → 用 IP 签证书。 */
+        java.io.ByteArrayOutputStream hsBuf;
         MitmTerminator mitmT;
         Socket localSock;
         java.io.OutputStream localOut;

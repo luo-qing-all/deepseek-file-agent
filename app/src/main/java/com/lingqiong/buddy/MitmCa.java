@@ -134,9 +134,22 @@ public class MitmCa {
     private Object[] hostKeyCert(String host) throws Exception {
         Object[] c = hostCache.get(host);
         if (c != null) return c;
-        KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
-        kpg.initialize(2048, rnd);
-        KeyPair kp = kpg.generateKeyPair();
+        /* [v80] 叶子证书改用 EC secp256r1。
+           RSA2048 生成一对密钥要 100~500ms；同时解密多个域名时累计可达数秒，
+           客户端等不到 ServerHello 就会重传 ClientHello
+           → 表现为 UNEXPECTED_MESSAGE / WRONG_VERSION_NUMBER。
+           EC 生成只要 1~2ms。CA 仍是 RSA（已装进系统信任库，不能换），
+           用 CA 的 RSA 私钥签 EC 叶子证书是完全合法的。 */
+        KeyPair kp;
+        try {
+            KeyPairGenerator kpg = KeyPairGenerator.getInstance("EC");
+            kpg.initialize(new java.security.spec.ECGenParameterSpec("secp256r1"), rnd);
+            kp = kpg.generateKeyPair();
+        } catch (Throwable ecFail) {
+            KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+            kpg.initialize(2048, rnd);
+            kp = kpg.generateKeyPair();
+        }
         X500Name subject = new X500Name("CN=" + host);
         X500Name issuer = new X500Name(caCert.getSubjectX500Principal().getName());
         Date nb = new Date(System.currentTimeMillis() - DAY);
@@ -146,7 +159,9 @@ public class MitmCa {
         GeneralNames sans = new GeneralNames(new GeneralName(GeneralName.dNSName, host));
         b.addExtension(Extension.subjectAlternativeName, false, sans);
         b.addExtension(Extension.basicConstraints, true, new BasicConstraints(false));
-        b.addExtension(Extension.keyUsage, true, new KeyUsage(KeyUsage.digitalSignature | KeyUsage.keyEncipherment));
+        /* [v80] EC 证书不做密钥加密（TLS 走 ECDHE），keyEncipherment 对 EC 无意义，
+           部分客户端会因此判证书不合规。只保留 digitalSignature。 */
+        b.addExtension(Extension.keyUsage, true, new KeyUsage(KeyUsage.digitalSignature));
         b.addExtension(Extension.extendedKeyUsage, false, new ExtendedKeyUsage(KeyPurposeId.id_kp_serverAuth));
         ContentSigner signer = new JcaContentSignerBuilder("SHA256withRSA").build(caKey);
         X509Certificate cert = new JcaX509CertificateConverter().getCertificate(b.build(signer));

@@ -77,6 +77,15 @@ public class MitmTerminator {
         SSLServerSocket ss = (SSLServerSocket) ca.serverContext(host).getServerSocketFactory()
                 .createServerSocket(0, 4, InetAddress.getByName("127.0.0.1"));
         ss.setNeedClientAuth(false);
+        /* [v80] 明确启用 TLS1.2/1.3：不同 ROM 默认协议集不一致，
+           不显式设置时可能只启用 1.2 或包含被废弃的版本。 */
+        try {
+            java.util.List<String> ok = new java.util.ArrayList<String>();
+            for (String pr : ss.getSupportedProtocols()) {
+                if ("TLSv1.2".equals(pr) || "TLSv1.3".equals(pr)) ok.add(pr);
+            }
+            if (!ok.isEmpty()) ss.setEnabledProtocols(ok.toArray(new String[0]));
+        } catch (Throwable ignoreTls) {}
         serverSocket = ss;
         Thread t = new Thread(new Runnable() { public void run() { acceptLoop(); } }, "mitm-accept");
         t.setDaemon(true);
@@ -90,34 +99,39 @@ public class MitmTerminator {
             clientSide.setUseClientMode(false);
             /* [v79] 给客户端握手设超时，避免 App 不握手时线程永久阻塞 */
             try { clientSide.setSoTimeout(15000); } catch (Throwable ignore0) {}
+            applyTls(clientSide);
 
-            // 连接真实服务器（再套一层 TLS）
-            Socket raw = new Socket();
-            raw.setTcpNoDelay(true);
-            try { if (service != null) service.protect(raw); } catch (Throwable ignore) {}
-            raw.connect(new InetSocketAddress(InetAddress.getByAddress(realIp), realPort), 15000);
-            SSLSocketFactory f = ca.clientContext().getSocketFactory();
-            serverSide = (SSLSocket) f.createSocket(raw, host, realPort, true);
-            serverSide.setUseClientMode(true);
+            /* ===== [v80] 核心修复：并行建连 =====
+               旧版是串行：accept → connect 真实服务器(最长 15s) → 服务器握手 → 才回客户端 ServerHello。
+               真实服务器一慢（或跨境/被限速），客户端 1 秒内等不到 ServerHello 就【重传 ClientHello】，
+               重传的 ClientHello 再被喂进已经握手的 SSLSocket → UNEXPECTED_MESSAGE；
+               某些情况下客户端还会收到错位数据 → WRONG_VERSION_NUMBER。
 
-            /* [v78] 服务器握手不再 try{}catch(ignore){} —— 吞掉它会让后续所有 write 抛
-               SocketException，表现为「解密转发失败: SocketException」刷屏。 */
-            try {
-                serverSide.startHandshake();
-            } catch (Throwable hs) {
-                String why = (hs.getMessage() != null ? hs.getMessage() : hs.getClass().getSimpleName());
-                if (record != null) {
-                    CaptureStore.addLog(record, "✗ 与真实服务器 TLS 握手失败：" + why);
+               现在改成：连真实服务器放到后台线程，本线程【立刻】跟客户端握手。
+               客户端马上拿到 ServerHello，就不会重传了。 */
+            final Throwable[] srvErr = new Throwable[1];
+            Thread tConn = new Thread(new Runnable() {
+                public void run() {
+                    try {
+                        Socket raw = new Socket();
+                        raw.setTcpNoDelay(true);
+                        try { if (service != null) service.protect(raw); } catch (Throwable ignore) {}
+                        raw.connect(new InetSocketAddress(InetAddress.getByAddress(realIp), realPort), 12000);
+                        SSLSocketFactory f = ca.clientContext().getSocketFactory();
+                        SSLSocket ss2 = (SSLSocket) f.createSocket(raw, host, realPort, true);
+                        ss2.setUseClientMode(true);
+                        applyTls(ss2);
+                        ss2.startHandshake();
+                        serverSide = ss2;
+                    } catch (Throwable e) {
+                        srvErr[0] = e;
+                    }
                 }
-                blacklist(host);   // 该域名以后直接直连，不再折腾
-                close();
-                return;
-            }
+            }, "mitm-conn");
+            tConn.setDaemon(true);
+            tConn.start();
 
-            /* [v79] 关键：主动完成【客户端】这一段握手。
-               旧版这里没握手，clientSide 是懒握手（第一次 read 才握手），
-               于是 addLog("已解密") 打在手之前 —— App 立刻用 alert 48 拒绝时，
-               界面已经先显示了「已解密」，纯属假成功。 */
+            /* ---- 客户端这一段握手：不等真实服务器，立刻做 ---- */
             try {
                 clientSide.startHandshake();
             } catch (Throwable chs) {
@@ -128,16 +142,42 @@ public class MitmTerminator {
                         || why.toLowerCase().contains("certificate unknown")
                         || why.contains("bad_certificate")
                         || why.contains("unknown_ca");
+                boolean dupHello = why.contains("UNEXPECTED_MESSAGE") || why.contains("WRONG_VERSION_NUMBER");
                 if (record != null) {
                     if (certReject) {
                         CaptureStore.addLog(record,
                                 "✗ 该 App 拒绝我们的证书 —— 多半启用了证书固定（pinning），"
                                 + "或装完证书后没把它从后台彻底划掉重开");
+                        blacklist(host);   /* 证书固定是无解的，拉黑避免反复折腾 */
+                    } else if (dupHello) {
+                        /* [v80] 这类错误几乎都是「客户端重传了 ClientHello」，
+                           不是证书问题，绝不能拉黑（否则这个域名永远看不了明文）。 */
+                        CaptureStore.addLog(record, "✗ 客户端握手异常（多为 ClientHello 重传）：" + why);
                     } else {
                         CaptureStore.addLog(record, "✗ 客户端 TLS 握手失败：" + why);
                     }
                 }
-                blacklist(host);   /* 下次同域名直接直连，App 不会断网 */
+                close();
+                return;
+            }
+
+            /* [v80] 握手已完成 → 关掉 15 秒超时。
+               否则 keep-alive 连接空闲 15s 后 read 抛 SocketTimeoutException，
+               pump 退出 → 连接被误杀（长连接/长轮询必踩）。 */
+            try { clientSide.setSoTimeout(0); } catch (Throwable ignore1) {}
+
+            /* ---- 等真实服务器那一段 ---- */
+            try { tConn.join(13000); } catch (Throwable ignore2) {}
+            if (serverSide == null) {
+                Throwable e = srvErr[0];
+                String why = (e == null) ? "连接超时"
+                        : ((e.getMessage() != null) ? e.getMessage() : e.getClass().getSimpleName());
+                if (record != null) {
+                    CaptureStore.addLog(record, "✗ 连不上真实服务器：" + why
+                            + "（本次未解密；不是证书问题，下次可能成功）");
+                }
+                /* [v80] 这里【不拉黑】：连不上是网络/服务器临时问题，
+                   拉黑会让这个域名以后永远无法解密。 */
                 close();
                 return;
             }
@@ -167,6 +207,17 @@ public class MitmTerminator {
             }
             close();
         }
+    }
+
+    /** [v80] 统一 TLS 参数：只启用 TLS1.2 / TLS1.3，让握手行为可预测。 */
+    private static void applyTls(SSLSocket s) {
+        try {
+            java.util.List<String> ok = new java.util.ArrayList<String>();
+            for (String pr : s.getSupportedProtocols()) {
+                if ("TLSv1.2".equals(pr) || "TLSv1.3".equals(pr)) ok.add(pr);
+            }
+            if (!ok.isEmpty()) s.setEnabledProtocols(ok.toArray(new String[0]));
+        } catch (Throwable ignore) {}
     }
 
     private void pump(SSLSocket from, SSLSocket to, boolean isRequest) {
