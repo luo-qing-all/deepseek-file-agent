@@ -393,6 +393,63 @@ public class FrontLoader {
     //   ② 以前下到 99% 闪退，重进从头再来。现在已下完的块按 sha 落盘，永久复用
     //   ③ 块按内容寻址 + 服务端长缓存，配合 manifest 签名，防篡改
     // ═══════════════════════════════════════════════════════════
+    /** [v88] 成品 HTML 缓存文件名：上次能成功启动的完整页面，用于秒开/兜底 */
+    static final String CACHE_HTML = "front_cached.html";
+
+    /** [v88] 把拼装好的完整 HTML 落盘（原子写，防半截文件） */
+    static void writeCachedHtml(File filesDir, String html) {
+        if (filesDir == null || html == null || html.length() < 1000) return;
+        try {
+            File f = new File(filesDir, CACHE_HTML);
+            File t = new File(f.getAbsolutePath() + ".tmp");
+            byte[] b = html.getBytes("UTF-8");
+            FileOutputStream o = new FileOutputStream(t);
+            try { o.write(b); o.getFD().sync(); }
+            finally { try { o.close(); } catch (Throwable ig) {} }
+            if (!t.renameTo(f)) { try { f.delete(); } catch (Throwable ig) {} t.renameTo(f); }
+        } catch (Throwable ig) {}
+    }
+
+    /** [v88] 读成品缓存；没有/太小/读失败都返回 null */
+    static String readCachedHtml(File filesDir) {
+        try {
+            File f = new File(filesDir, CACHE_HTML);
+            if (!f.exists() || f.length() < 1000) return null;
+            byte[] b = readBytes(f.getAbsolutePath());
+            if (b == null || b.length < 1000) return null;
+            return new String(b, "UTF-8");
+        } catch (Throwable t) { return null; }
+    }
+
+    /**
+     * [v88] 终极兜底：只用 APK 内置的 seed 块拼装（完全不碰网络）。
+     * seed/manifest.json + seed/chunks/* 都是打包时写进 APK 的，
+     * 只要 APK 装上了就一定成功 —— 保证任何情况下 App 都能打开。
+     */
+    public static String loadSeedBuiltin(File filesDir, android.content.res.AssetManager am) {
+        if (am == null) return null;
+        try {
+            byte[] mz = readAsset(am, "seed/manifest.json");
+            if (mz == null || mz.length == 0) return null;
+            String manifest = new String(mz, "UTF-8");
+            org.json.JSONObject m = new org.json.JSONObject(manifest);
+            org.json.JSONArray arr = m.optJSONArray("blocks");
+            if (arr == null || arr.length() == 0) return null;
+            int n = arr.length();
+            byte[][] blocks = new byte[n][];
+            for (int i = 0; i < n; i++) {
+                String id = arr.getString(i);
+                byte[] bz = readAsset(am, "seed/chunks/" + id);
+                if (bz == null || bz.length <= 16) return null;
+                blocks[i] = bz;
+            }
+            String html = FrontCrypto.decodeV3Blocks(manifest, blocks, PUB_PEM);
+            if (html != null && html.length() > 1000) {
+                writeCachedHtml(filesDir, html);
+            }
+            return html;
+        } catch (Throwable t) { return null; }
+    }
 
     /**
      * @param manifestUrl 清单地址
@@ -404,7 +461,7 @@ public class FrontLoader {
      */
     public static String loadV3(String manifestUrl, String chunkBase, File chunkDir,
                                 String manifestCache, int timeoutMs, Progress cb,
-                                android.content.res.AssetManager am) {
+                                android.content.res.AssetManager am, long hardDeadline) {
         try {
             if (cb != null) cb.onStatus("正在检查更新…");
 
@@ -465,16 +522,23 @@ public class FrontLoader {
 
             // ---- ③ 只下载真正缺的块（已下载/内置的永久复用 = 断点续传 + 增量）----
             if (miss > 0) {
-                if (cb != null) cb.onStatus("更新 " + miss + "/" + n + " 个文件块…");
+                if (cb != null) cb.onStatus("需要更新 " + miss + " 个文件块（共 " + n + " 块）…");
                 long got = 0, tLast = System.currentTimeMillis();
+                int doneCnt = 0;
                 for (int i = 0; i < n; i++) {
                     if (have[i]) continue;
-                    byte[] blk = httpGetBytes(chunkBase + ids[i], 20000, 0);
+                    // ★[v88] 硬时限：到点立刻放弃，已下好的块留作续传（绝不无限等）
+                    if (hardDeadline > 0 && System.currentTimeMillis() > hardDeadline) {
+                        if (cb != null) cb.onStatus("更新超时，先用已有版本启动…");
+                        return null;
+                    }
+                    // ★[v88] readTimeout 由 0（永不超时）改为 15 秒 —— 这是卡死主因
+                    byte[] blk = httpGetBytes(chunkBase + ids[i], 12000, 15000);
                     if (blk == null || blk.length <= 16) {
-                        blk = httpGetBytes(chunkBase + ids[i], 20000, 0);   // 重试一次
+                        blk = httpGetBytes(chunkBase + ids[i], 12000, 15000);   // 重试一次
                     }
                     if (blk == null || blk.length <= 16) {
-                        if (cb != null) cb.onStatus("缺少文件块，尝试其他通道…");
+                        if (cb != null) cb.onStatus("缺少文件块，先用已有版本启动…");
                         return null;
                     }
                     File f = new File(chunkDir, ids[i]);
@@ -483,13 +547,21 @@ public class FrontLoader {
                     try { o.write(blk); } finally { try { o.close(); } catch (Throwable ig) {} }
                     if (!tmp.renameTo(f)) { try { f.delete(); } catch (Throwable ig) {} tmp.renameTo(f); }
                     got += blk.length;
+                    doneCnt++;
                     long now = System.currentTimeMillis();
-                    if (cb != null && (now - tLast >= 200)) {
+                    // ★[v88] 进度按【块数】算，total=miss（原来把 total 传成 got，永远 100%）
+                    if (cb != null) {
                         long dt = now - tLast;
-                        long bps = dt > 0 ? got * 1000L / dt : 0;
-                        cb.onProgress(got, got, bps);
-                        tLast = now;
+                        long bps = dt > 0 ? (got * 1000L / dt) : 0;
+                        // 界面按字节显示：用「总长 / 块数」估算每块大小，换算成字节进度
+                        long avg = (n > 0 && totalLen > 0) ? (totalLen / n) : 65536L;
+                        if (avg <= 0) avg = 65536L;
+                        long estDone = (long) doneCnt * avg;
+                        long estTotal = (long) miss * avg;
+                        if (estDone > estTotal) estDone = estTotal;
+                        cb.onProgress(estDone, estTotal, bps);
                     }
+                    if (now - tLast >= 500) tLast = now;
                 }
             } else if (cb != null) {
                 cb.onStatus("准备就绪，正在启动…");
@@ -604,17 +676,60 @@ public class FrontLoader {
         String v2Cache = new File(filesDir, "front_pack2.json").getAbsolutePath();
         String v1Cache = new File(filesDir, "front_pack.json").getAbsolutePath();
 
-        // ① v3 增量（APK 内置块 → 本地缓存 → 只下缺的块）
+        final File fDir = filesDir;
+        final android.content.res.AssetManager fAm = am;
+        final String mcPath = new File(filesDir, "front_v3_manifest.json").getAbsolutePath();
+        final File chunkDir = new File(filesDir, "chunks");
+
+        // 先取一份「上次能启动的成品」——任何一步失败都能靠它秒开
+        String cached = readCachedHtml(filesDir);
+
+        // ① v3 增量：块齐时几乎零下载（只花 4 秒读 4KB 清单）
+        //    硬时限 20 秒；超时/失败立刻返回 null，不再无限等
         try {
-            String h = loadV3(PACK_URL_V3, CHUNK_URL_BASE,
-                    new File(filesDir, "chunks"),
-                    new File(filesDir, "front_v3_manifest.json").getAbsolutePath(),
-                    timeoutMs, cb, am);
-            if (h != null && h.length() > 0) return h;
+            String h = loadV3(PACK_URL_V3, CHUNK_URL_BASE, chunkDir, mcPath,
+                    timeoutMs, cb, am, System.currentTimeMillis() + 20000L);
+            if (h != null && h.length() > 0) {
+                writeCachedHtml(filesDir, h);
+                return h;
+            }
         } catch (Throwable ignore) { /* 降级 */ }
 
-        // ② 旧通道 v2 → v1 → 本地缓存
-        return load(PACK_URL_V2, v2Cache, PACK_URL, v1Cache, timeoutMs, cb);
+        // ② 有成品缓存 → 立刻用它启动（秒开，不等网络），后台静默更新
+        if (cached != null && cached.length() > 1000) {
+            if (cb != null) cb.onStatus("使用缓存版本启动，后台更新中…");
+            try {
+                Thread th = new Thread(new Runnable() {
+                    @Override public void run() {
+                        try {
+                            String h2 = loadV3(PACK_URL_V3, CHUNK_URL_BASE,
+                                    new File(fDir, "chunks"), mcPath,
+                                    8000, null, fAm, System.currentTimeMillis() + 180000L);
+                            if (h2 != null && h2.length() > 1000) writeCachedHtml(fDir, h2);
+                        } catch (Throwable ig) {}
+                    }
+                });
+                th.setDaemon(true);
+                th.start();
+            } catch (Throwable ig) {}
+            return cached;
+        }
+
+        // ③ v2 → v1 网络兜底
+        try {
+            String h3 = load(PACK_URL_V2, v2Cache, PACK_URL, v1Cache, timeoutMs, cb);
+            if (h3 != null && h3.length() > 1000) {
+                writeCachedHtml(filesDir, h3);
+                return h3;
+            }
+        } catch (Throwable ignore) {}
+
+        // ④ 终极兜底：纯内置块拼装（100% 不碰网络，保证能打开）
+        if (cb != null) cb.onStatus("使用内置版本启动…");
+        String h4 = loadSeedBuiltin(filesDir, am);
+        if (h4 != null && h4.length() > 1000) return h4;
+
+        return null;
     }
 
 }
