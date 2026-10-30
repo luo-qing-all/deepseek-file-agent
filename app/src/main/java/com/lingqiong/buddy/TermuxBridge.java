@@ -689,50 +689,49 @@ public class TermuxBridge {
      * com.termux 等长替换成本 App 包名（两者同为 10 字节，ELF 字符串偏移不变，
      * 二进制不会损坏），从而让 pkg install 正常工作。
      */
-    private static final String PATCH_DEBS_TEMPLATE = """
-#!/data/data/__PKG__/files/usr/bin/bash
-# Rewrite Termux deb packages on the fly: com.termux -> __PKG__
-# Both names are exactly 10 bytes, so byte-for-byte replacement is safe
-# even inside ELF binaries that hard-code /data/data/<pkg>/files/usr.
-umask 022
-OLD="com.termux"
-NEW="__PKG__"
-TMP="/data/data/__PKG__/files/usr/tmp"
-[ -d "$TMP" ] || mkdir -p "$TMP"
-
-while IFS= read -r deb; do
-  [ -n "$deb" ] || continue
-  case "$deb" in *.deb) ;; *) continue ;; esac
-  [ -f "$deb" ] || continue
-  d="$(mktemp -d "$TMP/pdb.XXXXXX")" || continue
-  if dpkg-deb -R "$deb" "$d" 2>/dev/null; then
-    # dpkg-deb -R 会丢掉维护者脚本的可执行位，必须补回来，否则重新打包会失败
-    if [ -d "$d/DEBIAN" ]; then
-      for s in preinst postinst prerm postrm config; do
-        [ -f "$d/DEBIAN/$s" ] && chmod 0755 "$d/DEBIAN/$s"
-      done
-    fi
-    if [ -d "$d/data/data/$OLD" ]; then
-      mkdir -p "$d/data/data"
-      rm -rf "$d/data/data/$NEW"
-      mv "$d/data/data/$OLD" "$d/data/data/$NEW"
-    fi
-    find "$d" -type f -print0 2>/dev/null | while IFS= read -r -d '' f; do
-      if LC_ALL=C grep -qa "$OLD" "$f" 2>/dev/null; then
-        LC_ALL=C sed -i "s/$OLD/$NEW/g" "$f" 2>/dev/null || true
-      fi
-    done
-    # 这些 deb 马上就会被 dpkg 消费，用最快的方式重压缩
-    if dpkg-deb -b -Zgzip -z1 "$d" "$deb.new" >/dev/null 2>&1; then
-      mv -f "$deb.new" "$deb"
-    else
-      rm -f "$deb.new"
-    fi
-  fi
-  rm -rf "$d"
-done
-exit 0
-""";
+    private static final String PATCH_DEBS_TEMPLATE = 
+            "#!/data/data/__PKG__/files/usr/bin/bash\n"
+            +             "# Rewrite Termux deb packages on the fly: com.termux -> __PKG__\n"
+            +             "# Both names are exactly 10 bytes, so byte-for-byte replacement is safe\n"
+            +             "# even inside ELF binaries that hard-code /data/data/<pkg>/files/usr.\n"
+            +             "umask 022\n"
+            +             "OLD=\"com.termux\"\n"
+            +             "NEW=\"__PKG__\"\n"
+            +             "TMP=\"/data/data/__PKG__/files/usr/tmp\"\n"
+            +             "[ -d \"$TMP\" ] || mkdir -p \"$TMP\"\n"
+            +             "\n"
+            +             "while IFS= read -r deb; do\n"
+            +             "  [ -n \"$deb\" ] || continue\n"
+            +             "  case \"$deb\" in *.deb) ;; *) continue ;; esac\n"
+            +             "  [ -f \"$deb\" ] || continue\n"
+            +             "  d=\"$(mktemp -d \"$TMP/pdb.XXXXXX\")\" || continue\n"
+            +             "  if dpkg-deb -R \"$deb\" \"$d\" 2>/dev/null; then\n"
+            +             "    # dpkg-deb -R 会丢掉维护者脚本的可执行位，必须补回来，否则重新打包会失败\n"
+            +             "    if [ -d \"$d/DEBIAN\" ]; then\n"
+            +             "      for s in preinst postinst prerm postrm config; do\n"
+            +             "        [ -f \"$d/DEBIAN/$s\" ] && chmod 0755 \"$d/DEBIAN/$s\"\n"
+            +             "      done\n"
+            +             "    fi\n"
+            +             "    if [ -d \"$d/data/data/$OLD\" ]; then\n"
+            +             "      mkdir -p \"$d/data/data\"\n"
+            +             "      rm -rf \"$d/data/data/$NEW\"\n"
+            +             "      mv \"$d/data/data/$OLD\" \"$d/data/data/$NEW\"\n"
+            +             "    fi\n"
+            +             "    find \"$d\" -type f -print0 2>/dev/null | while IFS= read -r -d '' f; do\n"
+            +             "      if LC_ALL=C grep -qa \"$OLD\" \"$f\" 2>/dev/null; then\n"
+            +             "        LC_ALL=C sed -i \"s/$OLD/$NEW/g\" \"$f\" 2>/dev/null || true\n"
+            +             "      fi\n"
+            +             "    done\n"
+            +             "    # 这些 deb 马上就会被 dpkg 消费，用最快的方式重压缩\n"
+            +             "    if dpkg-deb -b -Zgzip -z1 \"$d\" \"$deb.new\" >/dev/null 2>&1; then\n"
+            +             "      mv -f \"$deb.new\" \"$deb\"\n"
+            +             "    else\n"
+            +             "      rm -f \"$deb.new\"\n"
+            +             "    fi\n"
+            +             "  fi\n"
+            +             "  rm -rf \"$d\"\n"
+            +             "done\n"
+            +             "exit 0";
 
     /** 把 patch-debs 脚本与 apt 钩子配置写入指定环境的 usr（幂等，可重复调用）。 */
     private void deployAptPatch(File usr) {

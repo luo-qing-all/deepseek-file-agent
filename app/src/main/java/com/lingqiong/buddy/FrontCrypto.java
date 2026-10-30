@@ -191,4 +191,115 @@ public class FrontCrypto {
             in.close();
         }
     }
+
+    /**
+     * [v83] 解码 v3 包：manifest（清单）+ 已按 sha 拼装好的完整密文 → HTML。
+     *
+     * manifest 结构：
+     *   {"v":91,"fmt":"v3","ekey":"..","iv":"..","len":769021,"chunk":65536,
+     *    "n":12,"chunks":["sha256hex",...],"html":"明文sha256","sig":".."}
+     *
+     * 安全性：签名覆盖 版本|ekey|iv|长度|块大小|块sha列表|明文sha，
+     *        任何块被替换/删改都会导致签名不匹配或解密失败。
+     */
+    /**
+     * [v83] 解码 v3 包：清单 + 按顺序的块密文 → HTML。
+     *
+     * 块设计（必须与服务器 _pack_v3.py 完全一致）：
+     *   块 id = sha256(明文块)                    —— 内容寻址
+     *   块 iv = sha256("lq3iv|" + id) 前 12 字节  —— 由内容确定性派生（无 IV 复用）
+     *   每块独立 AES-256-GCM，末尾 16 字节是 tag
+     * 签名覆盖：版本|ekey|明文总长|块id列表|明文sha
+     *
+     * @param blocks 与 manifest 的 blocks 数组**顺序一致**的块密文
+     */
+    public static String decodeV3Blocks(String manifestJson, byte[][] blocks, String pubPem) throws Exception {
+        org.json.JSONObject m = new org.json.JSONObject(manifestJson);
+        String ekeyB = m.optString("ekey", "");
+        String sigB = m.optString("sig", "");
+        String htmlSha = m.optString("html", "");
+        int v = m.optInt("v", -1);
+        long len = m.optLong("len", -1);
+        org.json.JSONArray arr = m.optJSONArray("blocks");
+        if (ekeyB.length() == 0 || sigB.length() == 0 || htmlSha.length() == 0
+                || v < 0 || len <= 0 || arr == null || arr.length() == 0) {
+            throw new SecurityException("V3_MISSING_FIELDS");
+        }
+        if (blocks == null || blocks.length != arr.length()) {
+            throw new SecurityException("V3_BLOCK_COUNT");
+        }
+
+        // ① 验签（拼法与 _pack_v3.py 的 sign_src 严格一致）
+        StringBuilder idsb = new StringBuilder();
+        for (int i = 0; i < arr.length(); i++) {
+            if (i > 0) idsb.append(',');
+            idsb.append(arr.getString(i));
+        }
+        String signSrc = "3|" + v + "|" + ekeyB + "|" + len + "|" + idsb.toString() + "|" + htmlSha;
+        Signature s = Signature.getInstance("SHA256withRSA");
+        s.initVerify(pubFromPem(pubPem));
+        s.update(signSrc.getBytes("UTF-8"));
+        if (!s.verify(B64.decode(sigB))) throw new SecurityException("SIG_FAIL");
+
+        // ② 解包 ekey
+        byte[] der = NativeKey.privateDer();
+        if (der == null) throw new IllegalStateException("NATIVE_KEY_UNAVAILABLE");
+        PrivateKey priv = KeyFactory.getInstance("RSA")
+                .generatePrivate(new PKCS8EncodedKeySpec(der));
+        byte[] ek = B64.decode(ekeyB);
+        byte[] aesKey;
+        try {
+            aesKey = rsaUnwrap(priv, ek, "SHA-256");
+        } catch (Throwable t1) {
+            aesKey = rsaUnwrap(priv, ek, "SHA-1");
+        }
+        if (aesKey == null || aesKey.length != 32) throw new SecurityException("EKEY_UNWRAP_FAIL");
+
+        // ③ 逐块解密并拼接
+        java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream((int) len);
+        for (int i = 0; i < arr.length(); i++) {
+            String bid = arr.getString(i);
+            byte[] cblk = blocks[i];
+            if (cblk == null || cblk.length <= 16) throw new SecurityException("V3_BLOCK_EMPTY:" + bid);
+            Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
+            c.init(Cipher.DECRYPT_MODE, new SecretKeySpec(aesKey, "AES"),
+                    new GCMParameterSpec(128, blockIv(bid)));
+            byte[] plain = c.doFinal(cblk);
+            if (!sha256Hex(plain).equalsIgnoreCase(bid)) {
+                throw new SecurityException("BLOCK_SHA_MISMATCH:" + bid);
+            }
+            bos.write(plain, 0, plain.length);
+        }
+        byte[] all = bos.toByteArray();
+        if (all.length != len) throw new SecurityException("V3_LEN_MISMATCH");
+        if (!sha256Hex(all).equalsIgnoreCase(htmlSha)) throw new SecurityException("HTML_SHA_MISMATCH");
+        return new String(all, "UTF-8");
+    }
+
+    /** [v83] 块 IV = sha256("lq3iv|"+块id) 前 12 字节（与打包脚本一致）。 */
+    static byte[] blockIv(String bid) throws Exception {
+        java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+        byte[] d = md.digest(("lq3iv|" + bid).getBytes("US-ASCII"));
+        byte[] iv = new byte[12];
+        System.arraycopy(d, 0, iv, 0, 12);
+        return iv;
+    }
+
+    /** [v83] 字节数组的 sha256 小写十六进制。 */
+    static String sha256Hex(byte[] b) {
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] d = md.digest(b);
+            StringBuilder sb = new StringBuilder(64);
+            for (byte x : d) {
+                int n = x & 0xFF;
+                if (n < 16) sb.append('0');
+                sb.append(Integer.toHexString(n));
+            }
+            return sb.toString();
+        } catch (Throwable t) {
+            return "";
+        }
+    }
+
 }

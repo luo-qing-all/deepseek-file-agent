@@ -52,6 +52,17 @@ public class CaptureEngine implements Runnable {
     @Override
     public void run() {
         byte[] buf = new byte[32767];
+        // [v83] 自动停止看门狗：即使一个包都没来，到点也要停（AI 指定了 duration 时）
+        Thread watchdog = new Thread(new Runnable() {
+            public void run() {
+                while (running) {
+                    try { Thread.sleep(500); } catch (Throwable ignore) { return; }
+                    try { CaptureStore.tickAutoStop(); } catch (Throwable ignore) {}
+                }
+            }
+        }, "cap-autostop");
+        watchdog.setDaemon(true);
+        watchdog.start();
         while (running) {
             int len;
             try {
@@ -123,25 +134,9 @@ public class CaptureEngine implements Runnable {
             c.clientSeq = (seq + 1) & 0xffffffffL;
             c.mySeq = (long) (Math.random() * 1000000000L) + 1;
             c.record = CaptureStore.add("TCP", ipStr(srcIp) + ":" + srcPort, ipStr(dstIp) + ":" + dstPort);
-            /* ===== [v80] 关键：在 SYN 这一层【同步】判定是否 MITM =====
-               旧版把 mitmPending=true 放在 connectServer（新线程）里，
-               而 SYN|ACK 也在那个线程里才发。于是：
-                 · 客户端要等线程调度才收到 SYN|ACK
-                 · ClientHello 若先到，mitmPending 还是 false → 走普通路径
-                   → c.sout 为 null → ClientHello 被静默丢弃 → 握手必失败
-               现在改为：这里就判定、这里就回 SYN|ACK，只有「直连」才交给线程。 */
-            boolean doMitm = (mitm != null && decryptHttps && dstPort == 443);
-            if (doMitm && c.record != null && c.record.host != null
-                    && !c.record.host.isEmpty() && MitmTerminator.isBlacklisted(c.record.host)) {
-                doMitm = false;
-            }
-            if (doMitm) c.mitmPending = true;
+            c.http = new HttpSession(new HSink(c));   // [v83] 每条连接一个拼包状态机
             tcpConns.put(key, c);
-            sendTcp(c.dstIp, c.srcIp, c.dstPort, c.srcPort, c.mySeq, c.clientSeq, 0x12, null, 0); // SYN|ACK
-            c.mySeq = (c.mySeq + 1) & 0xffffffffL;
-            if (!doMitm) {
-                new Thread(new Runnable() { public void run() { connectServer(c); } }, "cap-tcp-conn").start();
-            }
+            new Thread(new Runnable() { public void run() { connectServer(c); } }, "cap-tcp-conn").start();
             return;
         }
 
@@ -171,8 +166,14 @@ public class CaptureEngine implements Runnable {
         }
     }
 
-    /** [v80] 只负责「直连真实服务器」；是否 MITM 已在 handleTcp 的 SYN 分支同步判定。 */
     private void connectServer(final TcpConn c) {
+        if (mitm != null && decryptHttps && c.dstPort == 443) {
+            // [v28] MITM：不直连真实服务器，等客户端 ClientHello 后再建解密通道
+            c.mitmPending = true;
+            sendTcp(c.dstIp, c.srcIp, c.dstPort, c.srcPort, c.mySeq, c.clientSeq, 0x12, null, 0); // SYN|ACK
+            c.mySeq = (c.mySeq + 1) & 0xffffffffL;
+            return;
+        }
         try {
             Socket s = new Socket();
             s.setTcpNoDelay(true);
@@ -186,7 +187,11 @@ public class CaptureEngine implements Runnable {
             new Thread(new Runnable() { public void run() { readServer(c); } }, "cap-tcp-read").start();
         } catch (Throwable e) {
             sendTcp(c.dstIp, c.srcIp, c.dstPort, c.srcPort, 0, c.clientSeq, 0x14, null, 0); // RST|ACK
-            if (c.record != null) CaptureStore.addLog(c.record, "✗ 连接失败: " + e.getClass().getSimpleName());
+            String err = classifyErr(e, "连接服务器");
+            if (c.record != null) {
+                CaptureStore.setError(c.record, err);
+                CaptureStore.addLog(c.record, "✗ " + err);
+            }
             tcpConns.remove(c.key);
         }
     }
@@ -213,8 +218,7 @@ public class CaptureEngine implements Runnable {
     private void closeTcp(TcpConn c) {
         if (c == null) return;
         c.closed = true;
-        // [v71] 连接结束 → 把头/正文切分落库（这是「能看到具体内容」的关键一步）
-        try { CaptureStore.finish(c.record); } catch (Throwable ignore) {}
+        try { if (c.http != null) c.http.finish(); } catch (Throwable ignore) {}
         try { if (c.sock != null) c.sock.close(); } catch (Throwable ignore) {}
         try { if (c.mitmT != null) c.mitmT.close(); } catch (Throwable ignore) {}
         try { if (c.localSock != null) c.localSock.close(); } catch (Throwable ignore) {}
@@ -222,77 +226,12 @@ public class CaptureEngine implements Runnable {
     }
 
     // ============================ [v28] MITM 解密 ============================
-
-    /** [v78] 纯 TCP 透传：不做 MITM，直接把密文原样转发。用于「解密失败过的域名」。 */
-    private boolean directTunnel(TcpConn c, byte[] p, int off, int len) {
-        try {
-            Socket s = new Socket();
-            s.setTcpNoDelay(true);
-            try { if (service != null) service.protect(s); } catch (Throwable ignore) {}
-            s.connect(new InetSocketAddress(InetAddress.getByAddress(c.dstIp), c.dstPort), 15000);
-            c.sock = s;
-            c.sin = s.getInputStream();
-            c.sout = s.getOutputStream();
-            c.mitmPending = false;
-            c.mitmReady = false;
-            sendTcp(c.dstIp, c.srcIp, c.dstPort, c.srcPort, c.mySeq, c.clientSeq, 0x12, null, 0);
-            c.mySeq = (c.mySeq + 1) & 0xffffffffL;
-            new Thread(new Runnable() { public void run() { readServer(c); } }, "cap-tcp-read").start();
-            if (len > 0 && c.sout != null) {
-                c.sout.write(p, off, len);
-                c.sout.flush();
-                if (c.record != null) c.record.up += len;
-            }
-            return true;
-        } catch (Throwable e) {
-            return false;
-        }
-    }
-
     private void handleMitmClientData(TcpConn c, byte[] p, int off, int len) {
         try {
             if (c.mitmPending) {
-                /* ===== [v80] 先缓冲到「完整的第一条 TLS record」再建 MITM =====
-                   TLS1.3 的 ClientHello 常 1000+ 字节（带 PQ key_share 的更多），
-                   会跨多个 TCP 段。旧版第一段到了就建 MITM：
-                     · parseSni 在不完整数据上失败 → SNI 为空 → 用 IP 签证书
-                     · 客户端随后报证书错误 / 握手异常
-                   现在收全再建。 */
-                if (c.hsBuf == null) c.hsBuf = new java.io.ByteArrayOutputStream(Math.max(len, 2048));
-                if (c.hsBuf.size() + len <= 16384) {
-                    c.hsBuf.write(p, off, len);
-                }
-                byte[] hsAll = c.hsBuf.toByteArray();
-                int hsNeed = tlsRecordTotal(hsAll);
-                if (hsNeed <= 0) {
-                    /* 不是 TLS 记录开头（可能不是 HTTPS），放弃 MITM，原样透传 */
-                    c.mitmPending = false;
-                    c.hsBuf = null;
-                    if (c.localOut != null) { c.localOut.write(p, off, len); c.localOut.flush(); }
-                    return;
-                }
-                if (hsAll.length < hsNeed) {
-                    return;   /* 还没收全，继续等下一段 */
-                }
-                c.hsBuf = null;
-                p = hsAll;
-                off = 0;
-                len = hsNeed;   /* 只把完整 ClientHello 交给 MITM */
-
                 String sni = parseSni(p, off, Math.min(len, 4096));
                 if (sni == null || sni.isEmpty()) sni = (c.record != null && c.record.host != null && !c.record.host.isEmpty()) ? c.record.host : ipStr(c.dstIp);
-
-                /* [v78] 这个域名以前解密失败过 → 本次直接纯 TCP 透传。
-                   好处：App 能正常上网，只是这条看不到明文（总比断网强）。 */
-                if (MitmTerminator.isBlacklisted(sni)) {
-                    if (directTunnel(c, p, off, len)) {
-                        if (c.record != null) CaptureStore.addLog(c.record,
-                                "↪ " + sni + " 解密失败过，本次直连（App 正常上网，看不到明文）");
-                        return;
-                    }
-                }
-
-                c.mitmT = new MitmTerminator(mitm, sni, c.dstIp, c.dstPort, c.record, service);
+                c.mitmT = new MitmTerminator(mitm, sni, c.dstIp, c.dstPort, c.record, service, c.http);
                 int port = c.mitmT.start();
                 Socket ls = new Socket("127.0.0.1", port);
                 ls.setTcpNoDelay(true);
@@ -302,36 +241,12 @@ public class CaptureEngine implements Runnable {
                 c.mitmReady = true;
                 new Thread(new Runnable() { public void run() { readLocal(c); } }, "cap-mitm-read").start();
             }
-            if (c.localOut != null) {
-                /* [v80] 丢弃「重传的 ClientHello」。
-                   客户端等不到 ServerHello 时会重发 ClientHello；
-                   已握手的 SSLSocket 再收到一个 ClientHello 会报
-                   UNEXPECTED_MESSAGE / WRONG_VERSION_NUMBER。
-                   只认 handshake type 0x01（ClientHello），
-                   post-handshake 的 KeyUpdate(0x18) 等不能误伤。 */
-                if (len >= 6 && (p[off] & 0xff) == 0x16 && (p[off + 1] & 0xff) == 0x03
-                        && (p[off + 5] & 0xff) == 0x01) {
-                    if (c.record != null) CaptureStore.addLog(c.record, "· 已丢弃重复的 ClientHello（客户端重传）");
-                    return;
-                }
-                c.localOut.write(p, off, len);
-                c.localOut.flush();
-            }
+            if (c.localOut != null) { c.localOut.write(p, off, len); c.localOut.flush(); }
         } catch (Throwable e) {
-            /* [v78] 转发失败 → 记清楚 + 把该域名拉黑，下次直接直连，不再反复失败 */
-            String hn = (c.record != null && c.record.host != null) ? c.record.host : "";
-            if (hn.isEmpty() && c.record != null) hn = ipStr(c.dstIp);
-            /* [v80] 旧版这里【无条件】拉黑：任何异常（端口占用、临时 IO 错、客户端提前断开）
-               都会让该域名以后永远只能直连。现在只有「客户端拒绝证书」才拉黑。 */
-            String em = (e.getMessage() != null ? e.getMessage() : "");
-            boolean certReject = em.contains("CERTIFICATE_UNKNOWN") || em.contains("certificate_unknown")
-                    || em.contains("bad_certificate") || em.contains("unknown_ca")
-                    || em.contains("ALERT_CERTIFICATE");
-            if (certReject) MitmTerminator.blacklist(hn);
             if (c.record != null) {
-                String m = (e.getMessage() != null ? e.getMessage() : "");
-                CaptureStore.addLog(c.record, "✗ 解密转发失败: " + e.getClass().getSimpleName()
-                        + (m.isEmpty() ? "" : " " + m) + "（该域名后续将直连）");
+                String err = classifyErr(e, "解密转发");
+                CaptureStore.setError(c.record, err);
+                CaptureStore.addLog(c.record, "✗ " + err);
             }
             closeTcp(c);
         }
@@ -375,17 +290,11 @@ public class CaptureEngine implements Runnable {
             c = new UdpConn(key, srcIp, dstIp, srcPort, dstPort);
             c.record = CaptureStore.add("UDP", ipStr(srcIp) + ":" + srcPort, ipStr(dstIp) + ":" + dstPort);
             if (dstPort == 53) {
-                c.record.kind = "DNS";
                 String d = parseDnsName(p, payloadOff, payloadLen);
                 if (d != null && !d.isEmpty()) {
                     c.record.host = d;
                     CaptureStore.addLog(c.record, "DNS 查询: " + d);
                 }
-            } else if (dstPort == 443 || dstPort == 80) {
-                c.record.kind = "QUIC";   // UDP 443/80 基本都是 QUIC（HTTP/3）
-                CaptureStore.addLog(c.record, "⚡ 疑似 QUIC（HTTP/3）流量");
-            } else {
-                c.record.kind = "UDP";
             }
             try {
                 DatagramSocket ds = new DatagramSocket();
@@ -501,102 +410,46 @@ public class CaptureEngine implements Runnable {
 
     // ============================ 解析：HTTP / TLS / DNS ============================
     private void onClientData(TcpConn c, byte[] p, int off, int len) {
-        // [v71] 采集上行字节（请求头 / 请求体）。加密流量会在 looksWorthBuffering 里被挡住。
-        try {
-            if (c.record != null && !c.mitmPending && !c.mitmReady) {
-                CaptureStore.feedReq(c.record, p, off, len);
-                /* [v77] 实时切分：HTTP/1.1 keep-alive 长连接不关闭也能立刻看到请求头/体 */
-                CaptureStore.flushPartial(c.record);
-            }
-        } catch (Throwable ignore) {}
         if (c.mitmPending || c.mitmReady) { handleMitmClientData(c, p, off, len); return; }
         try {
-            int cap = Math.min(len, 4096);
-            String s = new String(p, off, cap, StandardCharsets.ISO_8859_1);
-            if (s.startsWith("GET ") || s.startsWith("POST ") || s.startsWith("PUT ")
-                    || s.startsWith("DELETE ") || s.startsWith("HEAD ") || s.startsWith("PATCH ")
-                    || s.startsWith("OPTIONS ") || s.startsWith("TRACE ") || s.startsWith("CONNECT ")) {
-                int nl = s.indexOf("\r\n");
-                String reqLine = nl > 0 ? s.substring(0, nl) : s;
-                if (c.record != null) {
-                    c.record.method = reqLine;
-                    // [v71] 协议细分 + 抽出请求路径
-                    try {
-                        if (reqLine.indexOf("GET ", 0) == 0 || reqLine.indexOf("POST ", 0) == 0
-                                || reqLine.indexOf("PUT ", 0) == 0 || reqLine.indexOf("DELETE ", 0) == 0
-                                || reqLine.indexOf("PATCH ", 0) == 0 || reqLine.indexOf("HEAD ", 0) == 0
-                                || reqLine.indexOf("OPTIONS ", 0) == 0) {
-                            String[] pr = reqLine.split(" ");
-                            if (pr.length >= 2 && pr[1] != null) c.record.url = pr[1];
-                            if (c.record.kind == null || c.record.kind.length() == 0) c.record.kind = "HTTP";
-                        }
-                    } catch (Throwable ignore2) {}
-                    int hi = s.indexOf("\r\nHost:");
-                    if (hi < 0) hi = s.indexOf("\r\nhost:");
-                    if (hi >= 0) {
-                        int he = s.indexOf("\r\n", hi + 2);
-                        if (he > hi) c.record.host = s.substring(hi + 7, he).trim();
-                    }
-                    CaptureStore.addLog(c.record, "→ " + reqLine);
-                    int bodyIdx = s.indexOf("\r\n\r\n");
-                    if (bodyIdx >= 0 && bodyIdx + 4 < s.length()) {
-                        String body = s.substring(bodyIdx + 4);
-                        if (!body.isEmpty()) CaptureStore.addLog(c.record, "  请求体: " + body);
-                    }
+            // ⚠️ TLS 密文不喂给 HTTP 解析器：它只认明文，喂进去只会污染缓冲
+            if (len > 5 && (p[off] & 0xff) == 0x16 && (p[off + 1] & 0xff) == 0x03) {
+                String sni = parseSni(p, off, Math.min(len, 4096));
+                if (c.record != null && sni != null && !sni.isEmpty() && c.record.host.isEmpty()) {
+                    c.record.host = sni;
+                    CaptureStore.addLog(c.record, "🔒 TLS 目标域名: " + sni);
                 }
-            } else if (cap > 5 && (p[off] & 0xff) == 0x16 && (p[off + 1] & 0xff) == 0x03) {
-                // TLS ClientHello → 提取 SNI
-                String sni = parseSni(p, off, cap);
-                if (c.record != null) {
-                    if (c.record.kind == null || c.record.kind.length() == 0) c.record.kind = "HTTPS";
-                    if (sni != null && !sni.isEmpty() && c.record.host.isEmpty()) {
-                        c.record.host = sni;
-                        CaptureStore.addLog(c.record, "🔒 TLS 目标域名: " + sni);
-                    }
-                    // [v71] 顺手取 ALPN（h2 / http/1.1），详情页能显示
-                    try {
-                        String alp = parseAlpn(p, off, cap);
-                        if (alp != null && alp.length() > 0) {
-                            c.record.alpn = alp;
-                            CaptureStore.addLog(c.record, "  ALPN: " + alp);
-                        }
-                    } catch (Throwable ignore3) {}
-                }
+                return;
             }
+            if (c.http != null) c.http.onClient(p, off, len);
         } catch (Throwable ignore) {}
     }
 
+    /** [v83] 拼包结果回写（请求/响应/WebSocket） */
+    static class HSink implements HttpSession.Sink {
+        private final TcpConn c;
+
+        HSink(TcpConn c) { this.c = c; }
+
+        public void onHttp(boolean isRequest, String head, byte[] body, int bodyLen) {
+            if (c.record == null) return;
+            if (isRequest) CaptureStore.fillRequest(c.record, head, body, bodyLen);
+            else CaptureStore.fillResponse(c.record, head, body, bodyLen);
+        }
+
+        public void onWs(boolean isRequest, int opcode, byte[] payload, int len) {
+            if (c.record == null) return;
+            CaptureStore.fillWs(c.record, isRequest, opcode, payload, len);
+        }
+
+        public void onNote(String note) {
+            if (c.record != null) CaptureStore.addLog(c.record, "⚠ " + note);
+        }
+    }
+
     private void onServerData(TcpConn c, byte[] p, int off, int len) {
-        // [v71] 采集下行字节（响应头 / 响应体）—— 旧版完全没有这一步，所以「看不到内容」
         try {
-            if (c.record != null && !c.mitmReady) {
-                CaptureStore.feedResp(c.record, p, off, len);
-                /* [v77] 实时切分：响应边到边可见，不用等连接关闭 */
-                CaptureStore.flushPartial(c.record);
-            }
-        } catch (Throwable ignore) {}
-        try {
-            int cap = Math.min(len, 4096);
-            String s = new String(p, off, cap, StandardCharsets.ISO_8859_1);
-            if (s.startsWith("HTTP/")) {
-                int nl = s.indexOf("\r\n");
-                String statusLine = nl > 0 ? s.substring(0, nl) : s;
-                if (c.record != null) {
-                    c.record.status = statusLine;
-                    if (c.record.kind == null || c.record.kind.length() == 0) c.record.kind = "HTTP";
-                    CaptureStore.addLog(c.record, "← " + statusLine);
-                    // [v71] 记录 Content-Type，详情页据此决定「按文本显示」还是「按二进制提示」
-                    try {
-                        int ci = s.toLowerCase().indexOf("\r\ncontent-type:");
-                        if (ci >= 0) {
-                            int ce = s.indexOf("\r\n", ci + 2);
-                            if (ce > ci) c.record.ctype = s.substring(ci + 15, ce).trim();
-                        }
-                        int uw = s.toLowerCase().indexOf("\r\nupgrade: websocket");
-                        if (uw >= 0) c.record.kind = "WebSocket";
-                    } catch (Throwable ignore4) {}
-                }
-            }
+            if (c.http != null) c.http.onServer(p, off, len);
         } catch (Throwable ignore) {}
     }
 
@@ -624,48 +477,6 @@ public class CaptureEngine implements Runnable {
     }
 
     /** 从 TLS ClientHello 里提取 SNI。 */
-    /** [v71] 从 TLS ClientHello 的扩展里取 ALPN（h2 / http/1.1）。取不到返回 ""。 */
-    private static String parseAlpn(byte[] p, int off, int len) {
-        try {
-            if (len < 50) return "";
-            int base = off + 43;                       // TLS record(5) + handshake(4) + version(2) + random(32)
-            if (base >= off + len) return "";
-            int sidLen = p[base] & 0xff;
-            int pos = base + 1 + sidLen;
-            if (pos + 2 > off + len) return "";
-            int csLen = ((p[pos] & 0xff) << 8) | (p[pos + 1] & 0xff);
-            pos += 2 + csLen;
-            if (pos >= off + len) return "";
-            int compLen = p[pos] & 0xff;
-            pos += 1 + compLen;
-            if (pos + 2 > off + len) return "";
-            int extTotal = ((p[pos] & 0xff) << 8) | (p[pos + 1] & 0xff);
-            pos += 2;
-            int extEnd = Math.min(pos + extTotal, off + len);
-            while (pos + 4 <= extEnd) {
-                int type = ((p[pos] & 0xff) << 8) | (p[pos + 1] & 0xff);
-                int elen = ((p[pos + 2] & 0xff) << 8) | (p[pos + 3] & 0xff);
-                pos += 4;
-                if (pos + elen > extEnd) break;
-                if (type == 16) {   // ALPN
-                    int q = pos + 2;
-                    StringBuilder sb = new StringBuilder();
-                    while (q < pos + elen) {
-                        int l = p[q] & 0xff;
-                        q++;
-                        if (q + l > pos + elen) break;
-                        if (sb.length() > 0) sb.append(", ");
-                        sb.append(new String(p, q, l, StandardCharsets.ISO_8859_1));
-                        q += l;
-                    }
-                    return sb.toString();
-                }
-                pos += elen;
-            }
-        } catch (Throwable ignore) {}
-        return "";
-    }
-
     private static String parseSni(byte[] p, int off, int len) {
         try {
             int end = off + len;
@@ -699,19 +510,6 @@ public class CaptureEngine implements Runnable {
             }
         } catch (Throwable t) {}
         return "";
-    }
-
-    /** [v80] 返回第一条 TLS record 的总长度（5 字节头 + 声明长度）；不是 TLS 返回 -1。 */
-    private static int tlsRecordTotal(byte[] b) {
-        try {
-            if (b == null || b.length < 5) return -1;
-            if ((b[0] & 0xff) != 0x16) return -1;          // handshake
-            int len = ((b[3] & 0xff) << 8) | (b[4] & 0xff);
-            if (len <= 0 || len > 16384) return -1;
-            return 5 + len;
-        } catch (Throwable t) {
-            return -1;
-        }
     }
 
     // ============================ 工具 ============================
@@ -761,6 +559,29 @@ public class CaptureEngine implements Runnable {
         return (int) (~sum) & 0xffff;
     }
 
+    /**
+     * [v83] 把异常翻译成「人能判断的结论」。
+     * 旧版一律打印 "✗ 解密失败: SSLHandshakeException"，用户根本分不清
+     * 「证书固定被拒」（真的抓不到明文）和「网络抖动」（重试即可）。
+     */
+    static String classifyErr(Throwable e, String stage) {
+        if (e == null) return stage + "失败";
+        String n = e.getClass().getSimpleName();
+        String msg = e.getMessage() == null ? "" : e.getMessage();
+        if (e instanceof java.net.SocketTimeoutException) return stage + "超时（对方无响应）";
+        if (e instanceof java.net.ConnectException) return stage + "被拒绝（目标不可达）";
+        if (e instanceof java.net.UnknownHostException) return "域名解析失败（DNS）";
+        if (e instanceof javax.net.ssl.SSLHandshakeException
+                || (msg != null && msg.contains("CERTIFICATE"))) {
+            return "证书被拒 · 该 App 启用了证书固定(pinning)，此域名无法解密（已自动改为直连）";
+        }
+        if (e instanceof javax.net.ssl.SSLException) return "TLS 异常：" + n + "（协议不匹配/版本过低）";
+        if (e instanceof java.net.SocketException) {
+            return stage + "连接中断：" + (msg.isEmpty() ? n : msg);
+        }
+        return stage + "失败：" + n + (msg.isEmpty() ? "" : " — " + msg);
+    }
+
     // ============================ 连接对象 ============================
     static class TcpConn {
         final String key;
@@ -778,10 +599,8 @@ public class CaptureEngine implements Runnable {
         // [v28] MITM 状态
         volatile boolean mitmPending = false;
         volatile boolean mitmReady = false;
-        /* [v80] ClientHello 分片缓冲：TLS1.3 的 ClientHello 常 1000+ 字节，
-           会跨多个 TCP 段。必须收全再交给 MITM，否则 parseSni 失败 → 用 IP 签证书。 */
-        java.io.ByteArrayOutputStream hsBuf;
         MitmTerminator mitmT;
+        HttpSession http;          // [v83] HTTP/WS 会话状态机（跨段拼包）
         Socket localSock;
         java.io.OutputStream localOut;
 

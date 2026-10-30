@@ -129,9 +129,9 @@ public class MainActivity extends Activity {
         new Thread(new Runnable() {
             @Override public void run() {
                 // [2.5.5] 版本对比 + 不限时下载 + 进度回调（进度条实时更新）
-                final String html = FrontLoader.load(
-                        FrontLoader.PACK_URL_V2, cachePathV2,
-                        FrontLoader.PACK_URL, cachePath,
+                // [v83] 统一入口：v3 增量（只下变化块 / 断点续传）→ v2 → v1 → 缓存
+                final String html = FrontLoader.loadBest(
+                        getFilesDir(),
                         15000, new FrontLoader.Progress() {
                     @Override public void onStatus(final String msg) {
                         webView.post(new Runnable() { @Override public void run() {
@@ -143,7 +143,7 @@ public class MainActivity extends Activity {
                             webView.evaluateJavascript("window.__lqLoad&&window.__lqLoad(" + d + "," + total + "," + bps + ")", null);
                         }});
                     }
-                });
+                }, getAssets());
                 webView.post(new Runnable() {
                     @Override public void run() {
                         if (html == null) { die("无法获取前端资源，请检查网络后重试"); return; }
@@ -605,10 +605,35 @@ public class MainActivity extends Activity {
             });
         }
 
+        /**
+         * [v83] 带参数启动抓包。
+         * durationSec 0=不限；count 0=不限；types 逗号分隔类型（json,image...）；ips 逗号分隔域名/IP。
+         * 到达任一上限立即自动停止，由前端一次性取走结果给 AI。
+         */
+        @JavascriptInterface
+        public String startFiltered(int durationSec, int count, String types, String ips) {
+            try {
+                CaptureStore.setAutoStop(durationSec, count, types, ips, null);
+            } catch (Throwable ignore) {}
+            return start();
+        }
+
+        /** 当前自动停止配置（给界面显示剩余时间） */
+        @JavascriptInterface
+        public String autoInfo() { return CaptureStore.autoStopInfo(); }
+
+        /** 清掉自动停止配置（手动停止时用） */
+        @JavascriptInterface
+        public void clearAutoStop() { CaptureStore.clearAutoStop(); }
+
         @JavascriptInterface
         public String list() { return CaptureStore.toJson(); }
 
-        /** [v71] 单条完整内容（正文最多 200KB）。list() 只带 2KB 摘要，完整正文走这里。 */
+        /** [v83] 列表（轻量，不含正文）；limit<=0 表示不限 */
+        @JavascriptInterface
+        public String listLite(int limit, String filter) { return CaptureStore.toListJson(limit, filter); }
+
+        /** [v83] 单条完整详情（含解码后的正文与图片 base64） */
         @JavascriptInterface
         public String detail(long id) { return CaptureStore.detailJson(id); }
 
@@ -645,17 +670,9 @@ public class MainActivity extends Activity {
                 JSONObject o = new JSONObject();
                 o.put("ok", r.ok);
                 o.put("hasRoot", r.hasRoot);
-                o.put("mode", r.mode);          // [v71] 1=直接写 2=bind-mount 3=Magisk模块
-                o.put("detail", r.detail);      // [v71] 安装过程日志，便于诊断
                 o.put("message", r.message);
                 return o.toString();
             } catch (Throwable t) { return "{\"ok\":false,\"message\":\"安装异常\"}"; }
-        }
-
-        /** [v71] 撤销已安装的 CA（含临时 bind-mount）。 */
-        @JavascriptInterface
-        public boolean uninstallCa() {
-            try { return RootCaInstaller.uninstall(); } catch (Throwable t) { return false; }
         }
 
         @JavascriptInterface
@@ -674,6 +691,18 @@ public class MainActivity extends Activity {
     public class A11yBridge {
         @JavascriptInterface
         public boolean isEnabled() { return LqbAccessibilityService.isEnabled(); }
+
+        /**
+         * [v83] 截屏，返回 base64 JPEG（失败返回以 "error:" 开头的说明）。
+         * 前端拿到后作为图片交给模型 —— 不再让 AI「靠读屏文字去猜画面」。
+         */
+        @JavascriptInterface
+        public String screenshot() {
+            if (!LqbAccessibilityService.isEnabled()) return "error:无障碍服务未开启（去 设置→无障碍 打开 LingQiongBuddy）";
+            String b64 = LqbAccessibilityService.screenshotBase64(4000);
+            if (b64 == null || b64.isEmpty()) return "error:截图失败（系统拒绝了本次截屏，请确认系统版本 ≥ Android 11）";
+            return b64;
+        }
 
         /** 打开系统无障碍设置页（引导用户手动开启，不强制）。 */
         @JavascriptInterface
@@ -737,6 +766,58 @@ public class MainActivity extends Activity {
     }
 
     public class SystemBridge {
+
+        private android.media.AudioManager _am() {
+            return (android.media.AudioManager) getSystemService(android.content.Context.AUDIO_SERVICE);
+        }
+
+        /** [v83] 当前媒体音量百分比（0~100），失败 -1 */
+        @JavascriptInterface
+        public int getVolume() {
+            try {
+                android.media.AudioManager a = _am();
+                int max = a.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC);
+                int cur = a.getStreamVolume(android.media.AudioManager.STREAM_MUSIC);
+                return max > 0 ? (int) Math.round(cur * 100.0 / max) : 0;
+            } catch (Throwable t) { return -1; }
+        }
+
+        /** [v83] 设为某百分比（0~100） */
+        @JavascriptInterface
+        public String setVolume(int percent) {
+            try {
+                android.media.AudioManager a = _am();
+                int max = a.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC);
+                int v = Math.round(max * Math.max(0, Math.min(100, percent)) / 100f);
+                v = Math.max(0, Math.min(max, v));
+                a.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, v, 0);
+                return "ok:" + v + "/" + max;
+            } catch (Throwable t) { return "error:" + t.getMessage(); }
+        }
+
+        /** [v83] 加/减若干格（step 可为负） */
+        @JavascriptInterface
+        public String stepVolume(int step) {
+            try {
+                android.media.AudioManager a = _am();
+                int max = a.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC);
+                int cur = a.getStreamVolume(android.media.AudioManager.STREAM_MUSIC);
+                int v = Math.max(0, Math.min(max, cur + step));
+                a.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, v, 0);
+                int pct = max > 0 ? (int) Math.round(v * 100.0 / max) : 0;
+                return "ok:" + v + "/" + max + " (" + pct + "%)";
+            } catch (Throwable t) { return "error:" + t.getMessage(); }
+        }
+
+        @JavascriptInterface
+        public String mute(boolean on) {
+            try {
+                android.media.AudioManager a = _am();
+                a.adjustStreamVolume(android.media.AudioManager.STREAM_MUSIC,
+                        on ? android.media.AudioManager.ADJUST_MUTE : android.media.AudioManager.ADJUST_UNMUTE, 0);
+                return "ok";
+            } catch (Throwable t) { return "error:" + t.getMessage(); }
+        }
         @JavascriptInterface
         public String getSdkVersion() {
             return String.valueOf(Build.VERSION.SDK_INT);

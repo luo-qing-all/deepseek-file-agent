@@ -36,6 +36,15 @@ public class FrontLoader {
      */
     public static final String PACK_URL_V2 = "https://lingqiong.top/front_pack2.json";
 
+    /**
+     * [v83] 增量包清单地址：只有约 2KB，含「每块 sha256」。
+     * 客户端按 sha 本地缓存块 → 只下载缺失的块 → 真增量 + 断点续传。
+     */
+    public static final String PACK_URL_V3 = "https://lingqiong.top/front_pack3.json";
+
+    /** [v83] 内容寻址的块下载前缀（拼上 sha256 即可取块）。 */
+    public static final String CHUNK_URL_BASE = "https://lingqiong.top/front_chunk/";
+
     /** 内置验签公钥（RSA-2048，与服务器私钥配对）。 */
     public static final String PUB_PEM =
         "-----BEGIN PUBLIC KEY-----\n"
@@ -375,4 +384,237 @@ public class FrontLoader {
             if (conn != null) conn.disconnect();
         }
     }
+
+    // ═══════════════════════════════════════════════════════════
+    //  [v83] v3 增量加载：清单 → 只补缺失块 → 拼装 → 解密
+    //
+    //  解决的问题：
+    //   ① 以前版本一变就整包重下（1MB）。现在只下发生变化的块（通常 1~2 个 = 64~128KB）
+    //   ② 以前下到 99% 闪退，重进从头再来。现在已下完的块按 sha 落盘，永久复用
+    //   ③ 块按内容寻址 + 服务端长缓存，配合 manifest 签名，防篡改
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * @param manifestUrl 清单地址
+     * @param chunkBase   块地址前缀（末尾带 /）
+     * @param chunkDir    块缓存目录（文件名 = sha256）
+     * @param binCache    完整密文缓存文件路径（命中同版本可秒启）
+     * @param metaPath    记录上次成功版本号的小文件
+     * @return 解密后的 HTML；失败返回 null（调用方回退 v2）
+     */
+    public static String loadV3(String manifestUrl, String chunkBase, File chunkDir,
+                                String manifestCache, int timeoutMs, Progress cb,
+                                android.content.res.AssetManager am) {
+        try {
+            if (cb != null) cb.onStatus("正在检查更新…");
+
+            // ---- ① 清单：远端 → 本地缓存 → APK 内置（三级兜底，保证一定能启动）----
+            // ★ 清单只有 ~4KB，正常网络瞬间完成；这里把超时压到 4 秒，
+            //   避免断网/弱网时让用户干等 15 秒。超时后立刻改用内置资源启动。
+            String manifest = null;
+            boolean fromRemote = false;
+            try {
+                manifest = httpGet(manifestUrl, Math.min(timeoutMs, 4000));
+                if (manifest != null && manifest.length() > 0) fromRemote = true;
+            } catch (Throwable ig) {}
+            if (!fromRemote && manifestCache != null) {
+                try { manifest = readText(manifestCache); } catch (Throwable ig) {}
+            }
+            if ((manifest == null || manifest.length() == 0) && am != null) {
+                byte[] mz = readAsset(am, "seed/manifest.json");
+                if (mz != null) {
+                    manifest = new String(mz, "UTF-8");
+                    if (cb != null) cb.onStatus("使用内置版本启动…");
+                }
+            }
+            if (manifest == null || manifest.length() == 0) return null;
+
+            org.json.JSONObject m = new org.json.JSONObject(manifest);
+            int v = m.optInt("v", -1);
+            long totalLen = m.optLong("len", -1);
+            org.json.JSONArray arr = m.optJSONArray("blocks");
+            if (v < 0 || totalLen <= 0 || arr == null || arr.length() == 0) return null;
+            int n = arr.length();
+
+            if (chunkDir != null && !chunkDir.exists()) chunkDir.mkdirs();
+
+            // ---- ② 逐块确认：本地已有 → 用；没有 → 先从 APK 内置块取（秒开，不走网络）----
+            String[] ids = new String[n];
+            boolean[] have = new boolean[n];
+            int fromSeed = 0;
+            for (int i = 0; i < n; i++) {
+                ids[i] = arr.getString(i);
+                File f = new File(chunkDir, ids[i]);
+                have[i] = f.exists() && f.length() > 16;
+                if (!have[i] && am != null) {
+                    byte[] seed = readAsset(am, "seed/chunks/" + ids[i]);
+                    if (seed != null && seed.length > 16) {
+                        try {
+                            FileOutputStream o = new FileOutputStream(f);
+                            try { o.write(seed); } finally { try { o.close(); } catch (Throwable ig) {} }
+                            have[i] = true;
+                            fromSeed++;
+                        } catch (Throwable ig) {}
+                    }
+                }
+            }
+            if (fromSeed > 0 && cb != null) cb.onStatus("从内置资源准备前端（" + fromSeed + " 块）…");
+
+            int miss = 0;
+            for (int i = 0; i < n; i++) if (!have[i]) miss++;
+
+            // ---- ③ 只下载真正缺的块（已下载/内置的永久复用 = 断点续传 + 增量）----
+            if (miss > 0) {
+                if (cb != null) cb.onStatus("更新 " + miss + "/" + n + " 个文件块…");
+                long got = 0, tLast = System.currentTimeMillis();
+                for (int i = 0; i < n; i++) {
+                    if (have[i]) continue;
+                    byte[] blk = httpGetBytes(chunkBase + ids[i], 20000, 0);
+                    if (blk == null || blk.length <= 16) {
+                        blk = httpGetBytes(chunkBase + ids[i], 20000, 0);   // 重试一次
+                    }
+                    if (blk == null || blk.length <= 16) {
+                        if (cb != null) cb.onStatus("缺少文件块，尝试其他通道…");
+                        return null;
+                    }
+                    File f = new File(chunkDir, ids[i]);
+                    File tmp = new File(f.getAbsolutePath() + ".tmp");
+                    FileOutputStream o = new FileOutputStream(tmp);
+                    try { o.write(blk); } finally { try { o.close(); } catch (Throwable ig) {} }
+                    if (!tmp.renameTo(f)) { try { f.delete(); } catch (Throwable ig) {} tmp.renameTo(f); }
+                    got += blk.length;
+                    long now = System.currentTimeMillis();
+                    if (cb != null && (now - tLast >= 200)) {
+                        long dt = now - tLast;
+                        long bps = dt > 0 ? got * 1000L / dt : 0;
+                        cb.onProgress(got, got, bps);
+                        tLast = now;
+                    }
+                }
+            } else if (cb != null) {
+                cb.onStatus("准备就绪，正在启动…");
+            }
+
+            // ---- ④ 按清单顺序取块 ----
+            byte[][] blocks = new byte[n][];
+            for (int i = 0; i < n; i++) {
+                File f = new File(chunkDir, ids[i]);
+                if (!f.exists()) return null;
+                blocks[i] = readBytes(f.getAbsolutePath());
+            }
+
+            // ---- ⑤ 验签 + 逐块解密 ----
+            String html = FrontCrypto.decodeV3Blocks(manifest, blocks, PUB_PEM);
+            if (html == null || html.length() == 0) return null;
+
+            if (fromRemote && manifestCache != null) writeText(manifestCache, manifest);
+
+            // ---- ⑥ 清理不属于本清单的旧块 ----
+            try {
+                java.util.HashSet<String> keep = new java.util.HashSet<String>();
+                for (int i = 0; i < n; i++) keep.add(ids[i]);
+                File[] olds = chunkDir.listFiles();
+                if (olds != null) for (File f : olds) {
+                    String nm = f.getName();
+                    if (nm.endsWith(".tmp")) { f.delete(); continue; }
+                    if (!keep.contains(nm)) f.delete();
+                }
+            } catch (Throwable ignore) {}
+
+            return html;
+        } catch (Throwable t) {
+            if (cb != null) cb.onStatus("增量更新失败，尝试其他通道…");
+            return null;
+        }
+    }
+
+    /** [v83] 从 APK assets 读一个小文件；失败返回 null。 */
+    static byte[] readAsset(android.content.res.AssetManager am, String path) {
+        if (am == null) return null;
+        java.io.InputStream in = null;
+        try {
+            in = am.open(path);
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            byte[] buf = new byte[16384];
+            int n;
+            while ((n = in.read(buf)) > 0) bos.write(buf, 0, n);
+            return bos.toByteArray();
+        } catch (Throwable t) {
+            return null;
+        } finally {
+            try { if (in != null) in.close(); } catch (Throwable ignore) {}
+        }
+    }
+
+    /** 读小文件里的整数；不存在/损坏返回 -1。 */
+    static int readIntFile(String path) {
+        try {
+            if (path == null) return -1;
+            String t = readText(path).trim();
+            return Integer.parseInt(t);
+        } catch (Throwable t) {
+            return -1;
+        }
+    }
+
+    /** 写小文件里的整数。 */
+    static void writeIntFile(String path, int v) {
+        try {
+            if (path == null) return;
+            writeText(path, String.valueOf(v));
+        } catch (Throwable ignore) {}
+    }
+
+    /** GET 二进制（connectTimeout / readTimeout；readTimeout=0 表示不限时）。 */
+    static byte[] httpGetBytes(String urlStr, int connectTimeout, int readTimeout) {
+        HttpURLConnection conn = null;
+        InputStream in = null;
+        try {
+            URL url = new URL(urlStr);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setConnectTimeout(connectTimeout);
+            conn.setReadTimeout(readTimeout);
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("Accept", "*/*");
+            conn.setInstanceFollowRedirects(true);
+            int code = conn.getResponseCode();
+            if (code != 200) throw new IOException("HTTP " + code);
+            long len = conn.getContentLengthLong();
+            in = conn.getInputStream();
+            ByteArrayOutputStream bos = new ByteArrayOutputStream(
+                    (len > 0 && len < Integer.MAX_VALUE) ? (int) len : 8192);
+            byte[] buf = new byte[16384];
+            int r;
+            while ((r = in.read(buf)) > 0) bos.write(buf, 0, r);
+            return bos.toByteArray();
+        } catch (Throwable t) {
+            return null;
+        } finally {
+            try { if (in != null) in.close(); } catch (Throwable ignore) {}
+            if (conn != null) conn.disconnect();
+        }
+    }
+
+    /**
+     * [v83] 统一入口：v3 增量 → v2 → v1 → 本地缓存兜底。
+     * 任何一步失败都只降级，绝不抛异常（避免启动闪退）。
+     */
+    public static String loadBest(File filesDir, int timeoutMs, Progress cb,
+                                  android.content.res.AssetManager am) {
+        String v2Cache = new File(filesDir, "front_pack2.json").getAbsolutePath();
+        String v1Cache = new File(filesDir, "front_pack.json").getAbsolutePath();
+
+        // ① v3 增量（APK 内置块 → 本地缓存 → 只下缺的块）
+        try {
+            String h = loadV3(PACK_URL_V3, CHUNK_URL_BASE,
+                    new File(filesDir, "chunks"),
+                    new File(filesDir, "front_v3_manifest.json").getAbsolutePath(),
+                    timeoutMs, cb, am);
+            if (h != null && h.length() > 0) return h;
+        } catch (Throwable ignore) { /* 降级 */ }
+
+        // ② 旧通道 v2 → v1 → 本地缓存
+        return load(PACK_URL_V2, v2Cache, PACK_URL, v1Cache, timeoutMs, cb);
+    }
+
 }

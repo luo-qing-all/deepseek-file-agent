@@ -106,6 +106,15 @@ public class CaptureVpnService extends VpnService {
             b.addDnsServer("223.5.5.5");
             b.addDnsServer("119.29.29.29");
             b.addRoute("0.0.0.0", 0);
+            // [v83] 关键修复：把本 App 自己排除在 VPN 之外。
+            // 旧版 addRoute("0.0.0.0",0) 把本 App 的 AI 请求也拽进自己的 VPN，
+            // 再被自己的 MITM 用自签证书拦截，WebView 不信任 → 直接断网。
+            // 这就是「一开抓包，AI 就连不上」的根因。排除自己后 AI 走物理网络。
+            try {
+                b.addDisallowedApplication(getPackageName());
+            } catch (Throwable ignore) {
+                // API < 21 才会失败；本项目 minSdk 26，理论上不会走到这里
+            }
 
             tun = b.establish();
             if (tun == null) {
@@ -123,6 +132,12 @@ public class CaptureVpnService extends VpnService {
             running = true;
             instance = this;
             CaptureStore.setCapturing(true);
+            // [v83] 到达时间/数量上限 → 自动停止（AI 传的参数）
+            CaptureStore.onAutoStop = new Runnable() {
+                public void run() {
+                    try { stopCapture(); } catch (Throwable ignore) {}
+                }
+            };
         } catch (Throwable t) {
             running = false;
             CaptureStore.setCapturing(false);

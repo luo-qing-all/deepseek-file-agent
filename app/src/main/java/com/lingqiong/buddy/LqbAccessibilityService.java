@@ -56,6 +56,64 @@ public class LqbAccessibilityService extends AccessibilityService {
         return INSTANCE != null;
     }
 
+    /**
+     * [v83] 截屏并返回 JPEG 的 base64（不含 data: 前缀）。失败返回 null。
+     *
+     * 为什么用无障碍而不是 screencap：
+     *   screencap 要 shell/root 身份，普通 App 直接调用会被拒；
+     *   AccessibilityService.takeScreenshot（API 30+）是系统许可的正规通道，
+     *   不需要 root，也不需要录屏权限弹窗。
+     */
+    public static String screenshotBase64(int timeoutMs) {
+        final LqbAccessibilityService s = INSTANCE;
+        if (s == null) return null;
+        if (android.os.Build.VERSION.SDK_INT < 30) return null;
+        final java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+        final String[] holder = new String[]{null};
+        final String[] errHolder = new String[]{null};
+        try {
+            s.takeScreenshot(android.view.Display.DEFAULT_DISPLAY,
+                    java.util.concurrent.Executors.newSingleThreadExecutor(),
+                    new TakeScreenshotCallback() {
+                        @Override
+                        public void onSuccess(ScreenshotResult result) {
+                            android.graphics.Bitmap bmp = null;
+                            try {
+                                bmp = android.graphics.Bitmap.wrapHardwareBuffer(
+                                        result.getHardwareBuffer(), result.getColorSpace());
+                                if (bmp != null) {
+                                    java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+                                    bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 82, bos);
+                                    holder[0] = android.util.Base64.encodeToString(
+                                            bos.toByteArray(), android.util.Base64.NO_WRAP);
+                                } else {
+                                    errHolder[0] = "Bitmap 为空";
+                                }
+                            } catch (Throwable t) {
+                                errHolder[0] = t.getClass().getSimpleName();
+                            } finally {
+                                try { if (bmp != null) bmp.recycle(); } catch (Throwable ignore) {}
+                                try { result.getHardwareBuffer().close(); } catch (Throwable ignore) {}
+                                latch.countDown();
+                            }
+                        }
+
+                        @Override
+                        public void onFailure(int errorCode) {
+                            errHolder[0] = "系统拒绝截图(code=" + errorCode + ")";
+                            latch.countDown();
+                        }
+                    });
+            latch.await(Math.max(1000, timeoutMs), java.util.concurrent.TimeUnit.MILLISECONDS);
+        } catch (Throwable t) {
+            return null;
+        }
+        return holder[0];
+    }
+
+    /** 截图失败原因（给上层拼提示用） */
+    public static String lastShotError = "";
+
     private static boolean dispatch(Path path, long duration) {
         final LqbAccessibilityService s = INSTANCE;
         if (s == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return false;
