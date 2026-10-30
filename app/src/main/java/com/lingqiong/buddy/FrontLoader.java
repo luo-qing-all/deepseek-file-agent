@@ -459,32 +459,65 @@ public class FrontLoader {
      * @param metaPath    记录上次成功版本号的小文件
      * @return 解密后的 HTML；失败返回 null（调用方回退 v2）
      */
+    /**
+     * [v100] 从多个候选 manifest 里挑 v 版本号最大的一份（null / 坏数据自动跳过）。
+     * 目的：APK 内置的可能比本地缓存新，不能再按「谁先拿到用谁」。
+     */
+    static String pickNewestManifest(String... cands) {
+        String best = null;
+        int bestV = -1;
+        if (cands == null) return null;
+        for (String c : cands) {
+            if (c == null || c.trim().length() == 0) continue;
+            int v = -1;
+            try { v = new org.json.JSONObject(c).optInt("v", -1); } catch (Throwable ig) { continue; }
+            if (v > bestV) { bestV = v; best = c; }
+        }
+        return best;
+    }
+
     public static String loadV3(String manifestUrl, String chunkBase, File chunkDir,
                                 String manifestCache, int timeoutMs, Progress cb,
                                 android.content.res.AssetManager am, long hardDeadline) {
         try {
             if (cb != null) cb.onStatus("正在检查更新…");
 
-            // ---- ① 清单：远端 → 本地缓存 → APK 内置（三级兜底，保证一定能启动）----
-            // ★ 清单只有 ~4KB，正常网络瞬间完成；这里把超时压到 4 秒，
-            //   避免断网/弱网时让用户干等 15 秒。超时后立刻改用内置资源启动。
-            String manifest = null;
-            boolean fromRemote = false;
+            // ---- ① 清单：远端 / 本地缓存 / APK 内置 三者取【版本号最大】----
+            // ★[v100] 关键修复：原来是「远端 → 本地缓存 → 内置」先到先得。
+            //   弱网时远端 4 秒拿不到清单，就退到【旧的本地缓存】，
+            //   而 APK 内置明明更新却排在最后用不上
+            //   → 症状：装了新版 APK，界面还是旧版（新功能看不到，例如调试入口）。
+            //   现在三者都取出来，按 manifest 的 v 取最大，保证「装了新版就一定用新版」。
+            String remoteM = null;
             try {
-                manifest = httpGet(manifestUrl, Math.min(timeoutMs, 4000));
-                if (manifest != null && manifest.length() > 0) fromRemote = true;
+                remoteM = httpGet(manifestUrl, Math.min(timeoutMs, 4000));
+                if (remoteM != null && remoteM.trim().length() == 0) remoteM = null;
             } catch (Throwable ig) {}
-            if (!fromRemote && manifestCache != null) {
-                try { manifest = readText(manifestCache); } catch (Throwable ig) {}
+            String localM = null;
+            if (manifestCache != null) {
+                try { localM = readText(manifestCache); } catch (Throwable ig) {}
             }
-            if ((manifest == null || manifest.length() == 0) && am != null) {
-                byte[] mz = readAsset(am, "seed/manifest.json");
-                if (mz != null) {
-                    manifest = new String(mz, "UTF-8");
-                    if (cb != null) cb.onStatus("使用内置版本启动…");
-                }
+            String seedM = null;
+            if (am != null) {
+                try {
+                    byte[] mz = readAsset(am, "seed/manifest.json");
+                    if (mz != null) seedM = new String(mz, "UTF-8");
+                } catch (Throwable ig) {}
             }
-            if (manifest == null || manifest.length() == 0) return null;
+            String manifest = pickNewestManifest(remoteM, localM, seedM);
+            boolean fromRemote = (manifest != null && manifest.equals(remoteM));
+            if (manifest != null && !fromRemote && cb != null) {
+                cb.onStatus(manifest.equals(seedM) ? "使用内置版本启动…" : "使用本地缓存版本启动…");
+            }
+            if (manifest == null || manifest.trim().length() == 0) return null;
+
+            // 用了比本地缓存更新的清单 → 顺手纠正本地缓存（下次不必再比较）
+            if (manifestCache != null && !manifest.equals(localM)) {
+                int _bv = -1, _lv = -1;
+                try { _bv = new org.json.JSONObject(manifest).optInt("v", -1); } catch (Throwable ig) {}
+                try { if (localM != null) _lv = new org.json.JSONObject(localM).optInt("v", -1); } catch (Throwable ig) {}
+                if (_bv > _lv) { try { writeText(manifestCache, manifest); } catch (Throwable ig) {} }
+            }
 
             org.json.JSONObject m = new org.json.JSONObject(manifest);
             int v = m.optInt("v", -1);
@@ -579,7 +612,7 @@ public class FrontLoader {
             String html = FrontCrypto.decodeV3Blocks(manifest, blocks, PUB_PEM);
             if (html == null || html.length() == 0) return null;
 
-            if (fromRemote && manifestCache != null) writeText(manifestCache, manifest);
+            // [v100] 清单缓存的纠正已在上方统一处理（取了更新版本就写回）
 
             // ---- ⑥ 清理不属于本清单的旧块 ----
             try {
