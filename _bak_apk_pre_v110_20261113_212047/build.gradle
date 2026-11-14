@@ -1,0 +1,168 @@
+// ─────────────────────────────────────────────────────────────
+//  LingQiongBuddy · app/build.gradle
+//
+//  ⚠ 重要（曾导致 CI 构建失败的坑）：
+//     Gradle 规定 plugins {} 块必须是脚本中"最先出现"的语句，
+//     它前面除 buildscript{} 外不允许任何其它语句。
+//     一旦违反（比如把 def/if 放在 plugins{} 前面），
+//     构建脚本会在编译期直接报错并退出：
+//        "only buildscript {} and other plugins {} script blocks
+//         are allowed before plugins {} blocks"
+//     所以：插件声明永远放最前，签名读取等逻辑一律放其后。
+// ─────────────────────────────────────────────────────────────
+
+plugins {
+    id 'com.android.application'
+}
+
+// ─────────────────────────────────────────────────────────────
+//  签名配置读取（本地 / CI 两用）——"正规发布"的核心
+//    · 本地：工程根放 keystore.properties（已在 .gitignore 忽略）
+//    · CI  ：用 GitHub Secrets 注入 SIGNING_* 环境变量
+// ─────────────────────────────────────────────────────────────
+def ksPropFile = rootProject.file("keystore.properties")
+def ksProp = new Properties()
+def hasLocalSigning = ksPropFile.exists()
+if (hasLocalSigning) {
+    ksPropFile.withInputStream { ksProp.load(it) }
+}
+def envStoreFile = System.getenv("SIGNING_STORE_FILE")
+def signingReady = hasLocalSigning || (envStoreFile != null && !envStoreFile.isEmpty())
+
+android {
+    namespace 'com.lingqiong.buddy'
+
+    // [加固 v2] 固定 NDK 版本：与 CI 安装的版本保持一致，避免"找不到 NDK"导致构建失败。
+    // 25.1.8937393 是 AGP 8.1.x 的官方默认版本，兼容性最好。
+    ndkVersion "25.1.8937393"
+    compileSdk 34
+
+    defaultConfig {
+        // ★ 关键：applicationId 决定了内置 Termux 环境所在的私有目录，
+        //   也决定了能不能与官方 Termux 共存。
+        //
+        //   Termux bootstrap 里每个二进制的库搜索路径(RUNPATH)都被编译期硬编码成
+        //       /data/data/com.termux/files/usr/lib
+        //   所以本 App 用不了官方那套目录。为此，CI 打包时会下载官方 bootstrap，
+        //   把里面所有 "com.termux" 等长替换成本 App 的 applicationId
+        //   （两者必须同为 10 字节，才能保证 ELF 内部字符串偏移不变、二进制不损坏）。
+        //
+        //   这样：
+        //     · getFilesDir() == /data/data/<applicationId>/files → 环境属于本 App；
+        //     · applicationId ≠ com.termux → 与官方 Termux 可以并存，互不干扰。
+        //   若你想换包名：改成任意 10 字符的包名即可，并同步改 .github/workflows/build.yml 里的 APP_ID。
+        applicationId "com.lq.app"
+        // [minSdk 24] 2026-10-02：本行 26 → 24（支持 Android 7.0+，原 8.0+）。
+        // 降到 24 前已把全部 API 26+ 调用清掉：
+        //   · java.nio.file.Files/Paths → java.io（FrontLoader / FrontCrypto）
+        //   · java.util.Base64        → 内置 B64（FrontCrypto，启动路径）
+        // coreLibraryDesugaring 保持开启（java.time / stream 等兜底）。
+        minSdk 24
+
+        // ★ 关键：targetSdk 必须是 28。
+        //   Android 10+ 只对 targetSdk>=29 的应用禁止"从私有目录执行二进制"(W^X)，
+        //   28 可豁免。Termux 官方也是这么做的。
+        targetSdk 28
+
+        // ★ 以后升版本，只改这两行——这就是"正规"：
+        //   读源码的人一眼就懂，不用去逆向二进制。
+        versionCode 48
+        versionName "2.9.6"
+        multiDexEnabled true
+
+        // [加固 v2] 只编这两个 ABI：arm64-v8a（主流）与 armeabi-v7a（旧机兜底）。
+        // 不编 x86/x86_64，减小体积；.so 极小（约 10KB）。
+        ndk {
+            abiFilters 'arm64-v8a', 'armeabi-v7a'
+        }
+    }
+
+    // ── 正式签名（release）─────────────────────────────────────
+    signingConfigs {
+        release {
+            if (hasLocalSigning) {
+                storeFile rootProject.file(ksProp['storeFile'])
+                storePassword ksProp['storePassword']
+                keyAlias ksProp['keyAlias']
+                keyPassword ksProp['keyPassword']
+            } else if (envStoreFile != null && !envStoreFile.isEmpty()) {
+                storeFile file(envStoreFile)
+                storePassword System.getenv("SIGNING_STORE_PASSWORD")
+                keyAlias System.getenv("SIGNING_KEY_ALIAS")
+                keyPassword System.getenv("SIGNING_KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
+            // 只有真的拿到密钥，release 才签名；否则退化为未签名包（仅本地冒烟用）
+            if (signingReady) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+
+    // [加固 v2] 编译 native 库 liblqkey.so（内嵌包密钥解包私钥）
+    externalNativeBuild {
+        cmake {
+            path "src/main/cpp/CMakeLists.txt"
+            // 与 CI 安装的 CMake 版本一致
+            version "3.22.1"
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+        coreLibraryDesugaringEnabled true
+    }
+
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+    }
+
+    // ── [v28] 修复 CI 构建失败：DuplicateRelativeFileException ──────────
+    // BouncyCastle 的 bcprov-jdk18on / bcpkix-jdk18on 都是 multi-release JAR，
+    // 两个包各自都带一份 META-INF/versions/9/OSGI-INF/MANIFEST.MF 与
+    // META-INF/versions/9/module-info.class；打包合并时同名冲突，
+    // Gradle 直接抛 "3 files found with path ..."，构建中断。
+    // 这些是 Java 9+ 模块系统 / OSGi 的元数据，Android 运行时完全用不到，
+    // 显式排除即可（同时排除 JAR 自带签名，避免与 APK 签名冲突）。
+    packaging {
+        resources {
+            excludes += [
+                // 整个 multi-release 目录：Android(ART) 用不到 versions/* 的内容，
+                // 而 bcprov / bcpkix / bcutil 三个 jar 都带一份 versions/9/OSGI-INF/MANIFEST.MF
+                // 与 versions/9/module-info.class，合并打包时同名冲突（3 files found）导致构建中断。
+                // 一并用通配排除，避免遗漏其它版本目录（11/15/21）。
+                'META-INF/versions/**',
+                'META-INF/DEPENDENCIES',
+                'META-INF/INDEX.LIST',
+                'META-INF/LICENSE',
+                'META-INF/LICENSE.txt',
+                'META-INF/LICENSE.html',
+                'META-INF/NOTICE',
+                'META-INF/NOTICE.txt',
+                'META-INF/NOTICE.html',
+                'META-INF/*.SF',
+                'META-INF/*.DSA',
+                'META-INF/*.RSA'
+            ]
+        }
+    }
+}
+
+dependencies {
+    implementation 'androidx.annotation:annotation:1.7.1'
+    implementation 'androidx.core:core:1.12.0'
+    implementation 'dev.rikka.shizuku:api:13.1.5'
+    implementation 'dev.rikka.shizuku:provider:13.1.5'
+    // [v28] HTTPS 解密（MITM）：动态签发 X509 证书需要 BouncyCastle
+    implementation 'org.bouncycastle:bcprov-jdk18on:1.78.1'
+    implementation 'org.bouncycastle:bcpkix-jdk18on:1.78.1'
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
+}
