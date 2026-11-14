@@ -8,6 +8,20 @@ import android.graphics.Rect;
 import android.os.Build;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
+import android.content.Context;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.PixelFormat;
+import android.graphics.drawable.GradientDrawable;
+import android.os.Handler;
+import android.os.Looper;
+import android.view.Gravity;
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.ViewConfiguration;
+import android.view.WindowManager;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -47,8 +61,16 @@ public class LqbAccessibilityService extends AccessibilityService {
 
     @Override
     public boolean onUnbind(Intent intent) {
+        try { doStopPick(false); } catch (Throwable t) { }   // [v116] 无障碍被关掉时立刻移除取点浮窗
         INSTANCE = null;
         return super.onUnbind(intent);
+    }
+
+    @Override
+    public void onDestroy() {
+        try { doStopPick(false); } catch (Throwable t) { }   // [v116] 服务销毁兜底，防窗口残留卡屏
+        INSTANCE = null;
+        super.onDestroy();
     }
 
     /** 无障碍权限是否已开启（服务是否已连接）。 */
@@ -215,4 +237,400 @@ public class LqbAccessibilityService extends AccessibilityService {
             }
         }
     }
+
+    /* ============ [v116] 屏幕取点：无障碍悬浮窗（TYPE_ACCESSIBILITY_OVERLAY） ============
+       用途：用户像用自动点击器一样，在【任意 App 之上】直接点屏幕取点。
+       不需要 SYSTEM_ALERT_WINDOW，坐标天然是屏幕物理像素（与 dispatchGesture 同坐标系）。
+
+       窗口分两层（同一 WindowManager）：
+         1) PickView 全屏透明层：接收触摸、绘制标记；点「穿透」后设 FLAG_NOT_TOUCHABLE
+            让触摸落到下层 App，方便用户切 App / 导航到目标界面再点回来取点。
+         2) 底部控制条：撤销 / 穿透 / 完成 / 取消，永远可点（在下层之上，先加全屏层后加控制条）。
+
+       生命周期：onUnbind / onDestroy / 再次 startPick 都会先 clearPickViews()，
+       绝不残留窗口卡屏。
+    */
+
+    /** 取点回调：json 形如 {"evt":"start|add|undo|done|cancel","steps":[{...}]} */
+    public interface PickCallback { void onEvent(String json); }
+
+    private static volatile boolean sPicking = false;
+    private static PickCallback sPickCb = null;
+    private static LqbAccessibilityService sPickCtx = null;
+    private static WindowManager sPickWm = null;
+    private static View sPickView = null;
+    private static View sPickBar = null;
+    private static org.json.JSONArray sPickSteps = new org.json.JSONArray();
+    private static boolean sPassThrough = false;
+    private static TextView sPickCount = null;
+    private static TextView sPickPassBtn = null;
+
+    public static boolean isPicking() { return sPicking; }
+
+    private static int dpix(float v) {
+        float d = 2f;
+        try { if (sPickCtx != null) d = sPickCtx.getResources().getDisplayMetrics().density; } catch (Throwable t) { }
+        return Math.round(v * d);
+    }
+
+    private static void runOnMain(Runnable r) {
+        if (Looper.myLooper() == Looper.getMainLooper()) r.run();
+        else new Handler(Looper.getMainLooper()).post(r);
+    }
+
+    /** 开始取点。返回 false = 无障碍服务没开或系统不支持 overlay。 */
+    public static boolean startPick(final PickCallback cb) {
+        final LqbAccessibilityService s = INSTANCE;
+        if (s == null) return false;
+        final CountDownLatch latch = new CountDownLatch(1);
+        final AtomicBoolean ok = new AtomicBoolean(false);
+        Runnable r = new Runnable() {
+            public void run() {
+                try { ok.set(doStartPick(s, cb)); } catch (Throwable t) { ok.set(false); clearPickViews(); }
+                latch.countDown();
+            }
+        };
+        if (Looper.myLooper() == Looper.getMainLooper()) r.run();
+        else {
+            new Handler(Looper.getMainLooper()).post(r);
+            try { latch.await(2000, TimeUnit.MILLISECONDS); } catch (InterruptedException ie) { }
+        }
+        return ok.get();
+    }
+
+    private static boolean doStartPick(LqbAccessibilityService s, PickCallback cb) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP_MR1) return false;
+        if (sPicking) clearPickViews();
+        sPickCtx = s;
+        WindowManager wm = (WindowManager) s.getSystemService(Context.WINDOW_SERVICE);
+        if (wm == null) return false;
+        sPickWm = wm;
+        sPickSteps = new org.json.JSONArray();
+        sPickCb = cb;
+        sPassThrough = false;
+
+        PickView v = new PickView(s);
+        WindowManager.LayoutParams lp = new WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                PixelFormat.TRANSLUCENT);
+        lp.gravity = Gravity.TOP | Gravity.LEFT;
+        lp.x = 0; lp.y = 0;
+        wm.addView(v, lp);
+        sPickView = v;
+
+        LinearLayout bar = buildPickBar(s);
+        WindowManager.LayoutParams blp = new WindowManager.LayoutParams(
+                WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                PixelFormat.TRANSLUCENT);
+        blp.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
+        blp.y = dpix(30);
+        wm.addView(bar, blp);
+        sPickBar = bar;
+
+        sPicking = true;
+        refreshPickBar();
+        emitPick("start");
+        return true;
+    }
+
+    /** 结束取点：commit=true 视为「完成」，false 视为「取消」。主线程安全。 */
+    public static void stopPick(final boolean commit) {
+        runOnMain(new Runnable() {
+            public void run() { doStopPick(commit); }
+        });
+    }
+
+    private static void doStopPick(boolean commit) {
+        boolean was = sPicking;
+        clearPickViews();
+        if (was || commit) emitPick(commit ? "done" : "cancel");
+        sPickCb = null;
+        sPickCtx = null;
+    }
+
+    /** 撤销最近一个取点步骤。 */
+    public static boolean undoPick() {
+        if (!sPicking) return false;
+        final AtomicBoolean ok = new AtomicBoolean(false);
+        final CountDownLatch latch = new CountDownLatch(1);
+        Runnable r = new Runnable() {
+            public void run() {
+                try {
+                    int n = sPickSteps.length();
+                    if (n > 0) { sPickSteps.remove(n - 1); ok.set(true); }
+                } catch (Throwable t) { }
+                try { if (sPickView != null) sPickView.invalidate(); } catch (Throwable t) { }
+                refreshPickBar();
+                if (ok.get()) emitPick("undo");
+                latch.countDown();
+            }
+        };
+        if (Looper.myLooper() == Looper.getMainLooper()) r.run();
+        else {
+            new Handler(Looper.getMainLooper()).post(r);
+            try { latch.await(1000, TimeUnit.MILLISECONDS); } catch (InterruptedException ie) { }
+        }
+        return ok.get();
+    }
+
+    private static void clearPickViews() {
+        try {
+            if (sPickView != null && sPickWm != null) sPickWm.removeViewImmediate(sPickView);
+        } catch (Throwable t) { }
+        try {
+            if (sPickBar != null && sPickWm != null) sPickWm.removeViewImmediate(sPickBar);
+        } catch (Throwable t) { }
+        sPickView = null;
+        sPickBar = null;
+        sPickCount = null;
+        sPickPassBtn = null;
+        sPassThrough = false;
+        sPicking = false;
+    }
+
+    private static void emitPick(String evt) {
+        final PickCallback cb = sPickCb;
+        if (cb == null) return;
+        try {
+            org.json.JSONObject o = new org.json.JSONObject();
+            o.put("evt", evt);
+            o.put("steps", new org.json.JSONArray(sPickSteps.toString()));
+            cb.onEvent(o.toString());
+        } catch (Throwable t) { }
+    }
+
+    private static void togglePassThrough() {
+        if (sPickView == null || sPickWm == null) return;
+        try {
+            WindowManager.LayoutParams lp = (WindowManager.LayoutParams) sPickView.getLayoutParams();
+            if (lp == null) return;
+            sPassThrough = !sPassThrough;
+            if (sPassThrough) lp.flags |= WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
+            else lp.flags &= ~WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
+            sPickWm.updateViewLayout(sPickView, lp);
+        } catch (Throwable t) { }
+        refreshPickBar();
+    }
+
+    private static void refreshPickBar() {
+        try {
+            if (sPickCount != null) sPickCount.setText("已取 " + sPickSteps.length() + " 点");
+            if (sPickPassBtn != null) sPickPassBtn.setText(sPassThrough ? "取点" : "穿透");
+        } catch (Throwable t) { }
+    }
+
+    private static TextView mkPickBtn(Context c, String text) {
+        TextView t = new TextView(c);
+        t.setText(text);
+        t.setTextColor(0xFFFFFFFF);
+        t.setTextSize(13f);
+        t.setGravity(Gravity.CENTER);
+        t.setPadding(dpix(12), dpix(7), dpix(12), dpix(7));
+        t.setClickable(true);
+        return t;
+    }
+
+    private static LinearLayout buildPickBar(Context c) {
+        LinearLayout bar = new LinearLayout(c);
+        bar.setOrientation(LinearLayout.HORIZONTAL);
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(0xF21B1F2A);
+        bg.setCornerRadius(dpix(24));
+        bg.setStroke(Math.max(1, dpix(1)), 0x66FFFFFF);
+        bar.setBackground(bg);
+        bar.setPadding(dpix(4), dpix(4), dpix(4), dpix(4));
+
+        sPickCount = mkPickBtn(c, "已取 0 点");
+        sPickCount.setTextColor(0xFF9FB6FF);
+        bar.addView(sPickCount);
+
+        TextView bUndo = mkPickBtn(c, "撤销");
+        bUndo.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { undoPick(); }
+        });
+        bar.addView(bUndo);
+
+        sPickPassBtn = mkPickBtn(c, "穿透");
+        sPickPassBtn.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { togglePassThrough(); }
+        });
+        bar.addView(sPickPassBtn);
+
+        TextView bDone = mkPickBtn(c, "完成");
+        bDone.setTextColor(0xFF6FE39B);
+        bDone.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { doStopPick(true); }
+        });
+        bar.addView(bDone);
+
+        TextView bCancel = mkPickBtn(c, "取消");
+        bCancel.setTextColor(0xFFFF8B8B);
+        bCancel.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { doStopPick(false); }
+        });
+        bar.addView(bCancel);
+        return bar;
+    }
+
+    /** 全屏透明取点层：短按=点击点，按住拖动=滑动（记起点/终点/时长）。 */
+    static class PickView extends View {
+        private final Paint pRing = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint pFill = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint pLine = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint pTxt = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint pTxtB = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final int[] loc = new int[2];
+        private float d = 2f;
+        private float slop = 24f;
+        private float downX, downY, curX, curY;
+        private long downT = 0;
+        private boolean dragging = false;
+
+        PickView(Context c) {
+            super(c);
+            d = c.getResources().getDisplayMetrics().density;
+            try { slop = ViewConfiguration.get(c).getScaledTouchSlop() * 1.4f; } catch (Throwable t) { }
+            pRing.setStyle(Paint.Style.STROKE);
+            pRing.setStrokeWidth(3f * d);
+            pRing.setColor(0xFF4DA3FF);
+            pFill.setStyle(Paint.Style.FILL);
+            pFill.setColor(0x554DA3FF);
+            pLine.setStyle(Paint.Style.STROKE);
+            pLine.setStrokeWidth(3f * d);
+            pLine.setStrokeCap(Paint.Cap.ROUND);
+            pLine.setColor(0xFF4DA3FF);
+            pTxt.setTextSize(13f * d);
+            pTxt.setTextAlign(Paint.Align.CENTER);
+            pTxt.setColor(0xFFFFFFFF);
+            pTxt.setFakeBoldText(true);
+            pTxtB.setTextSize(13f * d);
+            pTxtB.setTextAlign(Paint.Align.CENTER);
+            pTxtB.setStyle(Paint.Style.STROKE);
+            pTxtB.setStrokeWidth(4f * d);
+            pTxtB.setColor(0xFF000000);
+            pTxtB.setFakeBoldText(true);
+        }
+
+        @Override
+        public boolean onTouchEvent(MotionEvent e) {
+            switch (e.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    downX = e.getX(); downY = e.getY();
+                    curX = downX; curY = downY;
+                    downT = System.currentTimeMillis();
+                    dragging = false;
+                    invalidate();
+                    return true;
+                case MotionEvent.ACTION_MOVE:
+                    curX = e.getX(); curY = e.getY();
+                    if (!dragging) {
+                        float dx = curX - downX, dy = curY - downY;
+                        if (Math.sqrt(dx * dx + dy * dy) > slop) {
+                            dragging = true;
+                            downT = System.currentTimeMillis();
+                        }
+                    }
+                    if (dragging) invalidate();
+                    return true;
+                case MotionEvent.ACTION_UP:
+                    long dur = System.currentTimeMillis() - downT;
+                    if (dur < 120) dur = 120;
+                    if (dur > 3000) dur = 3000;
+                    getLocationOnScreen(loc);
+                    float sx1 = downX + loc[0], sy1 = downY + loc[1];
+                    float sx2 = e.getX() + loc[0], sy2 = e.getY() + loc[1];
+                    if (dragging) recordSwipe(sx1, sy1, sx2, sy2, dur);
+                    else recordTap(sx1, sy1);
+                    dragging = false;
+                    invalidate();
+                    return true;
+                case MotionEvent.ACTION_CANCEL:
+                    dragging = false;
+                    invalidate();
+                    return true;
+                default:
+                    return true;
+            }
+        }
+
+        @Override
+        protected void onDraw(Canvas c) {
+            getLocationOnScreen(loc);
+            int n = sPickSteps.length();
+            for (int i = 0; i < n; i++) {
+                org.json.JSONObject o = sPickSteps.optJSONObject(i);
+                if (o == null) continue;
+                if ("swipe".equals(o.optString("type"))) {
+                    drawSwipe(c, (float) o.optDouble("x1"), (float) o.optDouble("y1"),
+                            (float) o.optDouble("x2"), (float) o.optDouble("y2"), i + 1);
+                } else {
+                    drawDot(c, (float) o.optDouble("x"), (float) o.optDouble("y"), i + 1);
+                }
+            }
+            if (dragging) {
+                drawSwipe(c, downX + loc[0], downY + loc[1], curX + loc[0], curY + loc[1], -1);
+            }
+        }
+
+        private void drawDot(Canvas c, float sx, float sy, int idx) {
+            float x = sx - loc[0], y = sy - loc[1];
+            float r = 20f * d;
+            c.drawCircle(x, y, r, pFill);
+            c.drawCircle(x, y, r, pRing);
+            if (idx > 0) {
+                String s = String.valueOf(idx);
+                float ty = y + 4.6f * d;
+                c.drawText(s, x, ty, pTxtB);
+                c.drawText(s, x, ty, pTxt);
+            }
+        }
+
+        private void drawSwipe(Canvas c, float sx1, float sy1, float sx2, float sy2, int idx) {
+            float x1 = sx1 - loc[0], y1 = sy1 - loc[1], x2 = sx2 - loc[0], y2 = sy2 - loc[1];
+            c.drawLine(x1, y1, x2, y2, pLine);
+            double ang = Math.atan2(y2 - y1, x2 - x1);
+            float ah = 15f * d;
+            for (int k = -1; k <= 1; k += 2) {
+                double a = ang + k * 0.45;
+                c.drawLine(x2, y2, x2 - (float) (Math.cos(a) * ah), y2 - (float) (Math.sin(a) * ah), pLine);
+            }
+            drawDot(c, sx1, sy1, idx);
+            c.drawCircle(x2, y2, 12f * d, pRing);
+        }
+
+        private void recordTap(float sx, float sy) {
+            try {
+                org.json.JSONObject o = new org.json.JSONObject();
+                o.put("type", "tap");
+                o.put("x", Math.round(sx));
+                o.put("y", Math.round(sy));
+                sPickSteps.put(o);
+            } catch (Throwable t) { return; }
+            refreshPickBar();
+            emitPick("add");
+        }
+
+        private void recordSwipe(float sx1, float sy1, float sx2, float sy2, long dur) {
+            try {
+                org.json.JSONObject o = new org.json.JSONObject();
+                o.put("type", "swipe");
+                o.put("x1", Math.round(sx1));
+                o.put("y1", Math.round(sy1));
+                o.put("x2", Math.round(sx2));
+                o.put("y2", Math.round(sy2));
+                o.put("dur", (int) dur);
+                sPickSteps.put(o);
+            } catch (Throwable t) { return; }
+            refreshPickBar();
+            emitPick("add");
+        }
+    }
+
 }
