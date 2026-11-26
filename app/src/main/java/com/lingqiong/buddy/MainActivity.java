@@ -318,12 +318,6 @@ public class MainActivity extends Activity {
     }
 
     @Override
-    protected void onResume() {
-        super.onResume();
-        try { if (webView != null) webView.resumeTimers(); } catch (Throwable ignore) {}
-    }
-
-    @Override
     protected void onDestroy() {
         try { releaseWake(); } catch (Throwable ignore) {}
         super.onDestroy();
@@ -684,6 +678,8 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         isForeground = true;
+        // [v121] ⑯ 回到前台立刻恢复 JS 定时器（配合 onPause 的 resumeTimers，保证流式/定时不断）
+        try { if (webView != null) webView.resumeTimers(); } catch (Throwable ignore) {}
         // 用户从系统设置返回时，通知前端刷新权限状态
         if (webView != null) {
             webView.post(new Runnable() {
