@@ -287,8 +287,29 @@ public class CaptureEngine implements Runnable {
                 return;
             }
             if (c.mitmPending) {
-                String sni = parseSni(p, off, Math.min(len, 4096));
-                if (sni == null || sni.isEmpty()) sni = (c.record != null && c.record.host != null && !c.record.host.isEmpty()) ? c.record.host : ipStr(c.dstIp);
+                /* [v132] ClientHello 常被 TCP 分段（典型 547 字节会拆成两段）。
+                   原来只拿第一段解析 SNI，越界失败 → 用 IP 当 host →
+                   证书 SAN 写成 DNS:IP，客户端验证不过 → CERTIFICATE_UNKNOWN。
+                   现在累积到能解析出 SNI 为止（最多 3 段 / 16KB）。 */
+                if (c.mitmBuf == null) c.mitmBuf = new java.io.ByteArrayOutputStream(8192);
+                if (c.mitmBuf.size() + len <= 16384) c.mitmBuf.write(p, off, len);
+                byte[] acc = c.mitmBuf.toByteArray();
+                String sni = parseSni(acc, 0, acc.length);
+                if ((sni == null || sni.isEmpty()) && acc.length < 16384 && c.mitmTries < 3) {
+                    c.mitmTries++;
+                    try { CaptureStore.addLog(c.record, "… ClientHello 分 " + c.mitmTries + " 段，累积 "
+                            + acc.length + " 字节，继续等 SNI"); } catch (Throwable ig) {}
+                    return; /* 等下一段 */
+                }
+                if (sni == null || sni.isEmpty()) {
+                    sni = (c.record != null && c.record.host != null && !c.record.host.isEmpty())
+                            ? c.record.host : ipStr(c.dstIp);
+                    try { CaptureStore.addLog(c.record, "⚠ 未能解析 SNI（" + acc.length
+                            + " 字节），改用 " + sni + " 签发证书"); } catch (Throwable ig) {}
+                } else {
+                    try { CaptureStore.addLog(c.record, "🔒 TLS 目标域名: " + sni
+                            + "（" + acc.length + " 字节）"); } catch (Throwable ig) {}
+                }
                 c.mitmT = new MitmTerminator(mitm, sni, c.dstIp, c.dstPort, c.record, service, c.http);
                 int port = c.mitmT.start();
                 Socket ls = new Socket("127.0.0.1", port);
@@ -297,7 +318,11 @@ public class CaptureEngine implements Runnable {
                 c.localOut = ls.getOutputStream();
                 c.mitmPending = false;
                 c.mitmReady = true;
+                c.mitmBuf = null;
                 new Thread(new Runnable() { public void run() { readLocal(c); } }, "cap-mitm-read").start();
+                /* 把累积的全部字节一次性交给 MITM（不要重复写） */
+                if (acc.length > 0) { c.localOut.write(acc); c.localOut.flush(); }
+                return;
             }
             if (c.localOut != null) { c.localOut.write(p, off, len); c.localOut.flush(); }
         } catch (Throwable e) {
@@ -664,6 +689,9 @@ public class CaptureEngine implements Runnable {
         CaptureStore.Entry record;
         // [v28] MITM 状态
         volatile boolean mitmPending = false;
+        /** [v132] ClientHello 累积缓冲（解决 TCP 分段导致 SNI 解析失败） */
+        java.io.ByteArrayOutputStream mitmBuf = null;
+        int mitmTries = 0;
         volatile boolean mitmReady = false;
         MitmTerminator mitmT;
         HttpSession http;          // [v83] HTTP/WS 会话状态机（跨段拼包）

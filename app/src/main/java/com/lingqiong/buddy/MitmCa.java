@@ -57,6 +57,20 @@ public class MitmCa {
     private final SecureRandom rnd = new SecureRandom();
     private X509Certificate caCert;
     private PrivateKey caKey;
+    /** [v132] 当前 CA 的 SHA-256 指纹（十六进制），用于和系统信任库比对 */
+    public volatile String caFingerprint = "";
+
+    /** [v132] 计算证书 SHA-256 指纹。 */
+    public static String fpOf(X509Certificate c) {
+        try {
+            byte[] d = MessageDigest.getInstance("SHA-256").digest(c.getEncoded());
+            StringBuilder sb = new StringBuilder();
+            for (byte b : d) sb.append(String.format("%02X", b));
+            return sb.toString();
+        } catch (Throwable t) {
+            return "";
+        }
+    }
 
     /** host -> {PrivateKey, X509Certificate[]{leaf, ca}} */
     private final ConcurrentHashMap<String, Object[]> hostCache = new ConcurrentHashMap<>();
@@ -70,13 +84,57 @@ public class MitmCa {
         File cf = new File(dir, "ca.crt");
         File kf = new File(dir, "ca.key");
         boolean ok = false;
+        String why = "";
         if (cf.exists() && kf.exists()) {
-            try { loadCa(cf, kf); ok = caCert != null && caKey != null; } catch (Throwable ignore) {}
+            try {
+                loadCa(cf, kf);
+                ok = caCert != null && caKey != null;
+                if (!ok) why = "加载后 caCert/caKey 为空";
+            } catch (Throwable t) {
+                /* [v132] 绝不静默：CA 加载失败会导致每次启动换新 CA，必须留下证据 */
+                why = t.getClass().getSimpleName() + ": " + t.getMessage();
+                try { android.util.Log.w("LQ-MITM", "CA 加载失败：" + why); } catch (Throwable ig) {}
+            }
         }
-        if (!ok) { genCa(); saveCa(cf, kf); }
+        if (!ok) {
+            if (!why.isEmpty()) {
+                try { android.util.Log.w("LQ-MITM", "重新生成 CA，原因：" + why); } catch (Throwable ig) {}
+            }
+            genCa();
+            saveCa(cf, kf);
+        }
+        /* [v132] 记录当前 CA 指纹，便于自检「系统里装的是不是这一张」 */
+        try { caFingerprint = fpOf(caCert); } catch (Throwable ig) {}
     }
 
     public X509Certificate caCert() { return caCert; }
+
+    /**
+     * [v132] 把当前 CA 指纹写到 files/mitm/ca.fp。
+     * 下次启动比对：如果变了，说明 CA 被重新生成过，系统信任库里装的必然失效，
+     * 必须重新安装 —— 这是「重启后突然全部解不出明文」的唯一可靠判据。
+     * @return true 表示检测到 CA 被更换
+     */
+    public boolean persistFingerprint() {
+        try {
+            File f = new File(dir, "ca.fp");
+            String old = "";
+            if (f.exists()) {
+                byte[] b = new byte[(int) f.length()];
+                java.io.FileInputStream in = new java.io.FileInputStream(f);
+                int n = in.read(b);
+                in.close();
+                old = n > 0 ? new String(b, 0, n, "UTF-8").trim() : "";
+            }
+            boolean changed = !old.isEmpty() && !old.equals(caFingerprint);
+            java.io.FileOutputStream out = new java.io.FileOutputStream(f);
+            out.write(caFingerprint.getBytes("UTF-8"));
+            out.close();
+            return changed;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
 
     public String caPem() throws Exception {
         StringWriter sw = new StringWriter();
@@ -128,13 +186,40 @@ public class MitmCa {
         p = new PEMParser(new FileReader(kf));
         Object ko = p.readObject();
         p.close();
-        caKey = new JcaPEMKeyConverter().getPrivateKey((org.bouncycastle.asn1.pkcs.PrivateKeyInfo) ko);
+        /* [v132] 关键修复：ca.key 由 JcaPEMWriter 写出时是 PKCS#1（BEGIN RSA PRIVATE KEY），
+           PEMParser 返回 PEMKeyPair；旧代码强转 PrivateKeyInfo 会抛 ClassCastException，
+           被构造函数静默吞掉后重新生成 CA —— 于是每次启动都换一对新 CA，
+           系统信任库里的旧 CA 对不上，客户端一律 CERTIFICATE_UNKNOWN。
+           这里两种格式都认。 */
+        JcaPEMKeyConverter conv = new JcaPEMKeyConverter();
+        if (ko instanceof org.bouncycastle.openssl.PEMKeyPair) {
+            caKey = conv.getKeyPair((org.bouncycastle.openssl.PEMKeyPair) ko).getPrivate();
+        } else if (ko instanceof org.bouncycastle.asn1.pkcs.PrivateKeyInfo) {
+            caKey = conv.getPrivateKey((org.bouncycastle.asn1.pkcs.PrivateKeyInfo) ko);
+        } else {
+            throw new IllegalStateException("ca.key 格式无法识别："
+                    + (ko == null ? "null" : ko.getClass().getName()));
+        }
     }
 
     /** 重新生成 CA（换证书时用）。 */
     public void reset() throws Exception {
         genCa();
         saveCa(new File(dir, "ca.crt"), new File(dir, "ca.key"));
+    }
+
+    /** [v132] 判断字符串是不是 IPv4 / IPv6 字面量。 */
+    static boolean isIpLiteral(String s) {
+        if (s == null || s.isEmpty()) return false;
+        /* IPv4：四段 0-255 */
+        if (s.matches("^\\d{1,3}(\\.\\d{1,3}){3}$")) {
+            for (String p : s.split("\\.")) {
+                try { if (Integer.parseInt(p) > 255) return false; } catch (Throwable t) { return false; }
+            }
+            return true;
+        }
+        /* IPv6：含冒号即认为是（够用，不需要严格校验） */
+        return s.indexOf(':') >= 0;
     }
 
     // ---------------- 动态签发 ----------------
@@ -156,7 +241,16 @@ public class MitmCa {
         Date na = new Date(System.currentTimeMillis() + 825L * DAY);
         BigInteger serial = new BigInteger(64, rnd).abs();
         JcaX509v3CertificateBuilder b = new JcaX509v3CertificateBuilder(issuer, serial, nb, na, subject, kp.getPublic());
-        GeneralNames sans = new GeneralNames(new GeneralName(GeneralName.dNSName, host));
+        /* [v132] IP 必须用 iPAddress 类型。原来一律用 dNSName，
+           遇到「SNI 解析失败 → host 是 IP」时会签出 DNS:1.2.3.4，
+           客户端按 IP 验证时找不到匹配的 SAN，直接 CERTIFICATE_UNKNOWN。 */
+        GeneralName gn;
+        if (isIpLiteral(host)) {
+            gn = new GeneralName(GeneralName.iPAddress, host);
+        } else {
+            gn = new GeneralName(GeneralName.dNSName, host);
+        }
+        GeneralNames sans = new GeneralNames(gn);
         b.addExtension(Extension.subjectAlternativeName, false, sans);
         b.addExtension(Extension.basicConstraints, true, new BasicConstraints(false));
         b.addExtension(Extension.keyUsage, true, new KeyUsage(KeyUsage.digitalSignature | KeyUsage.keyEncipherment));

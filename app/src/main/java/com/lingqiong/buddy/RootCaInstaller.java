@@ -72,30 +72,33 @@ public class RootCaInstaller {
             os.close();
             String src = tmp.getAbsolutePath();
 
-            // 2) 生成安装脚本
+            /* [v132] 关键修复：Java TrustManager 读的是 /system/etc/security/cacerts，
+               而该目录只读（remount 也失败）。可行路径是：
+                 ① 证书写 /apex/com.android.conscrypt/cacerts（可写）
+                 ② bind-mount /apex → /system（当前 namespace）
+                 ③ 遍历所有进程 namespace 逐个 bind-mount（目标 App 才看得到）
+               注意：已在运行的 App 的 TrustManager 已缓存 CA，必须重启该 App 才生效。 */
             String script =
                 "SRC='" + src + "'\n" +
                 "FILE='" + fileName + "'\n" +
-                "OK=0\n" +
-                "mount -o rw,remount /system 2>/dev/null\n" +
-                "mount -o rw,remount / 2>/dev/null\n" +
-                "for D in /system/etc/security/cacerts /apex/com.android.conscrypt/cacerts; do\n" +
-                "  if [ -d \"$D\" ]; then\n" +
-                "    cp \"$SRC\" \"$D/$FILE\" 2>/dev/null && chmod 644 \"$D/$FILE\" 2>/dev/null && OK=1\n" +
-                "  fi\n" +
-                "done\n" +
-                // Android 14+：apex 只读，尝试 bind mount 覆盖（部分环境可行）
-                "if [ $OK -eq 0 ]; then\n" +
-                "  if [ -d /apex/com.android.conscrypt/cacerts ]; then\n" +
-                "    TMPD=/data/local/tmp/cacerts_mitm\n" +
-                "    rm -rf \"$TMPD\"; mkdir -p \"$TMPD\"\n" +
-                "    cp /apex/com.android.conscrypt/cacerts/* \"$TMPD/\" 2>/dev/null\n" +
-                "    cp \"$SRC\" \"$TMPD/$FILE\" 2>/dev/null\n" +
-                "    chmod 644 \"$TMPD/$FILE\" 2>/dev/null\n" +
-                "    mount --bind \"$TMPD\" /apex/com.android.conscrypt/cacerts 2>/dev/null && OK=2\n" +
-                "  fi\n" +
+                "APEX=/apex/com.android.conscrypt/cacerts\n" +
+                "SYSD=/system/etc/security/cacerts\n" +
+                "WROTE=0; BOUND=0; TOTAL=0\n" +
+                "if [ -d \"$APEX\" ]; then\n" +
+                "  cp \"$SRC\" \"$APEX/$FILE\" 2>/dev/null && chmod 644 \"$APEX/$FILE\" 2>/dev/null && WROTE=1\n" +
                 "fi\n" +
-                "echo \"RESULT=$OK\"\n";
+                "if [ -d \"$SYSD\" ] && [ $WROTE -eq 1 ]; then\n" +
+                "  cp \"$SRC\" \"$SYSD/$FILE\" 2>/dev/null && chmod 644 \"$SYSD/$FILE\" 2>/dev/null && WROTE=2\n" +
+                "fi\n" +
+                "if [ $WROTE -eq 1 ]; then\n" +
+                "  mount --bind \"$APEX\" \"$SYSD\" 2>/dev/null && BOUND=$((BOUND+1))\n" +
+                "  for pid in $(ls /proc 2>/dev/null | grep -E '^[0-9]+$'); do\n" +
+                "    [ -d \"/proc/$pid/ns/mnt\" ] || continue\n" +
+                "    TOTAL=$((TOTAL+1))\n" +
+                "    nsenter -t $pid -m -- mount --bind \"$APEX\" \"$SYSD\" 2>/dev/null && BOUND=$((BOUND+1))\n" +
+                "  done\n" +
+                "fi\n" +
+                "echo \"RESULT=$WROTE BOUND=$BOUND TOTAL=$TOTAL\"\n";
 
             File sh = new File(ctx.getCacheDir(), "install_ca.sh");
             OutputStream so = new FileOutputStream(sh);
@@ -111,9 +114,21 @@ public class RootCaInstaller {
             p.waitFor();
 
             String o = out.toString();
-            if (o.contains("RESULT=1") || o.contains("RESULT=2")) {
+            /* 解析 RESULT=<写入方式> BOUND=<绑定成功数> TOTAL=<尝试数> */
+            int wrote = 0, bound = 0;
+            try {
+                java.util.regex.Matcher m = java.util.regex.Pattern
+                        .compile("RESULT=(\\d+) BOUND=(\\d+)").matcher(o);
+                if (m.find()) { wrote = Integer.parseInt(m.group(1)); bound = Integer.parseInt(m.group(2)); }
+            } catch (Throwable ig) {}
+            if (wrote > 0 && bound > 0) {
                 r.ok = true;
-                r.message = "根证书已安装到系统信任库" + (o.contains("RESULT=2") ? "（bind-mount）" : "");
+                r.message = "根证书已生效（绑定 " + bound + " 个进程）\n"
+                        + "⚠ 已经在跑的 App 必须从后台彻底划掉再重开，否则它仍用旧的信任库缓存。";
+            } else if (wrote > 0) {
+                r.ok = true;
+                r.message = "证书已写入，但 bind-mount 未成功（部分系统限制）。\n"
+                        + "如仍解不出明文，请重启手机后再开一次「解密 HTTPS」。\n" + o.trim();
             } else {
                 r.ok = false;
                 r.message = "写入系统证书目录失败（系统分区只读）。已导出证书，可用 Magisk 模块或手动安装。\n" + o.trim();
