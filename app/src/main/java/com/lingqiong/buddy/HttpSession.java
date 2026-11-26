@@ -19,8 +19,12 @@ import java.nio.charset.Charset;
 public class HttpSession {
 
     public interface Sink {
-        void onHttp(boolean isRequest, String head, byte[] body, int bodyLen);
-        void onWs(boolean isRequest, int opcode, byte[] payload, int len);
+        /* [v133] 参数语义统一为 isResponse —— 这是本文件内部真实使用的方向。
+           历史 bug：接口写 isRequest，调用处传的是 isResponse，
+           导致请求被填进 respHead、响应被填进 reqHead，
+           表现为「解密成功但一条 GET 都看不到」。 */
+        void onHttp(boolean isResponse, String head, byte[] body, int bodyLen);
+        void onWs(boolean isResponse, int opcode, byte[] payload, int len);
         void onNote(String note);
     }
 
@@ -269,7 +273,7 @@ public class HttpSession {
             byte[] payload = new byte[(int) plen];
             System.arraycopy(all, p, payload, 0, (int) plen);
             if (masked) for (int k = 0; k < payload.length; k++) payload[k] ^= mask[k & 3];
-            if (sink != null) sink.onWs(isClient, opcode, payload, payload.length);
+            if (sink != null) sink.onWs(!isClient, opcode, payload, payload.length); /* [v133] 统一 isResponse */
             pos = p + (int) plen;
         }
         byte[] remain = new byte[Math.max(0, all.length - pos)];

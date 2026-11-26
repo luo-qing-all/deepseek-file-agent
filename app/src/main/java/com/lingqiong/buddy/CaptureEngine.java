@@ -295,11 +295,17 @@ public class CaptureEngine implements Runnable {
                 if (c.mitmBuf.size() + len <= 16384) c.mitmBuf.write(p, off, len);
                 byte[] acc = c.mitmBuf.toByteArray();
                 String sni = parseSni(acc, 0, acc.length);
-                if ((sni == null || sni.isEmpty()) && acc.length < 16384 && c.mitmTries < 3) {
+                /* [v133] 关键修复：用 TLS record 头里的 length 判断 ClientHello 是否已收全。
+                   原来只看「解析不出 SNI 就等下一段」，但客户端发完 ClientHello 就在等
+                   ServerHello，不会再发数据 → 永远等不到 → 连接卡死（↑536B ↓0B）。
+                   现在：record 已完整就立刻处理，解析不出 SNI 就用 IP 签证书（iPAddress SAN）。 */
+                boolean helloComplete = isTlsRecordComplete(acc);
+                if ((sni == null || sni.isEmpty()) && !helloComplete
+                        && acc.length < 16384 && c.mitmTries < 3) {
                     c.mitmTries++;
                     try { CaptureStore.addLog(c.record, "… ClientHello 分 " + c.mitmTries + " 段，累积 "
-                            + acc.length + " 字节，继续等 SNI"); } catch (Throwable ig) {}
-                    return; /* 等下一段 */
+                            + acc.length + " 字节（未收全），继续等"); } catch (Throwable ig) {}
+                    return; /* 确实还没收全，等下一段 */
                 }
                 if (sni == null || sni.isEmpty()) {
                     sni = (c.record != null && c.record.host != null && !c.record.host.isEmpty())
@@ -514,23 +520,23 @@ public class CaptureEngine implements Runnable {
 
         HSink(TcpConn c) { this.c = c; }
 
-        public void onHttp(boolean isRequest, String head, byte[] body, int bodyLen) {
+        public void onHttp(boolean isResponse, String head, byte[] body, int bodyLen) {
             if (c.record == null) return;
-            /* [v128] 原来这里没 try —— fillRequest 抛异常会被 pump 的
-               catch(Throwable ignore) 吞掉，表现为「解密成功但正文空白」，
-               且没有任何线索。现在把异常记进日志。 */
+            /* [v133] 方向修正：参数是 isResponse，不是 isRequest。
+               原来判断反了 → 请求写进 respHead、响应写进 reqHead → 一条 GET 都抓不到。 */
             try {
-                if (isRequest) CaptureStore.fillRequest(c.record, head, body, bodyLen);
-                else CaptureStore.fillResponse(c.record, head, body, bodyLen);
+                if (isResponse) CaptureStore.fillResponse(c.record, head, body, bodyLen);
+                else CaptureStore.fillRequest(c.record, head, body, bodyLen);
             } catch (Throwable t) {
-                CaptureStore.addLog(c.record, "✗ 解析" + (isRequest ? "请求" : "响应") + "失败："
+                CaptureStore.addLog(c.record, "✗ 解析" + (isResponse ? "响应" : "请求") + "失败："
                         + String.valueOf(t.getMessage() == null ? t.getClass().getSimpleName() : t.getMessage()));
             }
         }
 
-        public void onWs(boolean isRequest, int opcode, byte[] payload, int len) {
+        public void onWs(boolean isResponse, int opcode, byte[] payload, int len) {
             if (c.record == null) return;
-            CaptureStore.fillWs(c.record, isRequest, opcode, payload, len);
+            /* [v133] 同上：参数是 isResponse。fillWs 仍要 isRequest，所以取反。 */
+            CaptureStore.fillWs(c.record, !isResponse, opcode, payload, len);
         }
 
         public void onNote(String note) {
@@ -565,6 +571,24 @@ public class CaptureEngine implements Runnable {
             }
             return sb.toString();
         } catch (Throwable t) { return ""; }
+    }
+
+    /**
+     * [v133] 判断 TLS record 是否已收全。
+     * record 头：type(1) + version(2) + length(2)，length 是 payload 长度。
+     * 收全条件：总字节数 >= 5 + length。
+     * 用于避免「ClientHello 解析不出 SNI 就死等下一段」导致连接卡死。
+     */
+    private static boolean isTlsRecordComplete(byte[] b) {
+        try {
+            if (b == null || b.length < 5) return false;
+            if ((b[0] & 0xff) != 0x16) return false; // 必须是 handshake record
+            int recLen = ((b[3] & 0xff) << 8) | (b[4] & 0xff);
+            if (recLen <= 0 || recLen > 16384) return false;
+            return b.length >= 5 + recLen;
+        } catch (Throwable t) {
+            return false;
+        }
     }
 
     /** 从 TLS ClientHello 里提取 SNI。 */
