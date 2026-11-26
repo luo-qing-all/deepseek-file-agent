@@ -75,6 +75,13 @@ public class MitmTerminator {
     private void acceptLoop() {
         try {
             clientSide = (SSLSocket) serverSocket.accept();
+            /* [v133] setUseClientMode 必须在 startHandshake 之前调用。
+               原代码写在握手之后，JDK 会抛
+                 IllegalArgumentException: Cannot change mode after SSL traffic has started
+               然后被外层 catch 当成「解密失败」把整条连接 close() 掉 ——
+               表现为「证书明明装好了，却每条都红叉」。
+               这个 bug 之前一直被证书链问题掩盖（握手在更早的阶段就失败了）。 */
+            try { clientSide.setUseClientMode(false); } catch (Throwable ignore) {}
             /* [v129] 与客户端握手失败时，把原因说清楚 ——
                绝大多数情况是目标 App 启用了证书固定（微信/银行/部分游戏），
                系统信任库里有本机 CA 也没用。 */
@@ -105,8 +112,6 @@ public class MitmTerminator {
                 close();
                 return;
             }
-            clientSide.setUseClientMode(false);
-
             // 连接真实服务器（再套一层 TLS）
             Socket raw = new Socket();
             raw.setTcpNoDelay(true);
