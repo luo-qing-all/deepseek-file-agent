@@ -37,6 +37,16 @@ public class CaptureEngine implements Runnable {
     // [v28] HTTPS 解密（MITM）
     private volatile MitmCa mitm = null;
     private volatile boolean decryptHttps = false;
+    /* [v131] MITM 握手失败的 host 黑名单：后续同 host 直连透传。
+       原来失败就 close()，等于把这个 App 的网络打断（用户看到「红叉」且 App 断网）。 */
+    private static final java.util.Set<String> MITM_FAILED = java.util.Collections.synchronizedSet(new java.util.HashSet<String>());
+    public static void markMitmFailed(String host) {
+        try { if (host != null && !host.isEmpty()) MITM_FAILED.add(host); } catch (Throwable ignore) {}
+    }
+    public static boolean isMitmFailed(String host) {
+        try { return host != null && MITM_FAILED.contains(host); } catch (Throwable t) { return false; }
+    }
+    public static void clearMitmFailed() { try { MITM_FAILED.clear(); } catch (Throwable ignore) {} }
 
     public void setMitm(MitmCa ca, boolean decrypt) { this.mitm = ca; this.decryptHttps = decrypt; }
 
@@ -204,7 +214,10 @@ public class CaptureEngine implements Runnable {
            原来这些连接根本不进解密流程，永远「未解出明文」。
            现在：先挂起，等客户端第一个包 —— 是 TLS ClientHello 才建解密通道，
            不是就立即直连透传（见 handleMitmClientData 的明文回退分支）。 */
-        if (mitm != null && decryptHttps) {
+        /* [v131] 该 host 之前解密失败过（证书固定等）→ 直接透传，不再重复失败、不再断网 */
+        boolean skipMitm = false;
+        try { skipMitm = isMitmFailed(c.record != null ? c.record.host : null); } catch (Throwable ignore) {}
+        if (mitm != null && decryptHttps && !skipMitm) {
             c.mitmPending = true;
             sendTcp(c.dstIp, c.srcIp, c.dstPort, c.srcPort, c.mySeq, c.clientSeq, 0x12, null, 0); // SYN|ACK
             c.mySeq = (c.mySeq + 1) & 0xffffffffL;

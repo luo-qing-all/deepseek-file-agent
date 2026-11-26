@@ -80,17 +80,28 @@ public class MitmTerminator {
                系统信任库里有本机 CA 也没用。 */
             try { clientSide.startHandshake(); }
             catch (Throwable th) {
-                String m = String.valueOf(th.getMessage() == null ? th.getClass().getSimpleName() : th.getMessage());
+                /* [v131] 记录【完整】异常：类名 + message。
+                   原来只按关键字归类，把「证书链构建失败（trust anchor not found）」
+                   这种真 bug 也说成「App 启用了证书固定」，把排查方向带偏。 */
+                String cls = th.getClass().getName();
+                String msg2 = String.valueOf(th.getMessage() == null ? "" : th.getMessage());
+                String full = cls + (msg2.isEmpty() ? "" : " · " + msg2);
                 String why;
-                if (m.contains("certificate") || m.contains("Certificate") || m.contains("PKIX")
-                        || m.contains("trust") || m.contains("Trust")) {
-                    why = "目标 App 不信任本机 CA（可能启用了证书固定 / 自带信任库）";
-                } else if (m.contains("protocol") || m.contains("Protocol")) {
-                    why = "TLS 协议版本不匹配";
+                if (msg2.contains("Trust anchor") || msg2.contains("trust anchor")
+                        || msg2.contains("CertPathValidator") || msg2.contains("PKIX")) {
+                    /* 这是我们自己签发的证书链有问题，不是对方证书固定 */
+                    why = "证书链不被信任（trust anchor 找不到）→ " + full;
+                } else if (msg2.contains("certificate") || msg2.contains("Certificate")
+                        || msg2.contains("trust") || msg2.contains("Trust")) {
+                    why = "目标 App 拒绝本机 CA（多为证书固定）→ " + full;
+                } else if (msg2.contains("protocol") || msg2.contains("Protocol")) {
+                    why = "TLS 协议版本不匹配 → " + full;
                 } else {
-                    why = m;
+                    why = full;
                 }
                 try { CaptureStore.addLog(record, "✗ 与客户端 TLS 握手失败：" + why); } catch (Throwable ig) {}
+                /* [v131] 把 host 加入黑名单：后续同 host 直连透传，不再重复失败、不再让 App 断网 */
+                try { CaptureEngine.markMitmFailed(host); } catch (Throwable ig) {}
                 close();
                 return;
             }
@@ -108,8 +119,9 @@ public class MitmTerminator {
             try { serverSide.startHandshake(); }
             catch (Throwable t) {
                 /* [v129] 不再静默：连真实服务器失败要说明白 */
-                String m = String.valueOf(t.getMessage() == null ? t.getClass().getSimpleName() : t.getMessage());
+                String m = t.getClass().getName() + (t.getMessage() == null ? "" : " · " + t.getMessage());
                 try { CaptureStore.addLog(record, "✗ 连真实服务器失败：" + m); } catch (Throwable ig) {}
+                try { CaptureEngine.markMitmFailed(host); } catch (Throwable ig) {}
             }
 
             if (record != null) CaptureStore.addLog(record, "🔓 HTTPS 已解密（" + host + "）");

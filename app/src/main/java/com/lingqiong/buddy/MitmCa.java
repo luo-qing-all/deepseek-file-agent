@@ -10,6 +10,9 @@ import org.bouncycastle.asn1.x509.GeneralName;
 import org.bouncycastle.asn1.x509.GeneralNames;
 import org.bouncycastle.asn1.x509.KeyPurposeId;
 import org.bouncycastle.asn1.x509.KeyUsage;
+import org.bouncycastle.asn1.x509.SubjectKeyIdentifier;
+import org.bouncycastle.asn1.x509.AuthorityKeyIdentifier;
+import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
@@ -96,6 +99,11 @@ public class MitmCa {
         JcaX509v3CertificateBuilder b = new JcaX509v3CertificateBuilder(name, serial, nb, na, name, kp.getPublic());
         b.addExtension(Extension.basicConstraints, true, new BasicConstraints(true));
         b.addExtension(Extension.keyUsage, true, new KeyUsage(KeyUsage.keyCertSign | KeyUsage.cRLSign));
+        /* [v131] CA 也带 SKI，方便 leaf 的 AKI 指向它 */
+        try {
+            b.addExtension(Extension.subjectKeyIdentifier, false,
+                    new SubjectKeyIdentifier(MessageDigest.getInstance("SHA-1").digest(kp.getPublic().getEncoded())));
+        } catch (Throwable ignore) {}
         ContentSigner signer = new JcaContentSignerBuilder("SHA256withRSA").build(kp.getPrivate());
         caCert = new JcaX509CertificateConverter().getCertificate(b.build(signer));
         caKey = kp.getPrivate();
@@ -138,7 +146,12 @@ public class MitmCa {
         kpg.initialize(2048, rnd);
         KeyPair kp = kpg.generateKeyPair();
         X500Name subject = new X500Name("CN=" + host);
-        X500Name issuer = new X500Name(caCert.getSubjectX500Principal().getName());
+        /* [v131] 必须用 getEncoded()，不能用 getName() 再 new X500Name(String)。
+           getName() 返回 RFC2253 字符串，重新解析会改变 ASN.1 字符串类型，
+           导致 issuer 的 DER 与 CA subject 的 DER 不一致 —— Android 建链时
+           逐字节比较，不一致就直接判「找不到信任锚点」，握手全部失败。
+           实测：旧做法 DER 相同长度但内容不同；新做法完全一致。 */
+        X500Name issuer = X500Name.getInstance(caCert.getSubjectX500Principal().getEncoded());
         Date nb = new Date(System.currentTimeMillis() - DAY);
         Date na = new Date(System.currentTimeMillis() + 825L * DAY);
         BigInteger serial = new BigInteger(64, rnd).abs();
@@ -148,6 +161,16 @@ public class MitmCa {
         b.addExtension(Extension.basicConstraints, true, new BasicConstraints(false));
         b.addExtension(Extension.keyUsage, true, new KeyUsage(KeyUsage.digitalSignature | KeyUsage.keyEncipherment));
         b.addExtension(Extension.extendedKeyUsage, false, new ExtendedKeyUsage(KeyPurposeId.id_kp_serverAuth));
+        /* [v131] 补 SKI / AKI：部分 Android 版本的链构建器会要求这两个扩展，
+           缺失时即便 issuer DER 一致也可能建链失败。 */
+        try {
+            SubjectKeyIdentifier caSki = new SubjectKeyIdentifier(
+                    MessageDigest.getInstance("SHA-1").digest(caCert.getPublicKey().getEncoded()));
+            b.addExtension(Extension.subjectKeyIdentifier, false,
+                    new SubjectKeyIdentifier(MessageDigest.getInstance("SHA-1").digest(kp.getPublic().getEncoded())));
+            b.addExtension(Extension.authorityKeyIdentifier, false,
+                    new AuthorityKeyIdentifier(caSki.getKeyIdentifier()));
+        } catch (Throwable ignore) {}
         ContentSigner signer = new JcaContentSignerBuilder("SHA256withRSA").build(caKey);
         X509Certificate cert = new JcaX509CertificateConverter().getCertificate(b.build(signer));
         Object[] arr = new Object[]{kp.getPrivate(), new X509Certificate[]{cert, caCert}};
