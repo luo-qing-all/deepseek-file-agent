@@ -76,6 +76,22 @@ public class MainActivity extends Activity {
         ws.setAllowFileAccessFromFileURLs(true);
         ws.setAllowUniversalAccessFromFileURLs(true);
         ws.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        // ===== [v121] ⑪ 性能：这些开关直接决定滚动手感 =====
+        ws.setCacheMode(WebSettings.LOAD_DEFAULT);          // 静态资源走 HTTP 缓存
+        ws.setLoadsImagesAutomatically(true);
+        ws.setBlockNetworkImage(false);
+        ws.setJavaScriptCanOpenWindowsAutomatically(false);
+        ws.setSupportMultipleWindows(false);                 // 少一层窗口管理
+        ws.setUseWideViewPort(false);
+        ws.setSaveFormData(false);                           // 不落表单数据，少一次磁盘写
+        ws.setGeolocationEnabled(false);
+        ws.setTextZoom(100);                                 // 防止系统字体缩放打乱布局
+        try { ws.setOffscreenPreRaster(true); } catch (Throwable ignore) {}   // 提前栅格化，滑动不掉帧
+        try { ws.setMediaPlaybackRequiresUserGesture(false); } catch (Throwable ignore) {}
+        // 硬件层加速：整页走 GPU 合成，长列表滚动明显更顺
+        try { webView.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null); } catch (Throwable ignore) {}
+        try { webView.setOverScrollMode(android.view.View.OVER_SCROLL_NEVER); } catch (Throwable ignore) {}
+        try { android.webkit.CookieManager.getInstance().setAcceptCookie(true); } catch (Throwable ignore) {}
 
         // ===== 桥接：把 Java 对象挂到 window 上 =====
         webView.addJavascriptInterface(new FileBridge(this), "AndroidFile");
@@ -154,7 +170,110 @@ public class MainActivity extends Activity {
         }, "lqb-front-load").start();
 
         // 注意：此处不再自动申请存储权限。改由用户在「总设置 → 文件系统权限」手动授权。
+
+        // ===== [v121] ③ 外部分享进来的图片/文件 =====
+        try { handleShareIntent(getIntent()); } catch (Throwable ignore) {}
+
+        // ===== [v121] ⑫ Java 侧热更：加载可下发的补丁 dex =====
+        try { loadHotPatch(); } catch (Throwable ignore) {}
     }
+
+    /* ==================== [v121] ③ 分享接收 ==================== */
+
+    /** 收到 ACTION_SEND / ACTION_SEND_MULTIPLE 时，把内容复制进私有目录并推给前端。 */
+    private void handleShareIntent(final Intent it) {
+        if (it == null) return;
+        String act = it.getAction();
+        if (!Intent.ACTION_SEND.equals(act) && !Intent.ACTION_SEND_MULTIPLE.equals(act)) return;
+        final java.util.ArrayList<Uri> uris = new java.util.ArrayList<Uri>();
+        try {
+            if (Intent.ACTION_SEND_MULTIPLE.equals(act)) {
+                // 用 Parcelable 接再 instanceof，避免不同 compileSdk 下泛型签名差异导致编译失败
+                java.util.ArrayList<android.os.Parcelable> got =
+                        it.getParcelableArrayListExtra(Intent.EXTRA_STREAM);
+                if (got != null) {
+                    for (android.os.Parcelable o : got) if (o instanceof Uri) uris.add((Uri) o);
+                }
+            } else {
+                android.os.Parcelable one = it.getParcelableExtra(Intent.EXTRA_STREAM);
+                if (one instanceof Uri) uris.add((Uri) one);
+            }
+        } catch (Throwable ignore) {}
+        final String text = it.getStringExtra(Intent.EXTRA_TEXT);
+        if (uris.isEmpty() && (text == null || text.trim().isEmpty())) return;
+
+        new Thread(new Runnable() {
+            @Override public void run() {
+                JSONArray arr = new JSONArray();
+                for (Uri u : uris) {
+                    JSONObject o = new JSONObject();
+                    try {
+                        o.put("p", localizeForFfmpeg(u));
+                        o.put("n", displayName(u));
+                        String m = getContentResolver().getType(u);
+                        o.put("m", m == null ? "" : m);
+                    } catch (Throwable ignore) {}
+                    arr.put(o);
+                }
+                JSONObject payload = new JSONObject();
+                try {
+                    payload.put("files", arr);
+                    payload.put("text", text == null ? "" : text);
+                } catch (Throwable ignore) {}
+                final String js = "window.__lqOnShare&&window.__lqOnShare(" + payload.toString() + ")";
+                webView.post(new Runnable() {
+                    @Override public void run() { webView.evaluateJavascript(js, null); }
+                });
+            }
+        }, "lqb-share").start();
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        try { setIntent(intent); } catch (Throwable ignore) {}
+        try { handleShareIntent(intent); } catch (Throwable ignore) {}
+        // [v121] ⑯ App 已在运行（singleTask）时定时任务到点：
+        // 原生直接让前端立刻取走待执行队列，不必等下次冷启动。
+        try {
+            if (intent != null && intent.getIntExtra("lqSchedFire", 0) == 1) {
+                webView.post(new Runnable() {
+                    @Override public void run() {
+                        webView.evaluateJavascript(
+                            "window.lqSchedDrainPending&&window.lqSchedDrainPending()", null);
+                    }
+                });
+            }
+        } catch (Throwable ignore) {}
+    }
+
+    /* ==================== [v121] ⑫ Java 热更 ==================== */
+
+    /**
+     * 加载可下发的补丁 dex（/sdcard/LingQiongBuddy/hotfix/patch.dex）。
+     *
+     * 边界说明（务必保留这段注释，避免以后误以为能改一切）：
+     *  · 能热更：纯 Java 逻辑（工具分发、文件处理、网络、字符串、算法）。
+     *  · 不能热更：AndroidManifest 里声明的组件、权限、native .so、res 资源、启动流程本身。
+     *  · 补丁类需提供 public static void install(Context, WebView) 作为入口，
+     *    包名固定 com.lq.patch.Patch。
+     */
+    private void loadHotPatch() {
+        try {
+            File dex = new File("/sdcard/LingQiongBuddy/hotfix/patch.dex");
+            if (!dex.exists() || dex.length() < 1024) return;
+            File optDir = new File(getFilesDir(), "hotfix_opt");
+            if (!optDir.exists()) optDir.mkdirs();
+            dalvik.system.DexClassLoader cl = new dalvik.system.DexClassLoader(
+                    dex.getAbsolutePath(), optDir.getAbsolutePath(), null, getClassLoader());
+            Class<?> c = cl.loadClass("com.lq.patch.Patch");
+            java.lang.reflect.Method m = c.getMethod("install", android.content.Context.class, WebView.class);
+            m.invoke(null, this, webView);
+        } catch (Throwable ignore) {}
+    }
+
+    /** 热更补丁的版本号（前端可读，用来判断是否已加载）。 */
+    public static volatile String HOTPATCH_VER = "";
 
     /** Android 11+ 用「所有文件访问权限」；更低版本用传统运行时权限。 */
     private void requestStoragePermission() {
@@ -189,6 +308,19 @@ public class MainActivity extends Activity {
     protected void onPause() {
         super.onPause();
         isForeground = false;
+        // ===== [v121] ⑯ 切后台/熄屏时不让 WebView 暂停 JS 定时器 =====
+        // Android 在 Activity 不可见时会 pauseTimers()，导致：
+        //  · 流式输出卡住不动（回到前台才继续）
+        //  · 定时任务到点不跑
+        // 这里立刻恢复，配合已有的 WakeLock + 前台服务，后台也能继续干活。
+        // 只恢复 JS 定时器；不在这里调 onResume()，避免 WebView 可见性状态错乱
+        try { if (webView != null) webView.resumeTimers(); } catch (Throwable ignore) {}
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        try { if (webView != null) webView.resumeTimers(); } catch (Throwable ignore) {}
     }
 
     @Override
@@ -733,6 +865,35 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public boolean key(String name) { return LqbAccessibilityService.globalAction(name); }
 
+        /* [v120] ⑭ 全屏无障碍取点：在任意 App 界面上点哪取哪。
+           LqbAccessibilityService 里早就写好了 PickView / startPick / stopPick，
+           但一直没接到 JS —— 这里补上桥接。 */
+        @JavascriptInterface
+        public boolean startPick() {
+            try {
+                return LqbAccessibilityService.startPick(new LqbAccessibilityService.PickCallback() {
+                    @Override public void onEvent(String json) {
+                        final String js = "window.__lqPickEvent&&window.__lqPickEvent(" + json + ")";
+                        try {
+                            webView.post(new Runnable() {
+                                @Override public void run() { webView.evaluateJavascript(js, null); }
+                            });
+                        } catch (Throwable ignore) {}
+                    }
+                });
+            } catch (Throwable t) { return false; }
+        }
+
+        @JavascriptInterface
+        public void stopPick(boolean commit) {
+            try { LqbAccessibilityService.stopPick(commit); } catch (Throwable ignore) {}
+        }
+
+        @JavascriptInterface
+        public boolean isPicking() {
+            try { return LqbAccessibilityService.isPicking(); } catch (Throwable t) { return false; }
+        }
+
         @JavascriptInterface
         public String readScreen() { return LqbAccessibilityService.readScreen(); }
 
@@ -929,6 +1090,8 @@ public class MainActivity extends Activity {
                         Intent choose = Intent.createChooser(i, "选择打开方式");
                         choose.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                         startActivity(choose);
+                    } catch (android.content.ActivityNotFoundException e) {
+                        Toast.makeText(MainActivity.this, "没有能打开这类文件的应用，可先用 App 内置浏览查看", Toast.LENGTH_SHORT).show();
                     } catch (Exception e) {
                         Toast.makeText(MainActivity.this, "无法打开： " + e.getMessage(), Toast.LENGTH_SHORT).show();
                     }
@@ -936,30 +1099,62 @@ public class MainActivity extends Activity {
             });
         }
 
-        /** [v56] 用系统文件管理器打开某个目录。 */
+        /** [v56] 用系统文件管理器打开某个目录。
+         *  [v121] 修复「找不到已有的文件管理器」：
+         *   原来用 resource/folder 这个 MIME，绝大多数文件管理器都不声明它，
+         *   于是选择器里一个应用都没有（或直接报错）。
+         *   现在按「最可能成功」的顺序回退：
+         *     ① DocumentsUI 的目录 URI（content://com.android.externalstorage.documents/...）
+         *     ② ACTION_OPEN_DOCUMENT_TREE（让系统自己弹目录选择器）
+         *     ③ 第三方文件管理器常见的 vnd.android.document/directory
+         *     ④ 最后提示用内置文件浏览（绝不静默失败）
+         */
         @JavascriptInterface
         public void openDir(final String path) {
             if (path == null || path.trim().isEmpty()) return;
             final String p = path;
             runOnUiThread(new Runnable() {
                 public void run() {
+                    // ① DocumentsUI 目录 URI（Android 8+ 通用）
+                    try {
+                        String rel = p;
+                        if (rel.startsWith("/storage/emulated/0/")) rel = rel.substring("/storage/emulated/0/".length());
+                        else if (rel.startsWith("/sdcard/")) rel = rel.substring("/sdcard/".length());
+                        if (p.startsWith("/storage/emulated/0") || p.startsWith("/sdcard")) {
+                            String docId = "primary:" + rel.replace("/", "%2F");
+                            Uri du = Uri.parse("content://com.android.externalstorage.documents/document/" + docId);
+                            Intent i = new Intent(Intent.ACTION_VIEW);
+                            i.setDataAndType(du, "vnd.android.document/directory");
+                            i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                            if (i.resolveActivity(getPackageManager()) != null) { startActivity(i); return; }
+                        }
+                    } catch (Throwable ignore) {}
+                    // ② 系统目录选择器（一定能弹，只是要点一下「使用此文件夹」）
+                    try {
+                        Intent t = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+                        t.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        startActivity(t);
+                        return;
+                    } catch (Throwable ignore) {}
+                    // ③ 传统目录 MIME
                     try {
                         java.io.File f = new java.io.File(p);
-                        if (!f.exists()) { Toast.makeText(MainActivity.this, "目录不存在：" + p, Toast.LENGTH_SHORT).show(); return; }
                         Uri uri;
                         try {
                             uri = androidx.core.content.FileProvider.getUriForFile(MainActivity.this, getPackageName() + ".fileprovider", f);
-                        } catch (Throwable t) { uri = Uri.fromFile(f); }
+                        } catch (Throwable t2) { uri = Uri.fromFile(f); }
                         Intent i = new Intent(Intent.ACTION_VIEW);
-                        i.setDataAndType(uri, "resource/folder");
+                        i.setDataAndType(uri, "vnd.android.document/directory");
                         i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
                         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                         Intent choose = Intent.createChooser(i, "选择文件管理器");
                         choose.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                         startActivity(choose);
-                    } catch (Exception e) {
-                        Toast.makeText(MainActivity.this, "无法打开目录（可用 App 内置文件浏览）", Toast.LENGTH_SHORT).show();
-                    }
+                        return;
+                    } catch (Throwable ignore) {}
+                    // ④ 兜底提示
+                    Toast.makeText(MainActivity.this, "没有可用的文件管理器，已打开 App 内置文件浏览", Toast.LENGTH_SHORT).show();
                 }
             });
         }

@@ -28,9 +28,28 @@ public class AlarmReceiver extends BroadcastReceiver {
         if (prompt == null || prompt.trim().isEmpty()) return;
 
         ScheduleStore.addPending(ctx, convId == null ? "" : convId, prompt);
+        // ★[v121] ⑯ 真正把 App 拉起来跑任务（原来只发通知，用户不开 App 就永远不执行）
+        launchApp(ctx);
         notifyUser(ctx, prompt);
         // 重新排程：每天型顺延到明天，仅一次型自然过期
         try { ScheduleManager.rescheduleAll(ctx); } catch (Throwable ignore) {}
+    }
+
+    /**
+     * [v121] ⑯ 把主界面拉到前台，让定时任务真的跑起来。
+     * 本工程 targetSdk=28，Android 10 的「后台启动 Activity 限制」不生效，
+     * 所以这里可以直接 startActivity；个别 ROM 仍然拦截时，
+     * 下面的全屏通知会点亮屏幕，用户一点即可执行。
+     */
+    private void launchApp(Context ctx) {
+        try {
+            Intent open = new Intent(ctx, MainActivity.class);
+            open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                    | Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            open.putExtra("lqSchedFire", 1);
+            ctx.startActivity(open);
+        } catch (Throwable ignore) {}
     }
 
     private void notifyUser(Context ctx, String prompt) {
@@ -56,7 +75,10 @@ public class AlarmReceiver extends BroadcastReceiver {
                     .setContentTitle("定时任务已到点")
                     .setContentText(txt)
                     .setAutoCancel(true)
+                    .setPriority(Notification.PRIORITY_HIGH)
                     .setContentIntent(pi);
+            // [v121] ⑯ 熄屏也能弹出（fullScreenIntent），点亮屏幕让任务马上跑
+            try { b.setFullScreenIntent(pi, true); } catch (Throwable ignore) {}
             nm.notify(id, b.build());
         } catch (Throwable ignore) {
         }

@@ -238,12 +238,23 @@ public class FrontLoader {
 
         try {
             if (cb != null) cb.onStatus(remoteV > 0 ? ("发现新版本 v" + remoteV + "，开始下载…") : "正在下载…");
-            String json = httpGetWithProgress(packUrl, cb);
+            // ★[v121] ⑤ 下载失败重试 3 轮，不立刻退回旧版本
+            String json = null;
+            for (int _t = 0; _t < 3; _t++) {
+                try {
+                    json = httpGetWithProgress(packUrl, cb);
+                    if (json != null && json.length() > 1000) break;
+                } catch (Throwable _e) {
+                    if (cb != null) cb.onStatus("下载中断，正在重试（第 " + (_t + 2) + " 次）…");
+                    try { Thread.sleep(800L * (_t + 1)); } catch (Throwable ig) {}
+                }
+            }
+            if (json == null || json.length() <= 1000) throw new IOException("download failed after retries");
             String html = FrontCrypto.decode(json, PUB_PEM);
             writeText(cachePath, json);
             return html;
         } catch (Throwable netErr) {
-            if (cb != null) cb.onStatus("下载失败，尝试使用本地缓存…");
+            if (cb != null) cb.onStatus("下载失败，先用当前版本启动…");
             try {
                 if (new File(cachePath).exists()) {
                     String json = readText(cachePath);
@@ -346,6 +357,14 @@ public class FrontLoader {
     }
 
     /** [2.5.5] 带进度的 GET：【读超时=0 即不限时】，按 Content-Length 报百分比/速度。 */
+    /** [v121] ④ 字节数 → 人读的大小（界面进度条用）。 */
+    static String fmtSize(long b) {
+        if (b < 1024L) return b + " B";
+        if (b < 1048576L) return String.format(java.util.Locale.US, "%.1f KB", b / 1024.0);
+        if (b < 1073741824L) return String.format(java.util.Locale.US, "%.2f MB", b / 1048576.0);
+        return String.format(java.util.Locale.US, "%.2f GB", b / 1073741824.0);
+    }
+
     static String httpGetWithProgress(String urlStr, Progress cb) throws IOException {
         HttpURLConnection conn = null;
         InputStream in = null;
@@ -489,10 +508,16 @@ public class FrontLoader {
             //   → 症状：装了新版 APK，界面还是旧版（新功能看不到，例如调试入口）。
             //   现在三者都取出来，按 manifest 的 v 取最大，保证「装了新版就一定用新版」。
             String remoteM = null;
-            try {
-                remoteM = httpGet(manifestUrl, Math.min(timeoutMs, 4000));
-                if (remoteM != null && remoteM.trim().length() == 0) remoteM = null;
-            } catch (Throwable ig) {}
+            // ★[v121] ⑤ 清单重试 3 轮（4s → 6s → 8s）。
+            //   原来只试 1 次 4 秒，弱网必失败 → 直接退回旧缓存，看起来像"更新被切走"。
+            for (int _mi = 0; _mi < 3 && remoteM == null; _mi++) {
+                try {
+                    if (_mi > 0 && cb != null) cb.onStatus("正在连接更新服务器（第 " + (_mi + 1) + " 次）…");
+                    String _m = httpGet(manifestUrl, Math.min(timeoutMs, 4000 + _mi * 2000));
+                    if (_m != null && _m.trim().length() > 0) remoteM = _m;
+                } catch (Throwable ig) {}
+                if (remoteM == null) { try { Thread.sleep(600L * (_mi + 1)); } catch (Throwable ig) {} }
+            }
             String localM = null;
             if (manifestCache != null) {
                 try { localM = readText(manifestCache); } catch (Throwable ig) {}
@@ -548,14 +573,19 @@ public class FrontLoader {
                     }
                 }
             }
-            if (fromSeed > 0 && cb != null) cb.onStatus("从内置资源准备前端（" + fromSeed + " 块）…");
+            if (fromSeed > 0 && cb != null) cb.onStatus("正在准备界面资源…");
 
             int miss = 0;
             for (int i = 0; i < n; i++) if (!have[i]) miss++;
 
             // ---- ③ 只下载真正缺的块（已下载/内置的永久复用 = 断点续传 + 增量）----
             if (miss > 0) {
-                if (cb != null) cb.onStatus("需要更新 " + miss + " 个文件块（共 " + n + " 块）…");
+                // ★[v121] ④ 只报「大小」，像游戏更新那样；块数是实现细节，用户不需要看
+                long avgSz = (n > 0 && totalLen > 0) ? (totalLen / n) : 65536L;
+                if (avgSz <= 0) avgSz = 65536L;
+                long needBytes = avgSz * miss;
+                if (cb != null) cb.onStatus("正在更新界面资源（" + fmtSize(needBytes) + "）…");
+                if (cb != null) cb.onProgress(0, needBytes, 0);
                 long got = 0, tLast = System.currentTimeMillis();
                 int doneCnt = 0;
                 for (int i = 0; i < n; i++) {
@@ -566,13 +596,23 @@ public class FrontLoader {
                         return null;
                     }
                     // ★[v88] readTimeout 由 0（永不超时）改为 15 秒 —— 这是卡死主因
-                    byte[] blk = httpGetBytes(chunkBase + ids[i], 12000, 15000);
-                    if (blk == null || blk.length <= 16) {
-                        blk = httpGetBytes(chunkBase + ids[i], 12000, 15000);   // 重试一次
-                    }
-                    if (blk == null || blk.length <= 16) {
-                        if (cb != null) cb.onStatus("缺少文件块，先用已有版本启动…");
-                        return null;
+                    // ★[v121] ⑤ 块下载失败 → 一直重试，绝不 return null 换版本。
+                    //   用户明确要求：下不下来就一直下，不要下到一半突然切走。
+                    byte[] blk = null;
+                    int _try = 0;
+                    while (true) {
+                        blk = httpGetBytes(chunkBase + ids[i], 12000, 15000);
+                        if (blk != null && blk.length > 16) break;
+                        _try++;
+                        if (cb != null) {
+                            long _avg = (n > 0 && totalLen > 0) ? (totalLen / n) : 65536L;
+                            if (_avg <= 0) _avg = 65536L;
+                            cb.onStatus("网络不稳定，正在重试（第 " + _try + " 次）· 已下载 "
+                                    + fmtSize(got) + " / " + fmtSize(_avg * miss));
+                        }
+                        try { Thread.sleep(Math.min(5000L, 500L * _try)); } catch (Throwable ig) {}
+                        // 用户主动退出 App 时不至于永远挂着：每 30 次检查一次线程中断
+                        if (_try % 30 == 0 && Thread.currentThread().isInterrupted()) return null;
                     }
                     File f = new File(chunkDir, ids[i]);
                     File tmp = new File(f.getAbsolutePath() + ".tmp");
@@ -586,12 +626,11 @@ public class FrontLoader {
                     if (cb != null) {
                         long dt = now - tLast;
                         long bps = dt > 0 ? (got * 1000L / dt) : 0;
-                        // 界面按字节显示：用「总长 / 块数」估算每块大小，换算成字节进度
                         long avg = (n > 0 && totalLen > 0) ? (totalLen / n) : 65536L;
                         if (avg <= 0) avg = 65536L;
-                        long estDone = (long) doneCnt * avg;
-                        long estTotal = (long) miss * avg;
-                        if (estDone > estTotal) estDone = estTotal;
+                        long estDone = got;
+                        long estTotal = avg * miss;
+                        if (estDone > estTotal) estTotal = estDone;
                         cb.onProgress(estDone, estTotal, bps);
                     }
                     if (now - tLast >= 500) tLast = now;
@@ -720,8 +759,11 @@ public class FrontLoader {
         // ① v3 增量：块齐时几乎零下载（只花 4 秒读 4KB 清单）
         //    硬时限 20 秒；超时/失败立刻返回 null，不再无限等
         try {
+            // ★[v121] ⑤ 原来这里给 20 秒硬时限，超时就返回 null → 界面立刻退回旧缓存，
+            //   用户看到的就是「下载到一半突然切换走了」。现在传 0 = 不限时，
+            //   块下载失败会一直重试（见 loadV3 ③），绝不半途换版本。
             String h = loadV3(PACK_URL_V3, CHUNK_URL_BASE, chunkDir, mcPath,
-                    timeoutMs, cb, am, System.currentTimeMillis() + 20000L);
+                    timeoutMs, cb, am, 0L);
             if (h != null && h.length() > 0) {
                 writeCachedHtml(filesDir, h);
                 return h;
