@@ -58,6 +58,19 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="application/*" />
             </intent-filter>
+            <!-- [v126] ④ 兜底：很多 App 分享时 Intent type 写 "*/*"，
+                 而 "*/*" 不匹配 image/* 这种具体类型 → 系统不会列出本 App。
+                 补这两条后，任何分享面板里都能看到 LingQiongBuddy。 -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
         </activity>
 
         <!-- [2.6.0] AI 后台持续运行的前台服务（生成期间常驻，结束即停） -->

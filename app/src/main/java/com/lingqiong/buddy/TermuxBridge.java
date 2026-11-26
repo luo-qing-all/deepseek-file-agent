@@ -353,6 +353,10 @@ public class TermuxBridge {
 
     private static final class Task {
         volatile boolean done = false;
+        /** [v126] 用户点了停止：poll 立刻返回 done，不再傻等进程自然结束。 */
+        volatile boolean cancelled = false;
+        /** [v126] 子进程 pid（反射取），用于杀整棵进程树。 */
+        volatile int pid = -1;
         volatile int code = -1;
         volatile boolean timedOut = false;
         volatile long cost = 0;
@@ -406,6 +410,7 @@ public class TermuxBridge {
                 ProcessBuilder pb = buildProcess(cmd, cwd, envId);
                 proc = pb.start();
                 t.proc = proc;
+                t.pid = pidOf(proc);
                 try { t.stdin = proc.getOutputStream(); } catch (Throwable ignore) {}
             }
             // 不关闭 stdin：内置终端可向运行中的程序写入输入（交互 / input / 确认提示）。
@@ -456,6 +461,97 @@ public class TermuxBridge {
         }
     }
 
+    /* ==================== [v126] 进程树强杀 ==================== */
+
+    /** 反射取 java.lang.Process 的 pid（Android 的 ProcessImpl 有 int pid 字段）。 */
+    private static int pidOf(Process p) {
+        if (p == null) return -1;
+        try {
+            java.lang.reflect.Field f = p.getClass().getDeclaredField("pid");
+            f.setAccessible(true);
+            return f.getInt(p);
+        } catch (Throwable ignore) {}
+        // 兜底：Android 8+ 有 Process.toHandle()? 不可用。再试一次父类字段
+        try {
+            Class<?> c = p.getClass();
+            while (c != null) {
+                for (java.lang.reflect.Field f : c.getDeclaredFields()) {
+                    if ("pid".equals(f.getName()) && f.getType() == int.class) {
+                        f.setAccessible(true);
+                        return f.getInt(p);
+                    }
+                }
+                c = c.getSuperclass();
+            }
+        } catch (Throwable ignore) {}
+        return -1;
+    }
+
+    /** 读 /proc/<pid>/stat 的 ppid（comm 里可能有空格和括号，所以从最后一个 ')' 之后解析）。 */
+    private static int ppidOf(int pid) {
+        try {
+            java.io.File f = new java.io.File("/proc/" + pid + "/stat");
+            if (!f.exists()) return -1;
+            byte[] buf = new byte[512];
+            java.io.FileInputStream in = new java.io.FileInputStream(f);
+            int n;
+            try { n = in.read(buf); } finally { try { in.close(); } catch (Throwable ig) {} }
+            if (n <= 0) return -1;
+            String s = new String(buf, 0, n, "UTF-8");
+            int rp = s.lastIndexOf(')');
+            if (rp < 0) return -1;
+            String rest = s.substring(rp + 1).trim();
+            String[] parts = rest.split("\\s+");
+            // parts[0]=state, parts[1]=ppid
+            if (parts.length < 2) return -1;
+            return Integer.parseInt(parts[1]);
+        } catch (Throwable ignore) { return -1; }
+    }
+
+    /** 递归收集 root 的全部子孙 pid。 */
+    private static void collectDescendants(int root, java.util.Map<Integer, Integer> parent,
+                                           java.util.List<Integer> out, int depth) {
+        if (depth > 12) return;
+        for (java.util.Map.Entry<Integer, Integer> e : parent.entrySet()) {
+            if (e.getValue() != null && e.getValue().intValue() == root) {
+                int child = e.getKey();
+                if (!out.contains(child)) {
+                    out.add(child);
+                    collectDescendants(child, parent, out, depth + 1);
+                }
+            }
+        }
+    }
+
+    /**
+     * 杀掉 pid 及其全部子孙进程。
+     * 关键：先杀子孙再杀父，否则父先死会让子孙被 init 收养，再也找不到归属。
+     */
+    private static void killTree(int rootPid) {
+        if (rootPid <= 0) return;
+        try {
+            java.util.Map<Integer, Integer> parent = new java.util.HashMap<>();
+            java.io.File[] dirs = new java.io.File("/proc").listFiles();
+            if (dirs != null) {
+                for (java.io.File d : dirs) {
+                    String n = d.getName();
+                    if (n.isEmpty() || !Character.isDigit(n.charAt(0))) continue;
+                    int pid;
+                    try { pid = Integer.parseInt(n); } catch (Throwable ig) { continue; }
+                    int pp = ppidOf(pid);
+                    if (pp > 0) parent.put(pid, pp);
+                }
+            }
+            java.util.List<Integer> kids = new java.util.ArrayList<>();
+            collectDescendants(rootPid, parent, kids, 0);
+            // 深度优先：kids 是逐层加入的，倒序基本等于先深后浅
+            for (int i = kids.size() - 1; i >= 0; i--) {
+                try { android.os.Process.sendSignal(kids.get(i).intValue(), 9); } catch (Throwable ig) {}
+            }
+            try { android.os.Process.sendSignal(rootPid, 9); } catch (Throwable ig) {}
+        } catch (Throwable ignore) {}
+    }
+
     /** 轮询任务结果。running 时也会带上"到目前为止"的输出，便于终端实时显示。 */
     @JavascriptInterface
     public String execPoll(String taskId) {
@@ -463,6 +559,12 @@ public class TermuxBridge {
         if (t == null) return "{\"state\":\"missing\"}";
         String out;
         synchronized (t.out) { out = t.out.toString(); }
+        // [v126] 用户已点停止：立刻收尾，不等进程真正退出（进程树已经在 execKill 里被杀）
+        if (t.cancelled) {
+            TASKS.remove(taskId);
+            return "{\"state\":\"done\",\"code\":-9,\"cost\":" + (System.currentTimeMillis() - t.start)
+                    + ",\"timedOut\":false,\"cancelled\":true,\"out\":\"" + esc(out) + "\"}";
+        }
         if (!t.done) {
             return "{\"state\":\"running\",\"out\":\"" + esc(out) + "\"}";
         }
@@ -503,7 +605,27 @@ public class TermuxBridge {
     public String execKill(String taskId) {
         Task t = TASKS.get(taskId);
         if (t == null) return "无此任务";
-        try { if (t.proc != null) t.proc.destroyForcibly(); } catch (Throwable ignore) {}
+        // [v126] ① 标记取消，poll 立刻能收尾（不用等进程自然结束）
+        t.cancelled = true;
+        Process p = t.proc;
+        int pid = (t.pid > 0) ? t.pid : pidOf(p);
+        // [v126] ② 杀整棵进程树（先子孙后父），避免 bash 死了子进程变孤儿继续跑
+        if (pid > 0) killTree(pid);
+        try { if (p != null) p.destroyForcibly(); } catch (Throwable ignore) {}
+        // [v126] ③ 兜底：300ms 后再补一刀（有些进程有延迟启动的子进程）
+        final int fpid = pid;
+        final Process fp = p;
+        if (fpid > 0) {
+            new Thread(new Runnable() {
+                @Override public void run() {
+                    try { Thread.sleep(300); } catch (Throwable ignore) {}
+                    try { killTree(fpid); } catch (Throwable ignore) {}
+                    try { if (fp != null) fp.destroyForcibly(); } catch (Throwable ignore) {}
+                }
+            }, "lqb-exec-rekill").start();
+        }
+        t.done = true;
+        t.code = -9;
         return "已中止";
     }
 

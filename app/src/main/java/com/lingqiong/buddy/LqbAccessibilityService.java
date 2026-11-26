@@ -263,6 +263,7 @@ public class LqbAccessibilityService extends AccessibilityService {
     private static org.json.JSONArray sPickSteps = new org.json.JSONArray();
     private static boolean sPassThrough = false;
     private static TextView sPickCount = null;
+    private static LinearLayout sPickTipBar = null;   // [v124] 顶部说明条
     private static TextView sPickPassBtn = null;
 
     public static boolean isPicking() { return sPicking; }
@@ -319,6 +320,14 @@ public class LqbAccessibilityService extends AccessibilityService {
                 PixelFormat.TRANSLUCENT);
         lp.gravity = Gravity.TOP | Gravity.LEFT;
         lp.x = 0; lp.y = 0;
+        /* [v127] API 30+：不裁剪任何系统栏区域，真正盖满整块屏幕
+           （否则部分机型只盖住 App 内容区，状态栏和导航栏区域点不到） */
+        if (Build.VERSION.SDK_INT >= 30) {
+            try { lp.setFitInsetsTypes(0); } catch (Throwable ignore) {}
+            try { lp.layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS; } catch (Throwable ignore) {}
+        }
+        try { lp.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE; } catch (Throwable ignore) {}
         wm.addView(v, lp);
         sPickView = v;
 
@@ -332,6 +341,19 @@ public class LqbAccessibilityService extends AccessibilityService {
         blp.y = dpix(30);
         wm.addView(bar, blp);
         sPickBar = bar;
+
+        /* [v124] 顶部说明条：告诉用户怎么操作，不然只有底部一排按钮没人看得懂 */
+        LinearLayout tip = buildPickTipBar(s);
+        WindowManager.LayoutParams tlp = new WindowManager.LayoutParams(
+                WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                        | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                PixelFormat.TRANSLUCENT);
+        tlp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+        tlp.y = dpix(46);
+        try { wm.addView(tip, tlp); sPickTipBar = tip; } catch (Throwable ignore) {}
 
         sPicking = true;
         refreshPickBar();
@@ -389,6 +411,8 @@ public class LqbAccessibilityService extends AccessibilityService {
         sPickView = null;
         sPickBar = null;
         sPickCount = null;
+        try { if (sPickTipBar != null && sPickWm != null) sPickWm.removeViewImmediate(sPickTipBar); } catch (Throwable ignore) {}
+        sPickTipBar = null;
         sPickPassBtn = null;
         sPassThrough = false;
         sPicking = false;
@@ -434,6 +458,44 @@ public class LqbAccessibilityService extends AccessibilityService {
         t.setPadding(dpix(12), dpix(7), dpix(12), dpix(7));
         t.setClickable(true);
         return t;
+    }
+
+    /** [v124] 顶部说明条：短按取点击、拖动取滑动，并提示可穿透回 App 操作。 */
+    private static LinearLayout buildPickTipBar(Context c) {
+        LinearLayout bar = new LinearLayout(c);
+        bar.setOrientation(LinearLayout.VERTICAL);
+        bar.setGravity(Gravity.CENTER_HORIZONTAL);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(0xF21B1F2A);
+        bg.setCornerRadius(dpix(16));
+        bg.setStroke(Math.max(1, dpix(1)), 0x66FFFFFF);
+        bar.setBackground(bg);
+        bar.setPadding(dpix(14), dpix(9), dpix(14), dpix(9));
+
+        TextView t1 = new TextView(c);
+        t1.setText("取点模式 · 全屏");
+        t1.setTextColor(0xFF9FB6FF);
+        t1.setTextSize(12f);
+        t1.setGravity(Gravity.CENTER);
+        t1.getPaint().setFakeBoldText(true);
+        bar.addView(t1);
+
+        TextView t2 = new TextView(c);
+        t2.setText("点一下 = 点击　划一下 = 滑动");
+        t2.setTextColor(0xFFFFFFFF);
+        t2.setTextSize(12f);
+        t2.setGravity(Gravity.CENTER);
+        t2.setPadding(0, dpix(3), 0, 0);
+        bar.addView(t2);
+
+        TextView t3 = new TextView(c);
+        t3.setText("取完点「完成」回 App 保存 · 想操作底层界面点「穿透」");
+        t3.setTextColor(0xFFB9C0CF);
+        t3.setTextSize(11f);
+        t3.setGravity(Gravity.CENTER);
+        t3.setPadding(0, dpix(2), 0, 0);
+        bar.addView(t3);
+        return bar;
     }
 
     private static LinearLayout buildPickBar(Context c) {
@@ -486,6 +548,10 @@ public class LqbAccessibilityService extends AccessibilityService {
         private final Paint pLine = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint pTxt = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint pTxtB = new Paint(Paint.ANTI_ALIAS_FLAG);
+        /* [v127] 取点层可见性用的画笔 */
+        private final Paint pEdge = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint pTag = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint pTagBg = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final int[] loc = new int[2];
         private float d = 2f;
         private float slop = 24f;
@@ -513,6 +579,12 @@ public class LqbAccessibilityService extends AccessibilityService {
             pTxtB.setTextSize(13f * d);
             pTxtB.setTextAlign(Paint.Align.CENTER);
             pTxtB.setStyle(Paint.Style.STROKE);
+            pTag.setTextSize(11.5f * d);
+            pTag.setColor(0xFFFFFFFF);
+            pTag.setFakeBoldText(true);
+            pTag.setAntiAlias(true);
+            pTagBg.setStyle(Paint.Style.FILL);
+            pTagBg.setAntiAlias(true);
             pTxtB.setStrokeWidth(4f * d);
             pTxtB.setColor(0xFF000000);
             pTxtB.setFakeBoldText(true);
@@ -563,6 +635,23 @@ public class LqbAccessibilityService extends AccessibilityService {
         @Override
         protected void onDraw(Canvas c) {
             getLocationOnScreen(loc);
+            /* [v127] 让取点层「看得见」：极淡遮罩 + 四边描边 + 左上角状态标签。
+               原来这层是全透明的，用户根本不知道自己在取点模式。 */
+            int vw = getWidth(), vh = getHeight();
+            c.drawColor(0x0A000000);                    /* 4% 黑，压一下底层但不挡内容 */
+            pEdge.setStyle(Paint.Style.STROKE);
+            pEdge.setStrokeWidth(Math.max(2f, 2f * d));
+            pEdge.setColor(0xCC4DA3FF);
+            float inset = Math.max(2f, 2f * d);
+            c.drawRect(inset, inset, vw - inset, vh - inset, pEdge);
+            /* 左上角标签 */
+            String tag = "取点中 " + sPickSteps.length();
+            float tw = pTag.measureText(tag);
+            float pad = 9f * d, th = 15f * d;
+            float ty0 = 14f * d;
+            pTagBg.setColor(0xE61B1F2A);
+            c.drawRoundRect(12f * d, ty0, 12f * d + tw + pad * 2, ty0 + th + pad, 7f * d, 7f * d, pTagBg);
+            c.drawText(tag, 12f * d + pad, ty0 + th, pTag);
             int n = sPickSteps.length();
             for (int i = 0; i < n; i++) {
                 org.json.JSONObject o = sPickSteps.optJSONObject(i);

@@ -85,7 +85,8 @@ public class MainActivity extends Activity {
         ws.setUseWideViewPort(false);
         ws.setSaveFormData(false);                           // 不落表单数据，少一次磁盘写
         ws.setGeolocationEnabled(false);
-        ws.setTextZoom(100);                                 // 防止系统字体缩放打乱布局
+        // [v124] 不强制 setTextZoom —— 跟随系统字体大小。
+        // v121 曾强制 100%，导致系统字体设小的用户反而看到字变大。
         try { ws.setOffscreenPreRaster(true); } catch (Throwable ignore) {}   // 提前栅格化，滑动不掉帧
         try { ws.setMediaPlaybackRequiresUserGesture(false); } catch (Throwable ignore) {}
         // 硬件层加速：整页走 GPU 合成，长列表滚动明显更顺
