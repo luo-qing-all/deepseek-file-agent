@@ -75,6 +75,25 @@ public class MitmTerminator {
     private void acceptLoop() {
         try {
             clientSide = (SSLSocket) serverSocket.accept();
+            /* [v129] 与客户端握手失败时，把原因说清楚 ——
+               绝大多数情况是目标 App 启用了证书固定（微信/银行/部分游戏），
+               系统信任库里有本机 CA 也没用。 */
+            try { clientSide.startHandshake(); }
+            catch (Throwable th) {
+                String m = String.valueOf(th.getMessage() == null ? th.getClass().getSimpleName() : th.getMessage());
+                String why;
+                if (m.contains("certificate") || m.contains("Certificate") || m.contains("PKIX")
+                        || m.contains("trust") || m.contains("Trust")) {
+                    why = "目标 App 不信任本机 CA（可能启用了证书固定 / 自带信任库）";
+                } else if (m.contains("protocol") || m.contains("Protocol")) {
+                    why = "TLS 协议版本不匹配";
+                } else {
+                    why = m;
+                }
+                try { CaptureStore.addLog(record, "✗ 与客户端 TLS 握手失败：" + why); } catch (Throwable ig) {}
+                close();
+                return;
+            }
             clientSide.setUseClientMode(false);
 
             // 连接真实服务器（再套一层 TLS）
@@ -86,7 +105,12 @@ public class MitmTerminator {
             serverSide = (SSLSocket) f.createSocket(raw, host, realPort, true);
             serverSide.setUseClientMode(true);
             try { applyAlpn(serverSide); } catch (Throwable ignore) {}
-            try { serverSide.startHandshake(); } catch (Throwable ignore) {}
+            try { serverSide.startHandshake(); }
+            catch (Throwable t) {
+                /* [v129] 不再静默：连真实服务器失败要说明白 */
+                String m = String.valueOf(t.getMessage() == null ? t.getClass().getSimpleName() : t.getMessage());
+                try { CaptureStore.addLog(record, "✗ 连真实服务器失败：" + m); } catch (Throwable ig) {}
+            }
 
             if (record != null) CaptureStore.addLog(record, "🔓 HTTPS 已解密（" + host + "）");
 

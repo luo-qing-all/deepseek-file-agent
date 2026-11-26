@@ -774,10 +774,17 @@ public class MainActivity extends Activity {
 
         // [v28] HTTPS 解密开关 + 根证书安装
         @JavascriptInterface
-        public void setDecryptHttps(boolean b) { CaptureVpnService.decryptHttps = b; }
+        public void setDecryptHttps(boolean b) {
+            /* [v129] 改成持久化：重启 App 后解密开关不再被重置为 false */
+            CaptureVpnService.setDecrypt(MainActivity.this, b);
+        }
 
         @JavascriptInterface
         public boolean getDecryptHttps() { return CaptureVpnService.decryptHttps; }
+
+        /* [v129] 证书是否仍在系统信任库（重启后 bind-mount 可能失效） */
+        @JavascriptInterface
+        public boolean isCaInstalled() { return CaptureVpnService.caInstalled(MainActivity.this); }
 
         @JavascriptInterface
         public String caStatus() {

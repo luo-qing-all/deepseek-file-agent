@@ -28,6 +28,40 @@ public class CaptureVpnService extends VpnService {
 
     /** [v28] 是否开启「解密 HTTPS」。 */
     public static volatile boolean decryptHttps = false;
+
+    /* [v129] 解密开关持久化。
+       原来 decryptHttps 只是个内存变量，App 一重启就回 false，
+       于是「明明开过解密，重启后又全是未解出明文」。
+       现在存 SharedPreferences，服务启动时自动恢复。 */
+    public static final String PREF = "lq_capture_pref";
+    public static final String KEY_DECRYPT = "decrypt_https";
+
+    public static void setDecrypt(Context ctx, boolean b) {
+        decryptHttps = b;
+        try {
+            ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE)
+               .edit().putBoolean(KEY_DECRYPT, b).apply();
+        } catch (Throwable ignore) {}
+    }
+
+    public static void restoreDecrypt(Context ctx) {
+        try {
+            decryptHttps = ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE)
+                              .getBoolean(KEY_DECRYPT, false);
+        } catch (Throwable ignore) {}
+    }
+
+    /** [v129] CA 是否还在系统信任库里（Android 14+ 看 apex 路径）。 */
+    public static boolean caInstalled(Context ctx) {
+        try {
+            MitmCa ca = ensureMitmCa(ctx);
+            if (ca == null) return false;
+            String hash = ca.caHashName();
+            String fn = hash + ".0";
+            return new java.io.File("/apex/com.android.conscrypt/cacerts/" + fn).exists()
+                || new java.io.File("/system/etc/security/cacerts/" + fn).exists();
+        } catch (Throwable t) { return false; }
+    }
     private static MitmCa staticMitmCa;
 
     private static volatile CaptureVpnService instance;
@@ -55,6 +89,7 @@ public class CaptureVpnService extends VpnService {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        restoreDecrypt(this);   // [v129] 每次启动都从磁盘恢复解密开关
         String action = intent != null ? intent.getAction() : null;
         if (ACTION_STOP.equals(action)) {
             stopCapture();

@@ -166,9 +166,45 @@ public class CaptureEngine implements Runnable {
         }
     }
 
+    /** [v129] 是否 TLS ClientHello（record type 0x16 + version 0x03xx）。 */
+    private static boolean isTlsHello(byte[] p, int off, int len) {
+        if (len < 3) return false;
+        return (p[off] & 0xff) == 0x16 && (p[off + 1] & 0xff) == 0x03;
+    }
+
+    /** [v129] 明文协议：直连服务器 + 转发已缓冲字节（不做任何解密）。 */
+    private void fallbackPlain(final TcpConn c, byte[] p, int off, int len) {
+        try {
+            Socket s = new Socket();
+            s.setTcpNoDelay(true);
+            try { if (service != null) service.protect(s); } catch (Throwable ignore) {}
+            s.connect(new InetSocketAddress(InetAddress.getByAddress(c.dstIp), c.dstPort), 15000);
+            c.sock = s;
+            c.sin = s.getInputStream();
+            c.sout = s.getOutputStream();
+            if (len > 0) {
+                c.sout.write(p, off, len);
+                c.sout.flush();
+                if (c.record != null) c.record.up += len;
+            }
+            new Thread(new Runnable() { public void run() { readServer(c); } }, "cap-tcp-read").start();
+        } catch (Throwable e) {
+            String err = classifyErr(e, "连接服务器");
+            if (c.record != null) {
+                CaptureStore.setError(c.record, err);
+                CaptureStore.addLog(c.record, "✗ " + err);
+            }
+            closeTcp(c);
+        }
+    }
+
     private void connectServer(final TcpConn c) {
-        if (mitm != null && decryptHttps && c.dstPort == 443) {
-            // [v28] MITM：不直连真实服务器，等客户端 ClientHello 后再建解密通道
+        /* [v129] 不再只认 443 端口。
+           很多 App 用 8443 / 8080 / 自定义端口跑 HTTPS（微信就是 8080），
+           原来这些连接根本不进解密流程，永远「未解出明文」。
+           现在：先挂起，等客户端第一个包 —— 是 TLS ClientHello 才建解密通道，
+           不是就立即直连透传（见 handleMitmClientData 的明文回退分支）。 */
+        if (mitm != null && decryptHttps) {
             c.mitmPending = true;
             sendTcp(c.dstIp, c.srcIp, c.dstPort, c.srcPort, c.mySeq, c.clientSeq, 0x12, null, 0); // SYN|ACK
             c.mySeq = (c.mySeq + 1) & 0xffffffffL;
@@ -228,6 +264,15 @@ public class CaptureEngine implements Runnable {
     // ============================ [v28] MITM 解密 ============================
     private void handleMitmClientData(TcpConn c, byte[] p, int off, int len) {
         try {
+            /* [v129] 明文协议回退：MITM 只对 TLS 有效。
+               如果第一个包不是 TLS ClientHello（0x16 0x03），
+               说明这是明文协议（HTTP/SMTP/MySQL/Redis…），
+               立即直连服务器并把已缓冲的字节转发过去，不让它卡住。 */
+            if (c.mitmPending && !isTlsHello(p, off, len)) {
+                c.mitmPending = false;
+                fallbackPlain(c, p, off, len);
+                return;
+            }
             if (c.mitmPending) {
                 String sni = parseSni(p, off, Math.min(len, 4096));
                 if (sni == null || sni.isEmpty()) sni = (c.record != null && c.record.host != null && !c.record.host.isEmpty()) ? c.record.host : ipStr(c.dstIp);

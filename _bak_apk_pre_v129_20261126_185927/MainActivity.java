@@ -1,0 +1,1208 @@
+package com.lingqiong.buddy;
+
+import android.Manifest;
+import android.app.Activity;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.Signature;
+import android.database.Cursor;
+import android.net.Uri;
+import android.net.VpnService;
+import android.os.Build;
+import android.os.Bundle;
+import android.os.Environment;
+import android.os.PowerManager;
+import android.provider.Settings;
+import android.webkit.JavascriptInterface;
+import android.webkit.ValueCallback;
+import android.webkit.WebChromeClient;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import android.widget.Toast;
+
+import org.json.JSONArray;
+
+import java.security.MessageDigest;
+import org.json.JSONObject;
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+
+/**
+ * 宿主 Activity：WebView 装载 index.html，并用 addJavascriptInterface 把
+ * FileBridge / ShizukuBridge / TermuxBridge / SystemBridge 暴露成 JS 里的 window 对象。
+ *
+ * 这就是"AI 能操作文件 / 终端"的物理接口——JS 只是喊一声，真正的执行在这里。
+ */
+public class MainActivity extends Activity {
+    /** 正式签名（lq-release.jks）证书 SHA-256；与打包签名不一致 → 判定为改包。 */
+    private static final String EXPECTED_SIG = "b7b78c6ffed16fb9e59174e109590f7c47edefa50e4cd844ed57e8d15af7e359";
+    /** 前端资源由服务器动态下发（AES-256-GCM + RSA 验签），APK 内不含可解密密钥。 */
+    private WebView webView;
+    private ValueCallback<Uri[]> filePathCallback;
+    private static final int FILE_CHOOSER_REQ = 1001;
+    private static final int PERM_REQ = 2001;
+    private static final int VPN_REQ = 3001;
+
+    /* ===== [2.6.0] 后台持续运行 + 完成通知 ===== */
+    private static final String WORK_CHANNEL_ID = "lq_ai_work";
+    private static final String DONE_CHANNEL_ID = "lq_ai_done";
+    private static final int WORK_NOTI_ID = 20001;
+    private static final int DONE_NOTI_ID = 20002;
+    private volatile boolean isForeground = false;
+    private PowerManager.WakeLock wakeLock;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        webView = new WebView(this);
+        setContentView(webView);
+
+        WebSettings ws = webView.getSettings();
+        ws.setJavaScriptEnabled(true);
+        ws.setDomStorageEnabled(true);
+        ws.setAllowFileAccess(true);
+        ws.setAllowContentAccess(true);
+        ws.setAllowFileAccessFromFileURLs(true);
+        ws.setAllowUniversalAccessFromFileURLs(true);
+        ws.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        // ===== [v121] ⑪ 性能：这些开关直接决定滚动手感 =====
+        ws.setCacheMode(WebSettings.LOAD_DEFAULT);          // 静态资源走 HTTP 缓存
+        ws.setLoadsImagesAutomatically(true);
+        ws.setBlockNetworkImage(false);
+        ws.setJavaScriptCanOpenWindowsAutomatically(false);
+        ws.setSupportMultipleWindows(false);                 // 少一层窗口管理
+        ws.setUseWideViewPort(false);
+        ws.setSaveFormData(false);                           // 不落表单数据，少一次磁盘写
+        ws.setGeolocationEnabled(false);
+        // [v124] 不强制 setTextZoom —— 跟随系统字体大小。
+        // v121 曾强制 100%，导致系统字体设小的用户反而看到字变大。
+        try { ws.setOffscreenPreRaster(true); } catch (Throwable ignore) {}   // 提前栅格化，滑动不掉帧
+        try { ws.setMediaPlaybackRequiresUserGesture(false); } catch (Throwable ignore) {}
+        // 硬件层加速：整页走 GPU 合成，长列表滚动明显更顺
+        try { webView.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null); } catch (Throwable ignore) {}
+        try { webView.setOverScrollMode(android.view.View.OVER_SCROLL_NEVER); } catch (Throwable ignore) {}
+        try { android.webkit.CookieManager.getInstance().setAcceptCookie(true); } catch (Throwable ignore) {}
+
+        // ===== 桥接：把 Java 对象挂到 window 上 =====
+        webView.addJavascriptInterface(new FileBridge(this), "AndroidFile");
+        webView.addJavascriptInterface(new ShizukuBridge(this), "AndroidShizuku");
+        webView.addJavascriptInterface(new TermuxBridge(this), "AndroidTermux");
+        webView.addJavascriptInterface(new SystemBridge(), "AndroidSystem");
+        webView.addJavascriptInterface(new A11yBridge(), "AndroidA11y");
+        webView.addJavascriptInterface(new CaptureBridge(), "AndroidCapture");
+
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                view.loadUrl(url);
+                return true;
+            }
+        });
+
+        // 处理 <input type="file"> 弹窗
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback,
+                                             FileChooserParams params) {
+                if (filePathCallback != null) {
+                    filePathCallback.onReceiveValue(null);
+                }
+                filePathCallback = callback;
+
+                Intent intent = params.createIntent();
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                try {
+                    startActivityForResult(intent, FILE_CHOOSER_REQ);
+                } catch (Exception e) {
+                    filePathCallback = null;
+                    return false;
+                }
+                return true;
+            }
+        });
+
+        // ===== 安全加固①：签名校验（换签 / 改包 → 直接退出）=====
+        if (!checkSignature()) { die("应用完整性校验失败，已停止运行"); return; }
+
+        // ===== 安全加固②：前端资源【动态下发 + 验签解密】=====
+        // APK 内不含可解密钥匙；密文与 AES 密钥由服务器下发，服务器私钥签名防篡改。
+        // 首次需联网；之后可用本地缓存（加密态）离线兜底。
+        webView.loadDataWithBaseURL("file:///android_asset/", LOADING_HTML, "text/html", "utf-8", null);
+        final String cachePath = new File(getFilesDir(), "front_pack.json").getAbsolutePath();
+        // [加固 v2] 新格式独立缓存（存加密态）。v2 解密需要 native 私钥，
+        // 若 native 不可用会自动降级到下面的 v1 通道，不影响启动。
+        final String cachePathV2 = new File(getFilesDir(), "front_pack2.json").getAbsolutePath();
+        new Thread(new Runnable() {
+            @Override public void run() {
+                // [2.5.5] 版本对比 + 不限时下载 + 进度回调（进度条实时更新）
+                // [v83] 统一入口：v3 增量（只下变化块 / 断点续传）→ v2 → v1 → 缓存
+                final String html = FrontLoader.loadBest(
+                        getFilesDir(),
+                        15000, new FrontLoader.Progress() {
+                    @Override public void onStatus(final String msg) {
+                        webView.post(new Runnable() { @Override public void run() {
+                            webView.evaluateJavascript("window.__lqStatus&&window.__lqStatus(" + jsStr(msg) + ")", null);
+                        }});
+                    }
+                    @Override public void onProgress(final long d, final long total, final long bps) {
+                        webView.post(new Runnable() { @Override public void run() {
+                            webView.evaluateJavascript("window.__lqLoad&&window.__lqLoad(" + d + "," + total + "," + bps + ")", null);
+                        }});
+                    }
+                }, getAssets());
+                webView.post(new Runnable() {
+                    @Override public void run() {
+                        if (html == null) { die("无法获取前端资源，请检查网络后重试"); return; }
+                        webView.loadDataWithBaseURL("file:///android_asset/", html, "text/html", "utf-8", null);
+                    }
+                });
+            }
+        }, "lqb-front-load").start();
+
+        // 注意：此处不再自动申请存储权限。改由用户在「总设置 → 文件系统权限」手动授权。
+
+        // ===== [v121] ③ 外部分享进来的图片/文件 =====
+        try { handleShareIntent(getIntent()); } catch (Throwable ignore) {}
+
+        // ===== [v121] ⑫ Java 侧热更：加载可下发的补丁 dex =====
+        try { loadHotPatch(); } catch (Throwable ignore) {}
+    }
+
+    /* ==================== [v121] ③ 分享接收 ==================== */
+
+    /** 收到 ACTION_SEND / ACTION_SEND_MULTIPLE 时，把内容复制进私有目录并推给前端。 */
+    private void handleShareIntent(final Intent it) {
+        if (it == null) return;
+        String act = it.getAction();
+        if (!Intent.ACTION_SEND.equals(act) && !Intent.ACTION_SEND_MULTIPLE.equals(act)) return;
+        final java.util.ArrayList<Uri> uris = new java.util.ArrayList<Uri>();
+        try {
+            if (Intent.ACTION_SEND_MULTIPLE.equals(act)) {
+                // 用 Parcelable 接再 instanceof，避免不同 compileSdk 下泛型签名差异导致编译失败
+                java.util.ArrayList<android.os.Parcelable> got =
+                        it.getParcelableArrayListExtra(Intent.EXTRA_STREAM);
+                if (got != null) {
+                    for (android.os.Parcelable o : got) if (o instanceof Uri) uris.add((Uri) o);
+                }
+            } else {
+                android.os.Parcelable one = it.getParcelableExtra(Intent.EXTRA_STREAM);
+                if (one instanceof Uri) uris.add((Uri) one);
+            }
+        } catch (Throwable ignore) {}
+        final String text = it.getStringExtra(Intent.EXTRA_TEXT);
+        if (uris.isEmpty() && (text == null || text.trim().isEmpty())) return;
+
+        new Thread(new Runnable() {
+            @Override public void run() {
+                JSONArray arr = new JSONArray();
+                for (Uri u : uris) {
+                    JSONObject o = new JSONObject();
+                    try {
+                        o.put("p", localizeForFfmpeg(u));
+                        o.put("n", displayName(u));
+                        String m = getContentResolver().getType(u);
+                        o.put("m", m == null ? "" : m);
+                    } catch (Throwable ignore) {}
+                    arr.put(o);
+                }
+                JSONObject payload = new JSONObject();
+                try {
+                    payload.put("files", arr);
+                    payload.put("text", text == null ? "" : text);
+                } catch (Throwable ignore) {}
+                final String js = "window.__lqOnShare&&window.__lqOnShare(" + payload.toString() + ")";
+                webView.post(new Runnable() {
+                    @Override public void run() { webView.evaluateJavascript(js, null); }
+                });
+            }
+        }, "lqb-share").start();
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        try { setIntent(intent); } catch (Throwable ignore) {}
+        try { handleShareIntent(intent); } catch (Throwable ignore) {}
+        // [v121] ⑯ App 已在运行（singleTask）时定时任务到点：
+        // 原生直接让前端立刻取走待执行队列，不必等下次冷启动。
+        try {
+            if (intent != null && intent.getIntExtra("lqSchedFire", 0) == 1) {
+                webView.post(new Runnable() {
+                    @Override public void run() {
+                        webView.evaluateJavascript(
+                            "window.lqSchedDrainPending&&window.lqSchedDrainPending()", null);
+                    }
+                });
+            }
+        } catch (Throwable ignore) {}
+    }
+
+    /* ==================== [v121] ⑫ Java 热更 ==================== */
+
+    /**
+     * 加载可下发的补丁 dex（/sdcard/LingQiongBuddy/hotfix/patch.dex）。
+     *
+     * 边界说明（务必保留这段注释，避免以后误以为能改一切）：
+     *  · 能热更：纯 Java 逻辑（工具分发、文件处理、网络、字符串、算法）。
+     *  · 不能热更：AndroidManifest 里声明的组件、权限、native .so、res 资源、启动流程本身。
+     *  · 补丁类需提供 public static void install(Context, WebView) 作为入口，
+     *    包名固定 com.lq.patch.Patch。
+     */
+    private void loadHotPatch() {
+        try {
+            File dex = new File("/sdcard/LingQiongBuddy/hotfix/patch.dex");
+            if (!dex.exists() || dex.length() < 1024) return;
+            File optDir = new File(getFilesDir(), "hotfix_opt");
+            if (!optDir.exists()) optDir.mkdirs();
+            dalvik.system.DexClassLoader cl = new dalvik.system.DexClassLoader(
+                    dex.getAbsolutePath(), optDir.getAbsolutePath(), null, getClassLoader());
+            Class<?> c = cl.loadClass("com.lq.patch.Patch");
+            java.lang.reflect.Method m = c.getMethod("install", android.content.Context.class, WebView.class);
+            m.invoke(null, this, webView);
+        } catch (Throwable ignore) {}
+    }
+
+    /** 热更补丁的版本号（前端可读，用来判断是否已加载）。 */
+    public static volatile String HOTPATCH_VER = "";
+
+    /** Android 11+ 用「所有文件访问权限」；更低版本用传统运行时权限。 */
+    private void requestStoragePermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (!Environment.isExternalStorageManager()) {
+                try {
+                    Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
+                    intent.setData(Uri.parse("package:" + getPackageName()));
+                    startActivity(intent);
+                } catch (Exception e) {
+                    try {
+                        Intent intent = new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
+                        startActivity(intent);
+                    } catch (Exception ex) {}
+                }
+            }
+        } else {
+            boolean need = checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                    != PackageManager.PERMISSION_GRANTED
+                    || checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE)
+                    != PackageManager.PERMISSION_GRANTED;
+            if (need) {
+                requestPermissions(new String[]{
+                        Manifest.permission.READ_EXTERNAL_STORAGE,
+                        Manifest.permission.WRITE_EXTERNAL_STORAGE
+                }, PERM_REQ);
+            }
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        isForeground = false;
+        // ===== [v121] ⑯ 切后台/熄屏时不让 WebView 暂停 JS 定时器 =====
+        // Android 在 Activity 不可见时会 pauseTimers()，导致：
+        //  · 流式输出卡住不动（回到前台才继续）
+        //  · 定时任务到点不跑
+        // 这里立刻恢复，配合已有的 WakeLock + 前台服务，后台也能继续干活。
+        // 只恢复 JS 定时器；不在这里调 onResume()，避免 WebView 可见性状态错乱
+        try { if (webView != null) webView.resumeTimers(); } catch (Throwable ignore) {}
+    }
+
+    @Override
+    protected void onDestroy() {
+        try { releaseWake(); } catch (Throwable ignore) {}
+        super.onDestroy();
+    }
+
+    /* ===== [2.6.0] AI 后台持续运行 + 完成通知 ===== */
+
+    /** 获取 CPU 唤醒锁：熄屏时 CPU 不休眠，WebView 的 AI 流式输出得以继续。 */
+    private void acquireWake() {
+        try {
+            if (wakeLock == null) {
+                PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+                if (pm == null) return;
+                wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "lq:ai_work");
+                wakeLock.setReferenceCounted(false);
+            }
+            if (!wakeLock.isHeld()) wakeLock.acquire(30L * 60L * 1000L);   // 30 分钟兜底自动释放
+        } catch (Throwable ignore) {}
+    }
+
+    private void releaseWake() {
+        try { if (wakeLock != null && wakeLock.isHeld()) wakeLock.release(); } catch (Throwable ignore) {}
+    }
+
+    /** 生成开始：持有唤醒锁 + 启动前台服务（防止 App 切后台/熄屏被冻结）。 */
+    public void workBegin(final String title) {
+        runOnUiThread(new Runnable() { public void run() {
+            acquireWake();
+            try {
+                Intent svc = new Intent(MainActivity.this, LqbForegroundService.class);
+                svc.setAction(LqbForegroundService.ACTION_START);
+                svc.putExtra(LqbForegroundService.EXTRA_TITLE, title == null ? "AI 正在生成" : title);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(svc);
+                else startService(svc);
+            } catch (Throwable ignore) {}
+        }});
+    }
+
+    /** 生成结束：释放唤醒锁 + 停止前台服务；后台运行或耗时较长时发「完成」通知。 */
+    public void workEnd(final String convTitle, final String digest, final long elapsedMs) {
+        runOnUiThread(new Runnable() { public void run() {
+            releaseWake();
+            try { stopService(new Intent(MainActivity.this, LqbForegroundService.class)); } catch (Throwable ignore) {}
+            if (!isForeground || elapsedMs > 6000L) {
+                String head = (convTitle != null && convTitle.length() > 0) ? ("「" + convTitle + "」") : "";
+                String body = (digest != null && digest.length() > 0) ? digest : "AI 回复已完成";
+                sendDoneNotification(head + "AI 回复已完成", body);
+            }
+        }});
+    }
+
+    private void ensureChannel(String id, String name, int importance) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
+        try {
+            NotificationManager m = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            if (m == null || m.getNotificationChannel(id) != null) return;
+            NotificationChannel ch = new NotificationChannel(id, name, importance);
+            m.createNotificationChannel(ch);
+        } catch (Throwable ignore) {}
+    }
+
+    /** 在通知栏发出「AI 回复已完成」，点击可回到 App。 */
+    private void sendDoneNotification(String title, String body) {
+        try {
+            ensureChannel(DONE_CHANNEL_ID, "AI 完成提醒", NotificationManager.IMPORTANCE_DEFAULT);
+            NotificationManager m = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            if (m == null) return;
+            Intent open = new Intent(this, MainActivity.class);
+            open.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            int piFlag = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
+                    ? (PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE)
+                    : PendingIntent.FLAG_UPDATE_CURRENT;
+            PendingIntent pi = PendingIntent.getActivity(this, 0, open, piFlag);
+            Notification.Builder b = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                    ? new Notification.Builder(this, DONE_CHANNEL_ID)
+                    : new Notification.Builder(this);
+            b.setContentTitle(title == null ? "AI 回复已完成" : title)
+             .setContentText(body == null ? "" : body)
+             .setSmallIcon(getApplicationInfo().icon)
+             .setAutoCancel(true)
+             .setContentIntent(pi)
+             .setStyle(new Notification.BigTextStyle().bigText(body == null ? "" : body));
+            m.notify(DONE_NOTI_ID, b.build());
+        } catch (Throwable ignore) {}
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == VPN_REQ) {
+            if (resultCode == Activity.RESULT_OK) {
+                try {
+                    Intent svc = new Intent(this, CaptureVpnService.class);
+                    svc.setAction(CaptureVpnService.ACTION_START);
+                    startService(svc);
+                } catch (Throwable ignore) {}
+            }
+            return;
+        }
+        if (requestCode == FILE_CHOOSER_REQ) {
+            if (filePathCallback == null) return;
+            Uri[] results = null;
+            if (resultCode == Activity.RESULT_OK && data != null) {
+                if (data.getClipData() != null) {
+                    int count = data.getClipData().getItemCount();
+                    results = new Uri[count];
+                    for (int i = 0; i < count; i++) {
+                        results[i] = data.getClipData().getItemAt(i).getUri();
+                    }
+                } else if (data.getData() != null) {
+                    results = new Uri[]{ data.getData() };
+                }
+            }
+            filePathCallback.onReceiveValue(results);
+            filePathCallback = null;
+
+            // 把"可被 ffmpeg 直接读取的真实文件路径"推给前端。
+            // 关键修复：系统文件选择器返回的是 content:// URI（DocumentsProvider），
+            // 它没有 _data 列，且内置 ffmpeg 作为独立进程无法解析 content://
+            // （会报 "No Java virtual machine has been registered / Invalid argument"）。
+            // 因此这里把 URI 的内容复制进 App 私有目录，得到真正的文件路径再交出去。
+            if (results != null && results.length > 0) {
+                final Uri[] uris = results;
+                new Thread(new Runnable() {
+                    @Override public void run() {
+                        JSONArray arr = new JSONArray();
+                        for (Uri u : uris) {
+                            JSONObject o = new JSONObject();
+                            try {
+                                o.put("p", localizeForFfmpeg(u));
+                                o.put("n", displayName(u));
+                            } catch (Throwable ignore) {}
+                            arr.put(o);
+                        }
+                        final String js = "window.__onNativePicker&&window.__onNativePicker(" + arr.toString() + ")";
+                        webView.post(new Runnable() {
+                            @Override public void run() { webView.evaluateJavascript(js, null); }
+                        });
+                    }
+                }, "lqb-picker").start();
+            }
+        }
+    }
+
+    /**
+     * 把选择到的 Uri 变成 ffmpeg 能直接读取的「真实文件路径」：
+    * 1. file:// → 直接用其路径；
+    * 2. content:// 若 _data 列能取到且文件确实可读 → 用真实路径；
+    * 3. 其余情况（DocumentsProvider / FileProvider 等无 _data 的 URI）→
+     *    通过 ContentResolver 读取内容并复制进 App 私有目录 files/tmp/，返回该路径。
+     */
+    private String localizeForFfmpeg(Uri uri) {
+        if (uri == null) return "";
+        try {
+            String scheme = uri.getScheme();
+            if (scheme != null && scheme.equalsIgnoreCase("file")) {
+                String p = uri.getPath();
+                if (p != null && !p.isEmpty()) return p;
+            }
+            String direct = queryDataColumn(uri);
+            // [2.5.11] 排除相册选择器(PhotoPicker)返回的虚拟合成路径：
+            // 形如 /sdcard/.transforms/synthetic/picker_get_content/... ，
+            // 主进程 File.exists() 为真但内容是合成的，独立进程 ffmpeg 读不到有效数据。
+            // 这类路径强制走下方 copyUriToPrivate 复制出真实文件。
+            if (direct != null && direct.indexOf(".transforms/synthetic") < 0 && direct.indexOf("picker_get_content") < 0) {
+                File f = new File(direct);
+                if (f.exists() && f.canRead()) return direct;
+            }
+            String copied = copyUriToPrivate(uri);
+            if (copied != null && !copied.isEmpty()) return copied;
+        } catch (Throwable ignore) {}
+        // 最后的兜底：至少把原始字符串交出去（前端会显示路径，便于排错）
+        return uri.toString();
+    }
+
+    /** 尝试读取 content:// 的 _data 列；不可用时返回 null（不抛异常）。 */
+    private String queryDataColumn(Uri uri) {
+        Cursor c = null;
+        try {
+            c = getContentResolver().query(uri, new String[]{"_data"}, null, null, null);
+            if (c != null && c.moveToFirst()) {
+                int idx = c.getColumnIndex("_data");
+                if (idx >= 0) {
+                    String p = c.getString(idx);
+                    if (p != null && !p.isEmpty()) return p;
+                }
+            }
+        } catch (Throwable ignore) {
+            // DocumentsProvider 没有 _data 列，query 会抛异常，这里静默
+        } finally {
+            try { if (c != null) c.close(); } catch (Throwable ignore) {}
+        }
+        return null;
+    }
+
+    /** 把 content:// 的内容复制到 files/tmp/import_<时间>_<文件名>，返回绝对路径。 */
+    private String copyUriToPrivate(Uri uri) {
+        InputStream in = null;
+        OutputStream out = null;
+        try {
+            File dir = new File(getFilesDir(), "tmp");
+            if (!dir.exists()) dir.mkdirs();
+            cleanupOldImports(dir);
+
+            String base = displayName(uri);
+            if (base == null || base.isEmpty()) base = "video.mp4";
+            base = base.replaceAll("[^0-9A-Za-z._\\-\\u4e00-\\u9fff]", "_");
+            File dst = new File(dir, "import_" + System.currentTimeMillis() + "_" + base);
+
+            in = getContentResolver().openInputStream(uri);
+            if (in == null) return "";
+            out = new FileOutputStream(dst);
+            byte[] buf = new byte[1 << 16];
+            int n;
+            while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+            out.flush();
+            return dst.getAbsolutePath();
+        } catch (Throwable t) {
+            return "";
+        } finally {
+            try { if (in != null) in.close(); } catch (Throwable ignore) {}
+            try { if (out != null) out.close(); } catch (Throwable ignore) {}
+        }
+    }
+
+    /** 清理超过 24 小时的旧导入临时文件，避免反复发大视频撑爆私有目录。 */
+    private void cleanupOldImports(File dir) {
+        try {
+            File[] fs = dir.listFiles();
+            if (fs == null) return;
+            long now = System.currentTimeMillis();
+            for (File f : fs) {
+                if (f.isFile() && f.getName().startsWith("import_")
+                        && now - f.lastModified() > 24L * 3600L * 1000L) {
+                    //noinspection ResultOfMethodCallIgnored
+                    f.delete();
+                }
+            }
+        } catch (Throwable ignore) {}
+    }
+
+    /** 取 Uri 的显示文件名（用于给复制出的临时文件起个好名字）。 */
+    private String displayName(Uri uri) {
+        if (uri == null) return "";
+        Cursor c = null;
+        try {
+            c = getContentResolver().query(uri, new String[]{"_display_name"}, null, null, null);
+            if (c != null && c.moveToFirst()) {
+                int i = c.getColumnIndex("_display_name");
+                if (i >= 0) {
+                    String s = c.getString(i);
+                    if (s != null && !s.isEmpty()) return s;
+                }
+            }
+        } catch (Throwable ignore) {
+        } finally {
+            try { if (c != null) c.close(); } catch (Throwable ignore) {}
+        }
+        String last = uri.getLastPathSegment();
+        if (last != null) {
+            int idx = last.lastIndexOf('/');
+            if (idx >= 0) last = last.substring(idx + 1);
+            try { last = Uri.decode(last); } catch (Throwable ignore) {}
+            return last;
+        }
+        return "";
+    }
+
+    /** SHA-256 → 小写 hex。 */
+    private static String sha256hex(byte[] data) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] h = md.digest(data);
+            StringBuilder sb = new StringBuilder();
+            for (byte b : h) sb.append(String.format("%02x", b));
+            return sb.toString();
+        } catch (Throwable t) { return ""; }
+    }
+
+    /** 校验当前 APK 签名是否为本应用正式签名；被换签 / 改包 → false。 */
+    private boolean checkSignature() {
+        try {
+            PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(), PackageManager.GET_SIGNATURES);
+            if (pi == null || pi.signatures == null) return false;
+            for (Signature sg : pi.signatures) {
+                if (EXPECTED_SIG.equalsIgnoreCase(sha256hex(sg.toByteArray()))) return true;
+            }
+        } catch (Throwable ignore) {}
+        return false;
+    }
+
+    /** [2.5.5] 启动加载页：进度条 + 百分比 + 速度 + 预计剩余时间（前端 HTML 取回后替换）。 */
+    private static final String LOADING_HTML =
+        "<!DOCTYPE html><html><head><meta charset='utf-8'>"
+        + "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+        + "<style>"
+        + "html,body{height:100%;margin:0;display:flex;align-items:center;justify-content:center;"
+        + "background:#fff;font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;color:#222}"
+        + ".box{width:80%;max-width:360px}"
+        + ".tt{font-size:15px;font-weight:600;text-align:center;margin-bottom:14px}"
+        + ".bar{height:8px;border-radius:5px;background:#eceef3;overflow:hidden}"
+        + ".fill{height:100%;width:0;border-radius:5px;background:linear-gradient(90deg,#4c7dff,#7aa2ff);transition:width .2s ease}"
+        + ".ind{width:38%;animation:sl 1.1s ease-in-out infinite}"
+        + "@keyframes sl{0%{margin-left:-38%}100%{margin-left:100%}}"
+        + ".pct{font-size:13px;font-weight:600;text-align:center;color:#4c7dff;margin-top:10px;min-height:18px}"
+        + ".meta{font-size:12px;text-align:center;color:#8a8f99;margin-top:6px;line-height:1.6;min-height:16px}"
+        + "</style></head><body>"
+        + "<div class='box'>"
+        + "<div class='tt' id='tt'>正在连接服务器…</div>"
+        + "<div class='bar'><div class='fill ind' id='fl'></div></div>"
+        + "<div class='pct' id='pc'></div>"
+        + "<div class='meta' id='mt'></div>"
+        + "</div>"
+        + "<script>"
+        + "function _fmt(b){if(b<1024)return b+' B';if(b<1048576)return (b/1024).toFixed(1)+' KB';return (b/1048576).toFixed(2)+' MB';}"
+        + "function _ft(s){if(s<60)return s+' 秒';var m=Math.floor(s/60),x=s%60;return m+' 分 '+x+' 秒';}"
+        + "function _draw(d,t,b){var f=document.getElementById('fl'),p=document.getElementById('pc'),m=document.getElementById('mt');"
+        + "if(!f)return;"
+        + "if(t>0){f.className='fill';var pc=Math.floor(d*100/t);if(pc>100)pc=100;f.style.width=pc+'%';p.textContent=pc+'%';}"
+        + "else{f.className='fill ind';p.textContent='';}"
+        + "var s='';"
+        + "if(t>0){s=_fmt(d)+' / '+_fmt(t);}else{s=_fmt(d);}"
+        + "if(b>0){s+='  ·  '+_fmt(b)+'/s';}"
+        + "if(b>0&&t>0&&d<t){s+='  ·  剩余约 '+_ft(Math.ceil((t-d)/b));}"
+        + "m.textContent=s;}"
+        + "window.__lqLoad=function(d,t,b){_draw(d,t,b);};"
+        + "window.__lqStatus=function(s){var e=document.getElementById('tt');if(e)e.textContent=s;};"
+        + "</script></body></html>";
+
+    /** 校验失败：提示后退出（不给任何可用界面）。 */
+    private void die(final String msg) {
+        try { Toast.makeText(this, msg, Toast.LENGTH_LONG).show(); } catch (Throwable ignore) {}
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(new Runnable() {
+            public void run() {
+                try { finish(); } catch (Throwable ignore) {}
+                System.exit(0);
+            }
+        }, 900);
+    }
+
+    /** [2.5.5] 把字符串转成安全的 JS 字面量（用于 evaluateJavascript 传参）。 */
+    private static String jsStr(String s) {
+        if (s == null) return "''";
+        StringBuilder sb = new StringBuilder("'");
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '\\') sb.append("\\\\");
+            else if (c == '\'') sb.append("\\'");
+            else if (c == '\n') sb.append("\\n");
+            else if (c == '\r') sb.append("\\r");
+            else if (c == '<') sb.append("\\u003c");
+            else sb.append(c);
+        }
+        return sb.append("'").toString();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        isForeground = true;
+        // [v121] ⑯ 回到前台立刻恢复 JS 定时器（配合 onPause 的 resumeTimers，保证流式/定时不断）
+        try { if (webView != null) webView.resumeTimers(); } catch (Throwable ignore) {}
+        // 用户从系统设置返回时，通知前端刷新权限状态
+        if (webView != null) {
+            webView.post(new Runnable() {
+                public void run() {
+                    webView.evaluateJavascript("window.__onPermChanged&&window.__onPermChanged()", null);
+                }
+            });
+        }
+    }
+
+    /** [v27] 抓包桥：前端通过 window.AndroidCapture 控制 VPN 抓包。 */
+    public class CaptureBridge {
+        @JavascriptInterface
+        public boolean isRunning() { return CaptureVpnService.isRunning(); }
+
+        @JavascriptInterface
+        public String start() {
+            try {
+                Intent prep = VpnService.prepare(MainActivity.this);
+                if (prep != null) {
+                    runOnUiThread(new Runnable() {
+                        public void run() {
+                            try { startActivityForResult(prep, VPN_REQ); } catch (Throwable ignore) {}
+                        }
+                    });
+                    return "need_auth";
+                }
+                runOnUiThread(new Runnable() {
+                    public void run() {
+                        try {
+                            Intent svc = new Intent(MainActivity.this, CaptureVpnService.class);
+                            svc.setAction(CaptureVpnService.ACTION_START);
+                            startService(svc);
+                        } catch (Throwable ignore) {}
+                    }
+                });
+                return "starting";
+            } catch (Throwable t) { return "error:" + t.getMessage(); }
+        }
+
+        @JavascriptInterface
+        public void stop() {
+            runOnUiThread(new Runnable() {
+                public void run() {
+                    try {
+                        Intent svc = new Intent(MainActivity.this, CaptureVpnService.class);
+                        svc.setAction(CaptureVpnService.ACTION_STOP);
+                        startService(svc);
+                    } catch (Throwable ignore) {}
+                }
+            });
+        }
+
+        /**
+         * [v83] 带参数启动抓包。
+         * durationSec 0=不限；count 0=不限；types 逗号分隔类型（json,image...）；ips 逗号分隔域名/IP。
+         * 到达任一上限立即自动停止，由前端一次性取走结果给 AI。
+         */
+        @JavascriptInterface
+        public String startFiltered(int durationSec, int count, String types, String ips) {
+            try {
+                CaptureStore.setAutoStop(durationSec, count, types, ips, null);
+            } catch (Throwable ignore) {}
+            return start();
+        }
+
+        /** 当前自动停止配置（给界面显示剩余时间） */
+        @JavascriptInterface
+        public String autoInfo() { return CaptureStore.autoStopInfo(); }
+
+        /** 清掉自动停止配置（手动停止时用） */
+        @JavascriptInterface
+        public void clearAutoStop() { CaptureStore.clearAutoStop(); }
+
+        @JavascriptInterface
+        public String list() { return CaptureStore.toJson(); }
+
+        /** [v83] 列表（轻量，不含正文）；limit<=0 表示不限 */
+        @JavascriptInterface
+        public String listLite(int limit, String filter) { return CaptureStore.toListJson(limit, filter); }
+
+        /** [v83] 单条完整详情（含解码后的正文与图片 base64） */
+        @JavascriptInterface
+        public String detail(long id) { return CaptureStore.detailJson(id); }
+
+        @JavascriptInterface
+        public int count() { return CaptureStore.size(); }
+
+        @JavascriptInterface
+        public void clear() { CaptureStore.clear(); }
+
+        // [v28] HTTPS 解密开关 + 根证书安装
+        @JavascriptInterface
+        public void setDecryptHttps(boolean b) { CaptureVpnService.decryptHttps = b; }
+
+        @JavascriptInterface
+        public boolean getDecryptHttps() { return CaptureVpnService.decryptHttps; }
+
+        @JavascriptInterface
+        public String caStatus() {
+            try {
+                MitmCa ca = CaptureVpnService.ensureMitmCa(MainActivity.this);
+                JSONObject o = new JSONObject();
+                o.put("hasRoot", RootCaInstaller.hasRoot());
+                o.put("installed", ca != null && RootCaInstaller.isInstalled(ca));
+                return o.toString();
+            } catch (Throwable t) { return "{}"; }
+        }
+
+        @JavascriptInterface
+        public String installCa() {
+            try {
+                MitmCa ca = CaptureVpnService.ensureMitmCa(MainActivity.this);
+                if (ca == null) return "{\"ok\":false,\"message\":\"CA 初始化失败\"}";
+                RootCaInstaller.Result r = RootCaInstaller.install(MainActivity.this, ca);
+                JSONObject o = new JSONObject();
+                o.put("ok", r.ok);
+                o.put("hasRoot", r.hasRoot);
+                o.put("message", r.message);
+                return o.toString();
+            } catch (Throwable t) { return "{\"ok\":false,\"message\":\"安装异常\"}"; }
+        }
+
+        @JavascriptInterface
+        public String exportCa() {
+            try {
+                MitmCa ca = CaptureVpnService.ensureMitmCa(MainActivity.this);
+                if (ca == null) return "";
+                String p = RootCaInstaller.exportPem(ca);
+                return p == null ? "" : p;
+            } catch (Throwable t) { return ""; }
+        }
+    }
+
+
+    /* ===== [v43] AI 操作手机：无障碍桥接（前端 window.AndroidA11y） ===== */
+    public class A11yBridge {
+        @JavascriptInterface
+        public boolean isEnabled() { return LqbAccessibilityService.isEnabled(); }
+
+        /**
+         * [v83] 截屏，返回 base64 JPEG（失败返回以 "error:" 开头的说明）。
+         * 前端拿到后作为图片交给模型 —— 不再让 AI「靠读屏文字去猜画面」。
+         */
+        @JavascriptInterface
+        public String screenshot() {
+            if (!LqbAccessibilityService.isEnabled()) return "error:无障碍服务未开启（去 设置→无障碍 打开 LingQiongBuddy）";
+            String b64 = LqbAccessibilityService.screenshotBase64(4000);
+            if (b64 == null || b64.isEmpty()) return "error:截图失败（系统拒绝了本次截屏，请确认系统版本 ≥ Android 11）";
+            return b64;
+        }
+
+        /** 打开系统无障碍设置页（引导用户手动开启，不强制）。 */
+        @JavascriptInterface
+        public void openSettings() {
+            runOnUiThread(new Runnable() { public void run() {
+                try {
+                    Intent i = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
+                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(i);
+                    Toast.makeText(MainActivity.this, "请在系统列表中找到并开启「LingQiongBuddy」", Toast.LENGTH_LONG).show();
+                } catch (Exception e) {
+                    Toast.makeText(MainActivity.this, "无法打开无障碍设置", Toast.LENGTH_SHORT).show();
+                }
+            }});
+        }
+
+        @JavascriptInterface
+        public boolean tap(float x, float y) { return LqbAccessibilityService.tap(x, y); }
+
+        @JavascriptInterface
+        public boolean longPress(float x, float y, long dur) { return LqbAccessibilityService.longPress(x, y, dur); }
+
+        @JavascriptInterface
+        public boolean swipe(float x1, float y1, float x2, float y2, long dur) {
+            return LqbAccessibilityService.swipe(x1, y1, x2, y2, dur);
+        }
+
+        @JavascriptInterface
+        public boolean key(String name) { return LqbAccessibilityService.globalAction(name); }
+
+        /* [v120] ⑭ 全屏无障碍取点：在任意 App 界面上点哪取哪。
+           LqbAccessibilityService 里早就写好了 PickView / startPick / stopPick，
+           但一直没接到 JS —— 这里补上桥接。 */
+        @JavascriptInterface
+        public boolean startPick() {
+            try {
+                return LqbAccessibilityService.startPick(new LqbAccessibilityService.PickCallback() {
+                    @Override public void onEvent(String json) {
+                        final String js = "window.__lqPickEvent&&window.__lqPickEvent(" + json + ")";
+                        try {
+                            webView.post(new Runnable() {
+                                @Override public void run() { webView.evaluateJavascript(js, null); }
+                            });
+                        } catch (Throwable ignore) {}
+                    }
+                });
+            } catch (Throwable t) { return false; }
+        }
+
+        @JavascriptInterface
+        public void stopPick(boolean commit) {
+            try { LqbAccessibilityService.stopPick(commit); } catch (Throwable ignore) {}
+        }
+
+        @JavascriptInterface
+        public boolean isPicking() {
+            try { return LqbAccessibilityService.isPicking(); } catch (Throwable t) { return false; }
+        }
+
+        @JavascriptInterface
+        public String readScreen() { return LqbAccessibilityService.readScreen(); }
+
+        /** 按应用名或包名打开 App。 */
+        @JavascriptInterface
+        public String openApp(String q) {
+            if (q == null || q.trim().isEmpty()) return "错误：未提供应用名";
+            String query = q.trim();
+            try {
+                PackageManager pm = getPackageManager();
+                Intent launch = pm.getLaunchIntentForPackage(query);
+                if (launch == null) {
+                    String low = query.toLowerCase();
+                    java.util.List<android.content.pm.ApplicationInfo> apps = pm.getInstalledApplications(0);
+                    for (android.content.pm.ApplicationInfo ai : apps) {
+                        String label = String.valueOf(pm.getApplicationLabel(ai));
+                        if (label.toLowerCase().contains(low) || ai.packageName.toLowerCase().contains(low)) {
+                            launch = pm.getLaunchIntentForPackage(ai.packageName);
+                            if (launch != null) break;
+                        }
+                    }
+                }
+                if (launch == null) return "未找到应用：" + q;
+                launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(launch);
+                return "ok";
+            } catch (Exception e) {
+                return "打开失败：" + (e.getMessage() == null ? "未知错误" : e.getMessage());
+            }
+        }
+    }
+
+    public class SystemBridge {
+
+        private android.media.AudioManager _am() {
+            return (android.media.AudioManager) getSystemService(android.content.Context.AUDIO_SERVICE);
+        }
+
+        /** [v83] 当前媒体音量百分比（0~100），失败 -1 */
+        @JavascriptInterface
+        public int getVolume() {
+            try {
+                android.media.AudioManager a = _am();
+                int max = a.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC);
+                int cur = a.getStreamVolume(android.media.AudioManager.STREAM_MUSIC);
+                return max > 0 ? (int) Math.round(cur * 100.0 / max) : 0;
+            } catch (Throwable t) { return -1; }
+        }
+
+        /** [v83] 设为某百分比（0~100） */
+        @JavascriptInterface
+        public String setVolume(int percent) {
+            try {
+                android.media.AudioManager a = _am();
+                int max = a.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC);
+                int v = Math.round(max * Math.max(0, Math.min(100, percent)) / 100f);
+                v = Math.max(0, Math.min(max, v));
+                a.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, v, 0);
+                return "ok:" + v + "/" + max;
+            } catch (Throwable t) { return "error:" + t.getMessage(); }
+        }
+
+        /** [v83] 加/减若干格（step 可为负） */
+        @JavascriptInterface
+        public String stepVolume(int step) {
+            try {
+                android.media.AudioManager a = _am();
+                int max = a.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC);
+                int cur = a.getStreamVolume(android.media.AudioManager.STREAM_MUSIC);
+                int v = Math.max(0, Math.min(max, cur + step));
+                a.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, v, 0);
+                int pct = max > 0 ? (int) Math.round(v * 100.0 / max) : 0;
+                return "ok:" + v + "/" + max + " (" + pct + "%)";
+            } catch (Throwable t) { return "error:" + t.getMessage(); }
+        }
+
+        @JavascriptInterface
+        public String mute(boolean on) {
+            try {
+                android.media.AudioManager a = _am();
+                a.adjustStreamVolume(android.media.AudioManager.STREAM_MUSIC,
+                        on ? android.media.AudioManager.ADJUST_MUTE : android.media.AudioManager.ADJUST_UNMUTE, 0);
+                return "ok";
+            } catch (Throwable t) { return "error:" + t.getMessage(); }
+        }
+        @JavascriptInterface
+        public String getSdkVersion() {
+            return String.valueOf(Build.VERSION.SDK_INT);
+        }
+
+        @JavascriptInterface
+        public boolean hasAllFilesAccess() {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                return Environment.isExternalStorageManager();
+            }
+            return checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                    == PackageManager.PERMISSION_GRANTED;
+        }
+
+        @JavascriptInterface
+        public String getVersionName() {
+            try {
+                return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+            } catch (PackageManager.NameNotFoundException e) { return "2.3.4"; }
+        }
+
+        @JavascriptInterface
+        public int getVersionCode() {
+            try {
+                return getPackageManager().getPackageInfo(getPackageName(), 0).versionCode;
+            } catch (PackageManager.NameNotFoundException e) { return 0; }
+        }
+
+        /** 用系统浏览器/下载器打开链接（用于「检查更新」跳转下载 APK）。 */
+        @JavascriptInterface
+        public void openUrl(final String url) {
+            if (url == null || url.trim().isEmpty()) return;
+            runOnUiThread(new Runnable() {
+                public void run() {
+                    try {
+                        startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+                    } catch (Exception e) {
+                        Toast.makeText(MainActivity.this, "无法打开链接", Toast.LENGTH_SHORT).show();
+                    }
+                }
+            });
+        }
+
+        /** [v56] 调起系统分享面板（用于「水晶主题」分享解锁等）。 */
+        @JavascriptInterface
+        public void share(final String text) {
+            runOnUiThread(new Runnable() {
+                public void run() {
+                    try {
+                        Intent i = new Intent(Intent.ACTION_SEND);
+                        i.setType("text/plain");
+                        i.putExtra(Intent.EXTRA_TEXT, text == null ? "" : text);
+                        Intent c = Intent.createChooser(i, "分享到");
+                        c.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        startActivity(c);
+                    } catch (Exception e) { Toast.makeText(MainActivity.this, "无法分享", Toast.LENGTH_SHORT).show(); }
+                }
+            });
+        }
+
+        /** [v56] 内存/进程概况（需求6）。无权限也能读到系统内存与本 App 内存。 */
+        @JavascriptInterface
+        public String memInfo() {
+            try {
+                org.json.JSONObject o = new org.json.JSONObject();
+                android.app.ActivityManager am = (android.app.ActivityManager) MainActivity.this.getSystemService(Context.ACTIVITY_SERVICE);
+                if (am != null) {
+                    android.app.ActivityManager.MemoryInfo mi = new android.app.ActivityManager.MemoryInfo();
+                    am.getMemoryInfo(mi);
+                    o.put("total", mi.totalMem);
+                    o.put("avail", mi.availMem);
+                    o.put("low", mi.lowMemory);
+                    o.put("threshold", mi.threshold);
+                }
+                Runtime rt = Runtime.getRuntime();
+                o.put("appHeapUsed", rt.totalMemory() - rt.freeMemory());
+                o.put("appHeapTotal", rt.totalMemory());
+                o.put("appHeapMax", rt.maxMemory());
+                int procs = 0;
+                try {
+                    String[] ps = new java.io.File("/proc").list();
+                    if (ps != null) for (String x : ps) { try { if (Integer.parseInt(x) > 0) procs++; } catch (Throwable ignore) {} }
+                } catch (Throwable ignore) {}
+                o.put("procCount", procs);
+                o.put("sdk", Build.VERSION.SDK_INT);
+                return o.toString();
+            } catch (Throwable t) { return "{\"err\":\"" + String.valueOf(t.getMessage()) + "\"}"; }
+        }
+
+        /** [v56] 用其他应用打开指定文件（弹出系统「打开方式」选择器）。 */
+        @JavascriptInterface
+        public void openFile(final String path, final String mime) {
+            if (path == null || path.trim().isEmpty()) return;
+            final String p = path;
+            final String m = (mime == null || mime.trim().isEmpty()) ? "*/*" : mime;
+            runOnUiThread(new Runnable() {
+                public void run() {
+                    try {
+                        java.io.File f = new java.io.File(p);
+                        if (!f.exists()) { Toast.makeText(MainActivity.this, "文件不存在：" + p, Toast.LENGTH_SHORT).show(); return; }
+                        Uri uri;
+                        try {
+                            uri = androidx.core.content.FileProvider.getUriForFile(MainActivity.this, getPackageName() + ".fileprovider", f);
+                        } catch (Throwable t) { uri = Uri.fromFile(f); }
+                        Intent i = new Intent(Intent.ACTION_VIEW);
+                        i.setDataAndType(uri, m);
+                        i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        Intent choose = Intent.createChooser(i, "选择打开方式");
+                        choose.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        startActivity(choose);
+                    } catch (android.content.ActivityNotFoundException e) {
+                        Toast.makeText(MainActivity.this, "没有能打开这类文件的应用，可先用 App 内置浏览查看", Toast.LENGTH_SHORT).show();
+                    } catch (Exception e) {
+                        Toast.makeText(MainActivity.this, "无法打开： " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                }
+            });
+        }
+
+        /** [v56] 用系统文件管理器打开某个目录。
+         *  [v121] 修复「找不到已有的文件管理器」：
+         *   原来用 resource/folder 这个 MIME，绝大多数文件管理器都不声明它，
+         *   于是选择器里一个应用都没有（或直接报错）。
+         *   现在按「最可能成功」的顺序回退：
+         *     ① DocumentsUI 的目录 URI（content://com.android.externalstorage.documents/...）
+         *     ② ACTION_OPEN_DOCUMENT_TREE（让系统自己弹目录选择器）
+         *     ③ 第三方文件管理器常见的 vnd.android.document/directory
+         *     ④ 最后提示用内置文件浏览（绝不静默失败）
+         */
+        @JavascriptInterface
+        public void openDir(final String path) {
+            if (path == null || path.trim().isEmpty()) return;
+            final String p = path;
+            runOnUiThread(new Runnable() {
+                public void run() {
+                    // ① DocumentsUI 目录 URI（Android 8+ 通用）
+                    try {
+                        String rel = p;
+                        if (rel.startsWith("/storage/emulated/0/")) rel = rel.substring("/storage/emulated/0/".length());
+                        else if (rel.startsWith("/sdcard/")) rel = rel.substring("/sdcard/".length());
+                        if (p.startsWith("/storage/emulated/0") || p.startsWith("/sdcard")) {
+                            String docId = "primary:" + rel.replace("/", "%2F");
+                            Uri du = Uri.parse("content://com.android.externalstorage.documents/document/" + docId);
+                            Intent i = new Intent(Intent.ACTION_VIEW);
+                            i.setDataAndType(du, "vnd.android.document/directory");
+                            i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                            if (i.resolveActivity(getPackageManager()) != null) { startActivity(i); return; }
+                        }
+                    } catch (Throwable ignore) {}
+                    // ② 系统目录选择器（一定能弹，只是要点一下「使用此文件夹」）
+                    try {
+                        Intent t = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+                        t.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        startActivity(t);
+                        return;
+                    } catch (Throwable ignore) {}
+                    // ③ 传统目录 MIME
+                    try {
+                        java.io.File f = new java.io.File(p);
+                        Uri uri;
+                        try {
+                            uri = androidx.core.content.FileProvider.getUriForFile(MainActivity.this, getPackageName() + ".fileprovider", f);
+                        } catch (Throwable t2) { uri = Uri.fromFile(f); }
+                        Intent i = new Intent(Intent.ACTION_VIEW);
+                        i.setDataAndType(uri, "vnd.android.document/directory");
+                        i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        Intent choose = Intent.createChooser(i, "选择文件管理器");
+                        choose.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        startActivity(choose);
+                        return;
+                    } catch (Throwable ignore) {}
+                    // ④ 兜底提示
+                    Toast.makeText(MainActivity.this, "没有可用的文件管理器，已打开 App 内置文件浏览", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+
+        /** 宿主包名（com.lq.app，与官方 com.termux 等长，故可共存）。 */
+        @JavascriptInterface
+        public String getHostPackageName() { return getPackageName(); }
+
+        /** 由「总设置 → 文件系统权限」按钮调用：主动发起存储授权（不再启动即弹）。 */
+        /** 前端探活失败 / 需强制退出时调用。 */
+        @JavascriptInterface
+        public void exitApp() {
+            runOnUiThread(new Runnable() {
+                public void run() { die("无法连接服务器"); }
+            });
+        }
+
+        @JavascriptInterface
+        public void requestStoragePermission() {
+            runOnUiThread(new Runnable() {
+                public void run() { MainActivity.this.requestStoragePermission(); }
+            });
+        }
+
+        @JavascriptInterface
+        public void toast(final String msg) {
+            runOnUiThread(new Runnable() {
+                public void run() {
+                    Toast.makeText(MainActivity.this, msg, Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+
+        /* ===== [v43] 定时任务：前端同步全部任务 & 取走到点待执行队列 ===== */
+        @JavascriptInterface
+        public void syncSchedules(String json) {
+            try { ScheduleManager.apply(MainActivity.this, json == null ? "[]" : json); } catch (Throwable ignore) {}
+        }
+
+        @JavascriptInterface
+        public String takePendingSchedule() {
+            try { return ScheduleStore.takePending(MainActivity.this); } catch (Throwable t) { return "[]"; }
+        }
+
+        /* ===== [2.6.0] AI 后台运行 + 完成通知（前端在生成开始/结束时调用） ===== */
+        @JavascriptInterface
+        public void beginWork(String title) { MainActivity.this.workBegin(title); }
+
+        @JavascriptInterface
+        public void endWork(String convTitle, String digest, long elapsedMs) {
+            MainActivity.this.workEnd(convTitle, digest, elapsedMs);
+        }
+    }
+}
