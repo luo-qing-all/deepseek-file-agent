@@ -433,8 +433,16 @@ public class CaptureEngine implements Runnable {
 
         public void onHttp(boolean isRequest, String head, byte[] body, int bodyLen) {
             if (c.record == null) return;
-            if (isRequest) CaptureStore.fillRequest(c.record, head, body, bodyLen);
-            else CaptureStore.fillResponse(c.record, head, body, bodyLen);
+            /* [v128] 原来这里没 try —— fillRequest 抛异常会被 pump 的
+               catch(Throwable ignore) 吞掉，表现为「解密成功但正文空白」，
+               且没有任何线索。现在把异常记进日志。 */
+            try {
+                if (isRequest) CaptureStore.fillRequest(c.record, head, body, bodyLen);
+                else CaptureStore.fillResponse(c.record, head, body, bodyLen);
+            } catch (Throwable t) {
+                CaptureStore.addLog(c.record, "✗ 解析" + (isRequest ? "请求" : "响应") + "失败："
+                        + String.valueOf(t.getMessage() == null ? t.getClass().getSimpleName() : t.getMessage()));
+            }
         }
 
         public void onWs(boolean isRequest, int opcode, byte[] payload, int len) {

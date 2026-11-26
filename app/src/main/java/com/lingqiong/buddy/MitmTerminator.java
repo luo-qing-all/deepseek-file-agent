@@ -9,6 +9,7 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 
+import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
@@ -41,6 +42,7 @@ public class MitmTerminator {
     private SSLSocket clientSide;   // 与客户端（服务端角色）
     private SSLSocket serverSide;   // 与真实服务器（客户端角色）
     private volatile boolean closed = false;
+    private volatile boolean sniffed = false;   // [v128] 明文类型只嗅探一次
 
     public MitmTerminator(MitmCa ca, String host, byte[] realIp, int realPort,
                           CaptureStore.Entry record, VpnService service, HttpSession hs) {
@@ -58,6 +60,11 @@ public class MitmTerminator {
         SSLServerSocket ss = (SSLServerSocket) ca.serverContext(host).getServerSocketFactory()
                 .createServerSocket(0, 4, InetAddress.getByName("127.0.0.1"));
         ss.setNeedClientAuth(false);
+        /* [v128] 强制 ALPN = http/1.1。
+           不设的话客户端会挑 h2，之后传的是 HTTP/2 二进制帧，
+           HttpSession 的 HTTP/1.x 文本解析会全部失败 —— 这就是
+           「TLS 解密成功但正文一片空白」的真正原因。 */
+        try { applyAlpn(ss); } catch (Throwable ignore) {}
         serverSocket = ss;
         Thread t = new Thread(new Runnable() { public void run() { acceptLoop(); } }, "mitm-accept");
         t.setDaemon(true);
@@ -78,6 +85,7 @@ public class MitmTerminator {
             SSLSocketFactory f = ca.clientContext().getSocketFactory();
             serverSide = (SSLSocket) f.createSocket(raw, host, realPort, true);
             serverSide.setUseClientMode(true);
+            try { applyAlpn(serverSide); } catch (Throwable ignore) {}
             try { serverSide.startHandshake(); } catch (Throwable ignore) {}
 
             if (record != null) CaptureStore.addLog(record, "🔓 HTTPS 已解密（" + host + "）");
@@ -96,6 +104,67 @@ public class MitmTerminator {
         }
     }
 
+    /**
+     * [v128] 只协商 http/1.1。
+     * API 29+ 才有可用的 ALPN setter；更低版本直接跳过（保持旧行为）。
+     */
+    private static void applyAlpn(SSLSocket sock) {
+        try {
+            if (android.os.Build.VERSION.SDK_INT < 29) return;
+            SSLParameters sp = sock.getSSLParameters();
+            sp.setApplicationProtocols(new String[]{"http/1.1"});
+            sock.setSSLParameters(sp);
+        } catch (Throwable ignore) {}
+    }
+
+    /** SSLServerSocket 与 SSLSocket 没有共同父接口，只能各写一个重载。 */
+    private static void applyAlpn(SSLServerSocket sock) {
+        try {
+            if (android.os.Build.VERSION.SDK_INT < 29) return;
+            SSLParameters sp = sock.getSSLParameters();
+            sp.setApplicationProtocols(new String[]{"http/1.1"});
+            sock.setSSLParameters(sp);
+        } catch (Throwable ignore) {}
+    }
+
+    /**
+     * [v128] 明文嗅探：判断解密后第一段数据到底是哪种协议。
+     * 结果写进日志，用户能立刻看出「解没解开、卡在哪一步」，
+     * 而不是只看到一条「已解密」然后一片空白。
+     */
+    private void sniffPlain(byte[] buf, int n, boolean isRequest) {
+        if (record == null || n <= 0) return;
+        if (sniffed) return;
+        sniffed = true;
+        String kind;
+        if (startsWith(buf, n, "PRI * HTTP/2.0")) {
+            kind = "HTTP/2（二进制帧）";
+            if (record != null) record.httpVersion = 20;
+        } else if (startsWith(buf, n, "GET ") || startsWith(buf, n, "POST ")
+                || startsWith(buf, n, "PUT ") || startsWith(buf, n, "HEAD ")
+                || startsWith(buf, n, "DELETE ") || startsWith(buf, n, "OPTIONS ")
+                || startsWith(buf, n, "PATCH ") || startsWith(buf, n, "HTTP/")) {
+            kind = "HTTP/1.x（文本）";
+            if (record != null && record.httpVersion == 0) record.httpVersion = 11;
+        } else if ((buf[0] & 0xff) == 0x16 || (buf[0] & 0xff) == 0x17) {
+            kind = "仍是 TLS 密文（握手没在本机终结）";
+        } else {
+            kind = "无法识别的协议（首字节 0x" + String.format("%02X", buf[0] & 0xff) + "）";
+        }
+        CaptureStore.addLog(record, "🔍 明文协议：" + kind);
+        if (kind.startsWith("HTTP/2")) {
+            CaptureStore.addLog(record, "⚠ 这条走了 HTTP/2，正文是二进制帧。"
+                    + "已尝试降级到 HTTP/1.1；若仍为空，说明该 App 强制 h2，换用其他接口或 App 内关闭 HTTP/2 后再试。");
+        }
+    }
+
+    private static boolean startsWith(byte[] b, int n, String s) {
+        byte[] t = s.getBytes(StandardCharsets.ISO_8859_1);
+        if (n < t.length) return false;
+        for (int i = 0; i < t.length; i++) if (b[i] != t[i]) return false;
+        return true;
+    }
+
     private void pump(SSLSocket from, SSLSocket to, boolean isRequest) {
         byte[] buf = new byte[16384];
         try {
@@ -103,6 +172,7 @@ public class MitmTerminator {
             OutputStream out = to.getOutputStream();
             int n;
             while (!closed && (n = in.read(buf)) > 0) {
+                try { sniffPlain(buf, n, isRequest); } catch (Throwable ignore) {}
                 // [v83] 明文完整交给拼包层解码（旧版只截前 2KB 转字符串就丢）
                 if (hs != null) {
                     try {

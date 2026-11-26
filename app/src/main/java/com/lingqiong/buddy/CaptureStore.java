@@ -53,6 +53,13 @@ public class CaptureStore {
         public String appName = "";   // 触发流量的应用
         public int uid = -1;
         public boolean ws = false;    // 是否 WebSocket
+
+        // ---- [v128] Wireshark 三栏需要 ----
+        public int httpVersion = 0;   // 10 / 11 / 20（0=未知）
+        public long reqMs = 0;        // 请求头解析出来的时间戳
+        public long respMs = 0;       // 响应头解析出来的时间戳
+        public String reqRawHex = "";  // 请求头+体的原始字节（hex dump，供字节流视图）
+        public String respRawHex = ""; // 响应头+体的原始字节
     }
 
     private static final int MAX = 600;              // 最多保留多少条连接
@@ -248,6 +255,9 @@ public class CaptureStore {
                     o.put("respType", e.respType);
                     o.put("reqLen", e.reqLen);
                     o.put("respLen", e.respLen);
+                    o.put("httpVersion", e.httpVersion);
+                    o.put("reqMs", e.reqMs);
+                    o.put("respMs", e.respMs);
                     o.put("hasReq", e.reqHead != null && !e.reqHead.isEmpty());
                     o.put("hasResp", e.respHead != null && !e.respHead.isEmpty());
                     o.put("log", new JSONArray(e.log));
@@ -288,6 +298,11 @@ public class CaptureStore {
 
                     o.put("reqHead", cut(e.reqHead, MAX_HEAD_SAVE));
                     o.put("respHead", cut(e.respHead, MAX_HEAD_SAVE));
+                    o.put("httpVersion", e.httpVersion);
+                    o.put("reqMs", e.reqMs);
+                    o.put("respMs", e.respMs);
+                    o.put("reqRawHex", e.reqRawHex == null ? "" : e.reqRawHex);
+                    o.put("respRawHex", e.respRawHex == null ? "" : e.respRawHex);
                     o.put("reqHeadFull", e.reqHead == null ? "" : e.reqHead);
                     o.put("respHeadFull", e.respHead == null ? "" : e.respHead);
                     o.put("reqBody", cut(e.reqBodyText, 64 * 1024));
@@ -321,11 +336,29 @@ public class CaptureStore {
     // ==================== 供上层写入解码结果 ====================
     public static void fillRequest(Entry e, String head, byte[] body, int bodyLen) {
         if (e == null) return;
+        if (e.reqMs == 0) e.reqMs = System.currentTimeMillis();
+        if (e.httpVersion == 0 && head != null) {
+            if (head.startsWith("HTTP/2")) e.httpVersion = 20;
+            else if (head.startsWith("HTTP/1.0")) e.httpVersion = 10;
+            else if (head.startsWith("HTTP/1.1") || head.startsWith("GET ") || head.startsWith("POST ")
+                    || head.startsWith("PUT ") || head.startsWith("HEAD ") || head.startsWith("DELETE ")
+                    || head.startsWith("OPTIONS ") || head.startsWith("PATCH ")) e.httpVersion = 11;
+        }
         HttpCodec.Decoded d = HttpCodec.decode(body, bodyLen, head, e.url);
         // 类型过滤（AI 指定了类型时）
         boolean typeOk = acceptType(d.type);
         synchronized (LOCK) {
             if (e.reqHead == null || e.reqHead.isEmpty()) e.reqHead = cut(head, MAX_HEAD_SAVE);
+            /* [v128] 原始字节流（头 + 体），供 Wireshark 式「字节流」视图 */
+            if ((e.reqRawHex == null || e.reqRawHex.isEmpty()) && head != null) {
+                try {
+                    byte[] hb = head.getBytes("ISO-8859-1");
+                    byte[] all = new byte[hb.length + Math.max(0, bodyLen)];
+                    System.arraycopy(hb, 0, all, 0, hb.length);
+                    if (body != null && bodyLen > 0) System.arraycopy(body, 0, all, hb.length, Math.min(bodyLen, body.length));
+                    e.reqRawHex = HttpCodec.hexDump(all, all.length, 4096);
+                } catch (Throwable ignore) {}
+            }
             e.reqType = d.type;
             e.reqLen = bodyLen;
             e.reqNote = d.note;
@@ -349,10 +382,25 @@ public class CaptureStore {
 
     public static void fillResponse(Entry e, String head, byte[] body, int bodyLen) {
         if (e == null) return;
+        if (e.respMs == 0) e.respMs = System.currentTimeMillis();
+        if (e.httpVersion == 0 && head != null && head.startsWith("HTTP/")) {
+            if (head.startsWith("HTTP/2")) e.httpVersion = 20;
+            else if (head.startsWith("HTTP/1.0")) e.httpVersion = 10;
+            else e.httpVersion = 11;
+        }
         HttpCodec.Decoded d = HttpCodec.decode(body, bodyLen, head, null);
         boolean typeOk = acceptType(d.type);
         synchronized (LOCK) {
             if (e.respHead == null || e.respHead.isEmpty()) e.respHead = cut(head, MAX_HEAD_SAVE);
+            if ((e.respRawHex == null || e.respRawHex.isEmpty()) && head != null) {
+                try {
+                    byte[] hb = head.getBytes("ISO-8859-1");
+                    byte[] all = new byte[hb.length + Math.max(0, bodyLen)];
+                    System.arraycopy(hb, 0, all, 0, hb.length);
+                    if (body != null && bodyLen > 0) System.arraycopy(body, 0, all, hb.length, Math.min(bodyLen, body.length));
+                    e.respRawHex = HttpCodec.hexDump(all, all.length, 4096);
+                } catch (Throwable ignore) {}
+            }
             e.respType = d.type;
             e.respLen = bodyLen;
             e.respNote = d.note;
