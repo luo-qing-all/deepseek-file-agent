@@ -2,6 +2,7 @@ package com.lingqiong.buddy;
 
 import android.net.VpnService;
 
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
@@ -43,6 +44,9 @@ public class MitmTerminator {
     private SSLSocket serverSide;   // 与真实服务器（客户端角色）
     private volatile boolean closed = false;
     private volatile boolean sniffed = false;   // [v128] 明文类型只嗅探一次
+    /* [v141] 当前请求的 URL / 方法：响应方向跑规则时要靠它匹配 */
+    private volatile String curUrl = "";
+    private volatile String curMethod = "";
 
     public MitmTerminator(MitmCa ca, String host, byte[] realIp, int realPort,
                           CaptureStore.Entry record, VpnService service, HttpSession hs) {
@@ -206,23 +210,101 @@ public class MitmTerminator {
         return true;
     }
 
+    /**
+     * [v141] 消息级转发：按「一条完整 HTTP 消息」为单位处理。
+     *
+     * 为什么改：原来读多少转多少，不知道消息在哪结束，没法改包。
+     * 现在：累积字节 → 用 LqIntercept.completeLen 判断边界 → 跑重写规则 / 断点 → 写出。
+     *
+     * 三条保护，确保不影响正常上网：
+     *   ① 非 HTTP（二进制 / WebSocket 帧 / TLS 重协商）→ 立即切直通
+     *   ② chunked 流式（SSE）或超大消息 → 立即切直通，不做缓冲
+     *   ③ 本方法内任何异常 → 原样写出，绝不断流
+     */
     private void pump(SSLSocket from, SSLSocket to, boolean isRequest) {
         byte[] buf = new byte[16384];
+        ByteArrayOutputStream acc = new ByteArrayOutputStream(16384);
+        boolean raw = false;   // true = 直通模式，不再解析
         try {
             InputStream in = from.getInputStream();
             OutputStream out = to.getOutputStream();
             int n;
             while (!closed && (n = in.read(buf)) > 0) {
                 try { sniffPlain(buf, n, isRequest); } catch (Throwable ignore) {}
-                // [v83] 明文完整交给拼包层解码（旧版只截前 2KB 转字符串就丢）
+                // [v83] 明文交给拼包层解码 —— 记录的是「原始」内容，
+                // 改包之后另记一行日志，这样用户能同时看到「发了什么」和「被改成了什么」
                 if (hs != null) {
                     try {
                         if (isRequest) hs.onClient(buf, 0, n);
                         else hs.onServer(buf, 0, n);
                     } catch (Throwable ignore) {}
                 }
-                out.write(buf, 0, n);
-                out.flush();
+
+                if (raw) {
+                    out.write(buf, 0, n);
+                    out.flush();
+                    continue;
+                }
+
+                acc.write(buf, 0, n);
+                boolean goRaw = false;
+
+                while (true) {
+                    byte[] a = acc.toByteArray();
+                    if (a.length == 0) break;
+                    int cl = LqIntercept.completeLen(a, a.length, !isRequest);
+                    if (cl == LqIntercept.NOT_HTTP || cl == LqIntercept.STREAM_THROUGH) {
+                        goRaw = true;
+                        break;
+                    }
+                    if (cl < 0) break;   // INCOMPLETE：继续等
+
+                    byte[] msg = new byte[cl];
+                    System.arraycopy(a, 0, msg, 0, cl);
+                    int rest = a.length - cl;
+                    acc.reset();
+                    if (rest > 0) acc.write(a, cl, rest);
+
+                    byte[] outMsg = msg;
+                    boolean dropped = false;
+                    try {
+                        long rid = record == null ? 0L : record.id;
+                        if (isRequest) {
+                            String[] rl = LqIntercept.requestLine(msg);
+                            curMethod = rl[0];
+                            curUrl = rl[1];
+                            outMsg = LqIntercept.passRequest(curUrl, curMethod, msg, rid);
+                        } else {
+                            outMsg = LqIntercept.passResponse(curUrl, curMethod, msg, rid);
+                        }
+                        if (outMsg == null) outMsg = msg;
+                        if (outMsg.length == 0) dropped = true;
+                        else if (outMsg.length != msg.length && record != null) {
+                            CaptureStore.addLog(record, "✎ 改包："
+                                    + msg.length + " → " + outMsg.length + " 字节");
+                        }
+                    } catch (Throwable ignore) {
+                        outMsg = msg;
+                    }
+
+                    if (dropped) {
+                        if (record != null) CaptureStore.addLog(record, "⛔ 已丢弃（规则 block）");
+                        close();
+                        return;
+                    }
+                    out.write(outMsg, 0, outMsg.length);
+                    out.flush();
+                }
+
+                if (goRaw) {
+                    raw = true;
+                    byte[] a = acc.toByteArray();
+                    if (a.length > 0) {
+                        out.write(a, 0, a.length);
+                        out.flush();
+                        acc.reset();
+                    }
+                }
             }
         } catch (Throwable ignore) {}
         close();

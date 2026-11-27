@@ -62,6 +62,29 @@ public class MainActivity extends Activity {
     private volatile boolean isForeground = false;
     private PowerManager.WakeLock wakeLock;
 
+    /* ===== [v139] 返回键：先逐层关界面，退无可退才离开 App =====
+       原来没有重写 onBackPressed，按返回键直接 finish() —— 用户在任何
+       二级界面按一下都会直接退出 App。现在交给前端 lqBack() 判断：
+       有浮层 / 子页面就先关掉并返回 true；前端说没得退了，
+       才 moveTaskToBack 退到后台（不杀进程，回来还是原样）。 */
+    @Override
+    public void onBackPressed() {
+        if (webView == null) { try { moveTaskToBack(true); } catch (Throwable t) { finish(); } return; }
+        try {
+            webView.evaluateJavascript(
+                "(function(){try{return (window.lqBack&&window.lqBack())?'1':'0'}catch(e){return '0'}})()",
+                new ValueCallback<String>() {
+                    @Override
+                    public void onReceiveValue(String v) {
+                        if (v != null && v.indexOf('1') >= 0) return;
+                        try { moveTaskToBack(true); } catch (Throwable t) { finish(); }
+                    }
+                });
+        } catch (Throwable t) {
+            try { moveTaskToBack(true); } catch (Throwable t2) { finish(); }
+        }
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -819,6 +842,99 @@ public class MainActivity extends Activity {
                 String p = RootCaInstaller.exportPem(ca);
                 return p == null ? "" : p;
             } catch (Throwable t) { return ""; }
+        }
+
+        /* ==================== [v141] 重写规则 ==================== */
+
+        @JavascriptInterface
+        public String rulesList() { return LqIntercept.listRulesJson(); }
+
+        @JavascriptInterface
+        public String ruleSave(String json) { return LqIntercept.saveRule(json); }
+
+        @JavascriptInterface
+        public boolean ruleDel(String id) { return LqIntercept.delRule(id); }
+
+        @JavascriptInterface
+        public boolean ruleEnable(String id, boolean en) { return LqIntercept.setRuleEnabled(id, en); }
+
+        @JavascriptInterface
+        public int ruleCount() { return LqIntercept.ruleCount(); }
+
+        /* ==================== [v141] 断点 ==================== */
+
+        @JavascriptInterface
+        public String bpsList() { return LqIntercept.listBpsJson(); }
+
+        @JavascriptInterface
+        public String bpSave(String json) { return LqIntercept.saveBp(json); }
+
+        @JavascriptInterface
+        public boolean bpDel(String id) { return LqIntercept.delBp(id); }
+
+        @JavascriptInterface
+        public boolean bpEnable(String id, boolean en) { return LqIntercept.setBpEnabled(id, en); }
+
+        /** 被断点拦下、正在等决定的消息 */
+        @JavascriptInterface
+        public String pendingList() { return LqIntercept.listPendingJson(); }
+
+        @JavascriptInterface
+        public int pendingCount() { return LqIntercept.pendingCount(); }
+
+        /** action: 1=放行 2=丢弃；newHead / newBodyB64 留空表示用原值 */
+        @JavascriptInterface
+        public boolean pendingDecide(long pid, int action, String newHead, String newBodyB64) {
+            return LqIntercept.decide(pid, action, newHead, newBodyB64);
+        }
+
+        /** 一键放行所有挂起的请求（避免用户走开后连接一直挂着） */
+        @JavascriptInterface
+        public boolean pendingReleaseAll() { return LqIntercept.releaseAll(); }
+
+        /* ==================== [v141] 改包重发 ==================== */
+
+        /**
+         * 同步重发：编辑后的请求头 + 请求体直接发出去，返回响应 JSON。
+         * 给 AI 工具用（AI 需要拿到结果才能继续分析）。
+         */
+        @JavascriptInterface
+        public String replay(String host, String head, String bodyB64, int timeoutMs) {
+            try {
+                return CaptureReplay.send(host, head, bodyB64, timeoutMs <= 0 ? 20000 : timeoutMs);
+            } catch (Throwable t) {
+                return "{\"ok\":false,\"error\":\"" + t.getClass().getSimpleName() + "\"}";
+            }
+        }
+
+        /**
+         * 异步重发：界面用。避免 20 秒阻塞把 WebView 卡住。
+         * 结果通过 window.__lqReplayCb(cbId, json) 回调。
+         */
+        @JavascriptInterface
+        public void replayAsync(final String host, final String head,
+                                final String bodyB64, final int timeoutMs, final String cbId) {
+            new Thread(new Runnable() {
+                public void run() {
+                    String r;
+                    try {
+                        r = CaptureReplay.send(host, head, bodyB64, timeoutMs <= 0 ? 20000 : timeoutMs);
+                    } catch (Throwable t) {
+                        r = "{\"ok\":false,\"error\":\"" + t.getClass().getSimpleName() + "\"}";
+                    }
+                    final String res = r;
+                    runOnUiThread(new Runnable() {
+                        public void run() {
+                            try {
+                                String js = "window.__lqReplayCb && window.__lqReplayCb("
+                                        + JSONObject.quote(cbId == null ? "" : cbId) + ","
+                                        + JSONObject.quote(res) + ")";
+                                webView.evaluateJavascript(js, null);
+                            } catch (Throwable ignore) {}
+                        }
+                    });
+                }
+            }, "lq-replay").start();
         }
     }
 

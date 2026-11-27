@@ -87,9 +87,19 @@ public class CaptureVpnService extends VpnService {
         return s != null && s.running;
     }
 
+    /**
+     * [v141] 拿当前 VPN 服务实例，供「改包重发」调用 protect()。
+     * 不 protect 的话重发的请求会被自己的 VPN 再抓一次，形成死循环。
+     * 没在抓包时返回 null，重发仍然能用（只是走普通网络）。
+     */
+    public static VpnService vpn() {
+        return instance;
+    }
+
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         restoreDecrypt(this);   // [v129] 每次启动都从磁盘恢复解密开关
+        try { LqIntercept.init(this); } catch (Throwable ignore) {}   // [v141] 加载重写规则 / 断点
         String action = intent != null ? intent.getAction() : null;
         if (ACTION_STOP.equals(action)) {
             stopCapture();
